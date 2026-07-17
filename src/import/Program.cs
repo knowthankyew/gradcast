@@ -245,6 +245,10 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
 {
     Console.WriteLine($"Importing field of study data from: {Path.GetFileName(csvPath)}");
 
+    // Pre-load all known school IDs to skip programs referencing schools not in our DB
+    var knownSchoolIds = new HashSet<int>(await db.Schools.Select(s => s.Id).ToListAsync());
+    Console.WriteLine($"  {knownSchoolIds.Count:N0} known schools in database.");
+
     using var reader = new StreamReader(csvPath);
     using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
     {
@@ -259,6 +263,7 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
     var batchSize = 1000;
     var batch = new List<GradCast.Data.Entities.Program>(batchSize);
     var totalRows = 0;
+    var skippedRows = 0;
 
     while (await csv.ReadAsync())
     {
@@ -267,6 +272,13 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
         var credLevel = ParseInt(csv.GetField("CREDLEV"));
 
         if (unitId == null || string.IsNullOrEmpty(cipCode) || credLevel == null) continue;
+
+        // Skip programs for schools we don't have
+        if (!knownSchoolIds.Contains(unitId.Value))
+        {
+            skippedRows++;
+            continue;
+        }
 
         // Skip aggregate rows (2-digit CIP codes like "01" without sub-detail)
         if (cipCode.Length <= 3) continue;
@@ -298,7 +310,7 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
     if (batch.Count > 0)
         await FlushProgramBatchAsync(db, batch);
 
-    Console.WriteLine($"\r  Processed {totalRows:N0} programs. Done.");
+    Console.WriteLine($"\r  Processed {totalRows:N0} programs ({skippedRows:N0} skipped — no matching school). Done.");
 }
 
 static async Task FlushProgramBatchAsync(GradCastDbContext db, List<GradCast.Data.Entities.Program> programs)
