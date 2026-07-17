@@ -13,11 +13,27 @@ builder.Services.Configure<CollegeScorecardOptions>(
 // Data source mode: "local" uses SQLite, "api" uses remote, "hybrid" uses local + API fallback
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";
 
+// Resolve database path: if relative, resolve from the solution root (two levels up from src/api)
+string ResolveDatabasePath(string? configuredPath)
+{
+    var path = configuredPath ?? "gradcast.db";
+    if (Path.IsPathRooted(path)) return path;
+
+    // Walk up from the content root to find the solution root (where .slnx lives)
+    var dir = new DirectoryInfo(builder.Environment.ContentRootPath);
+    while (dir != null && !dir.GetFiles("*.slnx").Any() && !dir.GetFiles("*.sln").Any())
+    {
+        dir = dir.Parent;
+    }
+
+    var solutionRoot = dir?.FullName ?? Directory.GetCurrentDirectory();
+    return Path.Combine(solutionRoot, path);
+}
+
 if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
 {
     // Local SQLite mode — requires running the import tool first
-    var dbPath = builder.Configuration.GetValue<string>("DatabasePath")
-        ?? Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+    var dbPath = ResolveDatabasePath(builder.Configuration.GetValue<string>("DatabasePath"));
 
     builder.Services.AddDbContext<GradCastDbContext>(options =>
         options.UseSqlite($"Data Source={dbPath}"));
@@ -29,8 +45,7 @@ if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
 else if (dataSource.Equals("hybrid", StringComparison.OrdinalIgnoreCase))
 {
     // Hybrid mode — local DB for imported data, API fallback for everything else
-    var dbPath = builder.Configuration.GetValue<string>("DatabasePath")
-        ?? Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+    var dbPath = ResolveDatabasePath(builder.Configuration.GetValue<string>("DatabasePath"));
 
     builder.Services.AddDbContext<GradCastDbContext>(options =>
         options.UseSqlite($"Data Source={dbPath}"));
