@@ -36,6 +36,7 @@
         <template v-if="store.selectedSchool && !detailLoading">
           <SchoolDetail :school="store.selectedSchool" />
           <ProgramList :programs="store.selectedSchool.programs" />
+          <BudgetSimulator v-if="store.canSimulate" />
         </template>
 
         <v-card v-if="!store.selectedSchool && !detailLoading && !error" class="text-center pa-8" variant="tonal">
@@ -63,6 +64,7 @@ import SchoolDetail from './components/SchoolDetail.vue'
 import ProgramList from './components/ProgramList.vue'
 import YearSelector from './components/YearSelector.vue'
 import LocationSelector from './components/LocationSelector.vue'
+import BudgetSimulator from './components/BudgetSimulator.vue'
 import { useSchoolApi } from './composables/useSchoolApi'
 import { useAppStore } from './stores/appStore'
 
