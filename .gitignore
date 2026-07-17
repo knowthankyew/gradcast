@@ -33,3 +33,8 @@ Thumbs.db
 
 # Build output
 src/web/dist/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
