@@ -40,7 +40,19 @@
         </v-col>
 
         <v-col cols="12" sm="6" md="4">
-          <div class="text-caption text-medium-emphasis">Completion Rate (150% time)</div>
+          <div class="text-caption text-medium-emphasis d-inline-flex align-center">
+            Completion Rate
+            <v-tooltip location="bottom" max-width="320">
+              <template #activator="{ props: tooltipProps }">
+                <v-icon v-bind="tooltipProps" size="x-small" class="ml-1" color="grey">mdi-information-outline</v-icon>
+              </template>
+              <span>
+                Measured at "150% time" — meaning students who finished within 1.5x the
+                expected program length (e.g., 6 years for a 4-year degree). This is the
+                federal standard for measuring on-time graduation.
+              </span>
+            </v-tooltip>
+          </div>
           <div class="text-h6">
             {{ school.completionRate != null ? formatPercent(school.completionRate) : 'N/A' }}
           </div>
