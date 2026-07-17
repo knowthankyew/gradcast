@@ -119,12 +119,14 @@ public class BudgetSimulatorService
         }
 
         // Fall back to school-wide median across all programs
-        var schoolMedian = await _db.Programs
+        var earningsList = await _db.Programs
             .Where(p => p.SchoolId == request.SchoolId && p.MedianEarnings.HasValue)
             .Select(p => p.MedianEarnings!.Value)
-            .DefaultIfEmpty(0)
-            .AverageAsync(ct);
+            .ToListAsync(ct);
 
+        if (earningsList.Count == 0) return 0;
+
+        var schoolMedian = earningsList.Average();
         return schoolMedian > 0 ? Math.Round(schoolMedian, 0) : 0;
     }
 
