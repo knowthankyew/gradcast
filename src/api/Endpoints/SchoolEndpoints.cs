@@ -60,12 +60,21 @@ public static class SchoolEndpoints
 
     private static async Task<IResult> GetSchoolDetail(
         int id,
+        [FromQuery] int? year,
         ICollegeScorecardService service,
         CancellationToken ct)
     {
+        if (year.HasValue && (year.Value < 2000 || year.Value > DateTime.UtcNow.Year))
+        {
+            return Results.Problem(
+                title: "Invalid year",
+                detail: $"Year must be between 2000 and {DateTime.UtcNow.Year}.",
+                statusCode: 400);
+        }
+
         try
         {
-            var detail = await service.GetSchoolDetailAsync(id, ct);
+            var detail = await service.GetSchoolDetailAsync(id, year, ct);
             if (detail is null)
             {
                 return Results.Problem(

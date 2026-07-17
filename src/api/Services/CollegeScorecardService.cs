@@ -81,9 +81,10 @@ public class CollegeScorecardService : ICollegeScorecardService
         return schools;
     }
 
-    public async Task<SchoolDetail?> GetSchoolDetailAsync(int schoolId, CancellationToken ct = default)
+    public async Task<SchoolDetail?> GetSchoolDetailAsync(int schoolId, int? year = null, CancellationToken ct = default)
     {
-        var cacheKey = $"school_detail_{schoolId}";
+        var dataPrefix = year.HasValue ? year.Value.ToString() : "latest";
+        var cacheKey = $"school_detail_{schoolId}_{dataPrefix}";
         if (_cache.TryGetValue(cacheKey, out SchoolDetail? cached))
         {
             return cached;
@@ -96,12 +97,12 @@ public class CollegeScorecardService : ICollegeScorecardService
             "school.state",
             "school.school_url",
             "school.ownership",
-            "latest.admissions.admission_rate.overall",
-            "latest.student.size",
-            "latest.cost.tuition.in_state",
-            "latest.cost.tuition.out_of_state",
-            "latest.completion.rate_suppressed.overall",
-            "latest.programs.cip_4_digit"
+            $"{dataPrefix}.admissions.admission_rate.overall",
+            $"{dataPrefix}.student.size",
+            $"{dataPrefix}.cost.tuition.in_state",
+            $"{dataPrefix}.cost.tuition.out_of_state",
+            $"{dataPrefix}.completion.rate_suppressed.overall",
+            $"{dataPrefix}.programs.cip_4_digit"
         );
 
         var url = $"{_options.BaseUrl}/schools?api_key={_options.ApiKey}" +
@@ -121,16 +122,16 @@ public class CollegeScorecardService : ICollegeScorecardService
         }
 
         var item = results[0];
-        var detail = MapSchoolDetail(item);
+        var detail = MapSchoolDetail(item, dataPrefix);
 
         _cache.Set(cacheKey, detail, CacheDuration);
         return detail;
     }
 
-    private SchoolDetail MapSchoolDetail(JsonElement item)
+    private SchoolDetail MapSchoolDetail(JsonElement item, string dataPrefix)
     {
         var ownership = GetIntOrDefault(item, "school.ownership");
-        var programs = MapPrograms(item);
+        var programs = MapPrograms(item, dataPrefix);
 
         return new SchoolDetail(
             Id: item.GetProperty("id").GetInt32(),
@@ -140,20 +141,20 @@ public class CollegeScorecardService : ICollegeScorecardService
             SchoolUrl: GetStringOrNull(item, "school.school_url"),
             Ownership: ownership,
             OwnershipName: OwnershipTypes.GetValueOrDefault(ownership, "Unknown"),
-            AdmissionRate: GetDecimalOrNull(item, "latest.admissions.admission_rate.overall"),
-            StudentSize: GetNullableInt(item, "latest.student.size"),
-            TuitionInState: GetNullableInt(item, "latest.cost.tuition.in_state"),
-            TuitionOutOfState: GetNullableInt(item, "latest.cost.tuition.out_of_state"),
-            CompletionRate: GetDecimalOrNull(item, "latest.completion.rate_suppressed.overall"),
+            AdmissionRate: GetDecimalOrNull(item, $"{dataPrefix}.admissions.admission_rate.overall"),
+            StudentSize: GetNullableInt(item, $"{dataPrefix}.student.size"),
+            TuitionInState: GetNullableInt(item, $"{dataPrefix}.cost.tuition.in_state"),
+            TuitionOutOfState: GetNullableInt(item, $"{dataPrefix}.cost.tuition.out_of_state"),
+            CompletionRate: GetDecimalOrNull(item, $"{dataPrefix}.completion.rate_suppressed.overall"),
             Programs: programs
         );
     }
 
-    private List<ProgramData> MapPrograms(JsonElement item)
+    private List<ProgramData> MapPrograms(JsonElement item, string dataPrefix)
     {
         var programs = new List<ProgramData>();
 
-        if (!item.TryGetProperty("latest.programs.cip_4_digit", out var programsArray) ||
+        if (!item.TryGetProperty($"{dataPrefix}.programs.cip_4_digit", out var programsArray) ||
             programsArray.ValueKind != JsonValueKind.Array)
         {
             return programs;

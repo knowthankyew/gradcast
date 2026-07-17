@@ -14,6 +14,8 @@
       <v-container class="py-6" style="max-width: 1100px;">
         <SchoolSearch @school-selected="onSchoolSelected" />
 
+        <YearSelector v-if="currentSchoolId" @year-changed="onYearChanged" />
+
         <v-alert
           v-if="error"
           type="error"
@@ -54,14 +56,27 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import SchoolSearch from './components/SchoolSearch.vue'
 import SchoolDetail from './components/SchoolDetail.vue'
 import ProgramList from './components/ProgramList.vue'
+import YearSelector from './components/YearSelector.vue'
 import { useSchoolApi } from './composables/useSchoolApi'
 
 const { schoolDetail, detailLoading, error, getSchoolDetail } = useSchoolApi()
 
+const currentSchoolId = ref<number | null>(null)
+const selectedYear = ref<number | null>(null)
+
 async function onSchoolSelected(id: number) {
-  await getSchoolDetail(id)
+  currentSchoolId.value = id
+  await getSchoolDetail(id, selectedYear.value)
+}
+
+async function onYearChanged(year: number | null) {
+  selectedYear.value = year
+  if (currentSchoolId.value) {
+    await getSchoolDetail(currentSchoolId.value, year)
+  }
 }
 </script>

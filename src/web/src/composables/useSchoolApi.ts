@@ -42,12 +42,18 @@ export function useSchoolApi() {
     }
   }
 
-  async function getSchoolDetail(id: number): Promise<SchoolDetail | null> {
+  async function getSchoolDetail(id: number, year?: number | null): Promise<SchoolDetail | null> {
     detailLoading.value = true
     error.value = null
 
     try {
-      const response = await fetch(`/api/schools/${id}`)
+      const params = new URLSearchParams()
+      if (year) {
+        params.append('year', year.toString())
+      }
+      const queryString = params.toString()
+      const url = `/api/schools/${id}${queryString ? '?' + queryString : ''}`
+      const response = await fetch(url)
 
       if (!response.ok) {
         const problem = await response.json().catch(() => null)
