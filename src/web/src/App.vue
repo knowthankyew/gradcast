@@ -61,9 +61,13 @@
     </v-main>
 
     <v-footer app class="text-center text-caption text-medium-emphasis pa-4">
-      Data provided by the U.S. Department of Education
+      Data provided by the
       <a href="https://collegescorecard.ed.gov/" target="_blank" rel="noopener" class="ml-1">
-        College Scorecard
+        U.S. Dept. of Education
+      </a>
+      &amp;
+      <a href="https://www.huduser.gov/portal/datasets/fmr.html" target="_blank" rel="noopener" class="ml-1">
+        HUD Fair Market Rents
       </a>
     </v-footer>
   </v-app>

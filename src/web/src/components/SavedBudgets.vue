@@ -115,7 +115,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { BudgetSimulation } from '../composables/useBudgetSimulator'
 import { useSavedBudgets } from '../composables/useSavedBudgets'
 import { useAppStore } from '../stores/appStore'
@@ -131,7 +131,7 @@ const newName = ref('')
 const justSaved = ref(false)
 const showClearConfirm = ref(false)
 
-const canSave = props.simulation !== null
+const canSave = computed(() => props.simulation !== null)
 
 function onSave() {
   if (!newName.value.trim() || !props.simulation) return
