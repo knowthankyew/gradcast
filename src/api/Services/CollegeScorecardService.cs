@@ -218,8 +218,12 @@ public class CollegeScorecardService : ICollegeScorecardService
         {
             var code = GetStringOrDefault(prog, "code");
             var title = GetStringOrDefault(prog, "title");
-            var credLevel = GetIntOrDefault(prog, "credential.level");
-            var completions = GetNullableInt(prog, "counts.ipeds_awards1");
+
+            // credential.level comes as nested object: {"credential": {"level": 3}}
+            var credLevel = GetNestedInt(prog, "credential", "level") ?? 0;
+
+            // counts.ipeds_awards1 comes as nested object: {"counts": {"ipeds_awards1": 12}}
+            var completions = GetNestedInt(prog, "counts", "ipeds_awards1");
 
             decimal? earnings = null;
             if (prog.TryGetProperty("earnings", out var earningsObj) &&
@@ -286,6 +290,18 @@ public class CollegeScorecardService : ICollegeScorecardService
         el.TryGetProperty(prop, out var val) && val.ValueKind == JsonValueKind.Number
             ? val.GetDecimal()
             : null;
+
+    private static int? GetNestedInt(JsonElement el, string parent, string child)
+    {
+        if (el.TryGetProperty(parent, out var parentEl) &&
+            parentEl.ValueKind == JsonValueKind.Object &&
+            parentEl.TryGetProperty(child, out var childEl) &&
+            childEl.ValueKind == JsonValueKind.Number)
+        {
+            return childEl.GetInt32();
+        }
+        return null;
+    }
 }
 
 public class CollegeScorecardApiException : Exception
