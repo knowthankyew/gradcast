@@ -170,7 +170,7 @@ App.vue
 - Group programs under their category, sort categories alphabetically, sort programs within by completion count descending.
 
 ### UI Framework
-- Vuetify 3 with default Material Design theme (customized brand colors).
+- Vuetify 4 with default Material Design theme (customized brand colors).
 - Key Vuetify components used:
   - `v-autocomplete` — type-ahead school search with built-in debounce, keyboard nav, ARIA.
   - `v-card` — school detail overview.
@@ -307,8 +307,8 @@ public record JobPulseResult(
 ### Phase 2 Services
 
 #### LocationService
-- Queries local SQLite table of ~930 US CBSAs for autocomplete
-- Pre-seeded during import (small static dataset, included in repo or import tool)
+- Queries local SQLite table of 156 major US metro areas (top CBSAs by population)
+- Pre-seeded during import from static seed data; full Census delineation (~930 CBSAs) available as future enhancement
 
 #### HousingCostService
 - Queries HUD FMR data by CBSA code and bedroom count

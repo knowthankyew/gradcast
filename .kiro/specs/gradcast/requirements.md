@@ -66,7 +66,7 @@ GradCast is a single-page application (C# backend / Vue.js frontend) that allows
 
 #### FR-5: Post-Graduation Target Location Selector
 - **FR-5.1**: User can search and select a target metro area (CBSA) where they plan to live after graduation.
-- **FR-5.2**: Location search uses type-ahead autocomplete against a local dataset of ~930 US CBSAs.
+- **FR-5.2**: Location search uses type-ahead autocomplete against a local dataset of 156 major US metro areas (expandable to full ~930 CBSAs via Census import).
 - **FR-5.3**: User selects a housing preference: "Live alone (1-Bed)" or "Have a roommate (Shared 2-Bed)."
 - **FR-5.4**: Selected location persists across views and feeds into budget calculations.
 - **FR-5.5**: UI placed as a "Target Destination" card between school search and school detail.
@@ -126,6 +126,6 @@ GradCast is a single-page application (C# backend / Vue.js frontend) that allows
 ## Decisions
 1. **State/city filter**: Yes — include optional state filter alongside name search.
 2. **Median earnings**: Include in Phase 1 — per-program median earnings 1 year after graduation.
-3. **UI Framework**: Vuetify 3 (Material Design, Bootstrap-familiar grid system).
-4. **Component library**: Vuetify 3 provides autocomplete, expansion panels, cards, data tables.
+3. **UI Framework**: Vuetify 4 (Material Design, Bootstrap-familiar grid system).
+4. **Component library**: Vuetify 4 provides autocomplete, expansion panels, cards, data tables.
 5. **Portfolio goal**: This is a GitHub portfolio piece to demonstrate C#/Vue.js skills and show investors a tangible PoC of the GradCast vision.
