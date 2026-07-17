@@ -38,6 +38,15 @@ builder.Services.AddSingleton<TaxCalculationService>();
 builder.Services.AddSingleton<LoanAmortizationService>();
 builder.Services.AddScoped<BudgetSimulatorService>();
 
+// Job Pulse (Adzuna API — graceful fallback if unconfigured)
+builder.Services.Configure<AdzunaOptions>(
+    builder.Configuration.GetSection(AdzunaOptions.SectionName));
+builder.Services.AddHttpClient<IJobPulseService, AdzunaJobPulseService>(client =>
+{
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(15);
+});
+
 // College Scorecard data source mode: "local", "api", or "hybrid"
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";
 
@@ -98,5 +107,6 @@ app.UseCors();
 app.MapSchoolEndpoints();
 app.MapLocationEndpoints();
 app.MapFinanceEndpoints();
+app.MapJobEndpoints();
 
 app.Run();
