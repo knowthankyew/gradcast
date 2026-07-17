@@ -10,7 +10,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<CollegeScorecardOptions>(
     builder.Configuration.GetSection(CollegeScorecardOptions.SectionName));
 
-// Data source mode: "local" uses SQLite, "api" uses the remote College Scorecard API
+// Data source mode: "local" uses SQLite, "api" uses remote, "hybrid" uses local + API fallback
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";
 
 if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
@@ -25,6 +25,26 @@ if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
     builder.Services.AddScoped<ICollegeScorecardService, LocalCollegeScorecardService>();
 
     Console.WriteLine($"[GradCast] Using LOCAL data source: {dbPath}");
+}
+else if (dataSource.Equals("hybrid", StringComparison.OrdinalIgnoreCase))
+{
+    // Hybrid mode — local DB for imported data, API fallback for everything else
+    var dbPath = builder.Configuration.GetValue<string>("DatabasePath")
+        ?? Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+
+    builder.Services.AddDbContext<GradCastDbContext>(options =>
+        options.UseSqlite($"Data Source={dbPath}"));
+
+    builder.Services.AddHttpClient<CollegeScorecardService>(client =>
+    {
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+
+    builder.Services.AddScoped<LocalCollegeScorecardService>();
+    builder.Services.AddScoped<ICollegeScorecardService, HybridCollegeScorecardService>();
+
+    Console.WriteLine($"[GradCast] Using HYBRID data source: local ({dbPath}) + API fallback");
 }
 else
 {
