@@ -1,10 +1,26 @@
 <template>
-  <v-card v-if="categories.length > 0" elevation="2">
+  <v-card v-if="categories.length > 0" elevation="2" class="mb-6">
     <v-card-title class="d-flex align-center">
       <v-icon class="mr-2">mdi-book-open-variant</v-icon>
       Programs by Department
       <v-chip class="ml-3" size="small" color="primary" variant="tonal">
         {{ categories.length }} categories
+      </v-chip>
+      <v-spacer />
+      <v-chip
+        v-if="store.selectedProgram"
+        color="accent"
+        variant="elevated"
+        size="small"
+        closable
+        @click:close="store.clearProgram()"
+      >
+        <v-icon start size="small">mdi-check-circle</v-icon>
+        {{ store.selectedProgram.title }}
+      </v-chip>
+      <v-chip v-else size="small" variant="tonal" color="grey">
+        <v-icon start size="small">mdi-cursor-default-click</v-icon>
+        Click a program to use its earnings data
       </v-chip>
     </v-card-title>
 
@@ -28,7 +44,7 @@
           </v-expansion-panel-title>
 
           <v-expansion-panel-text>
-            <v-table density="compact">
+            <v-table density="compact" hover>
               <thead>
                 <tr>
                   <th>Program</th>
@@ -38,8 +54,22 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="program in category.programs" :key="`${program.code}-${program.credentialLevel}`">
-                  <td>{{ program.title }}</td>
+                <tr
+                  v-for="program in category.programs"
+                  :key="`${program.code}-${program.credentialLevel}`"
+                  :class="{ 'program-selected': isSelected(program) }"
+                  class="program-row"
+                  @click="selectProgram(program)"
+                >
+                  <td>
+                    <v-icon
+                      v-if="isSelected(program)"
+                      size="x-small"
+                      color="accent"
+                      class="mr-1"
+                    >mdi-check-circle</v-icon>
+                    {{ program.title }}
+                  </td>
                   <td>
                     <v-chip size="x-small" :color="credentialColor(program.credentialLevel)">
                       {{ program.credentialName }}
@@ -68,10 +98,13 @@
 import { computed } from 'vue'
 import type { ProgramData, ProgramCategory } from '../types'
 import { cipCategories } from '../data/cipCategories'
+import { useAppStore } from '../stores/appStore'
 
 const props = defineProps<{
   programs: ProgramData[]
 }>()
+
+const store = useAppStore()
 
 const categories = computed<ProgramCategory[]>(() => {
   const grouped = new Map<string, ProgramData[]>()
@@ -100,6 +133,23 @@ const categories = computed<ProgramCategory[]>(() => {
   return result.sort((a, b) => a.name.localeCompare(b.name))
 })
 
+function isSelected(program: ProgramData): boolean {
+  return store.selectedProgram?.cipCode === program.code &&
+         store.selectedProgram?.credentialName === program.credentialName
+}
+
+function selectProgram(program: ProgramData) {
+  if (isSelected(program)) {
+    store.clearProgram()
+  } else {
+    store.setProgram({
+      cipCode: program.code,
+      title: program.title,
+      credentialName: program.credentialName,
+    })
+  }
+}
+
 function credentialColor(level: number): string {
   switch (level) {
     case 1: return 'grey'
@@ -121,3 +171,16 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 </script>
+
+<style scoped>
+.program-row {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.program-row:hover {
+  background-color: rgba(var(--v-theme-primary), 0.04);
+}
+.program-selected {
+  background-color: rgba(var(--v-theme-accent), 0.08) !important;
+}
+</style>

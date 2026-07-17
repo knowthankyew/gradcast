@@ -37,7 +37,7 @@ export function useBudgetSimulator() {
     try {
       const body = {
         schoolId: store.selectedSchoolId,
-        cipCode: null as string | null,
+        cipCode: store.selectedProgram?.cipCode ?? null,
         cbsaCode: store.selectedLocation!.cbsaCode,
         housingType: store.housingType,
         salaryOverride: salaryOverride ?? null,
@@ -63,9 +63,15 @@ export function useBudgetSimulator() {
     }
   }
 
-  // Auto-run simulation when inputs change
+  // Auto-run simulation when any relevant input changes
+  // immediate: true ensures it fires on first render if canSimulate is already true
   watch(
-    () => [store.selectedSchoolId, store.selectedLocation, store.housingType],
+    () => [
+      store.selectedSchoolId,
+      store.selectedLocation?.cbsaCode,
+      store.housingType,
+      store.selectedProgram?.cipCode,
+    ],
     () => {
       if (store.canSimulate) {
         runSimulation()
@@ -73,7 +79,7 @@ export function useBudgetSimulator() {
         simulation.value = null
       }
     },
-    { deep: true }
+    { immediate: true }
   )
 
   return {

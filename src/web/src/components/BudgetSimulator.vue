@@ -161,11 +161,15 @@
       </template>
     </v-card-text>
   </v-card>
+
+  <!-- Saved scenarios -->
+  <SavedBudgets :simulation="sim" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useBudgetSimulator } from '../composables/useBudgetSimulator'
+import SavedBudgets from './SavedBudgets.vue'
 
 const { simulation: sim, loading, error, runSimulation } = useBudgetSimulator()
 

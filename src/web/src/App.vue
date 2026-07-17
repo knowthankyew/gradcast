@@ -12,12 +12,16 @@
 
     <v-main>
       <v-container class="py-6" style="max-width: 1100px;">
+
+        <!-- Step 1: Search for a school -->
         <SchoolSearch @school-selected="onSchoolSelected" />
 
-        <LocationSelector v-if="store.hasSchool" />
+        <!-- Loading -->
+        <div v-if="detailLoading" class="d-flex justify-center my-8">
+          <v-progress-circular indeterminate color="primary" size="48" />
+        </div>
 
-        <YearSelector v-if="store.hasSchool" @year-changed="onYearChanged" />
-
+        <!-- Error -->
         <v-alert
           v-if="error"
           type="error"
@@ -29,21 +33,28 @@
           {{ error }}
         </v-alert>
 
-        <div v-if="detailLoading" class="d-flex justify-center my-8">
-          <v-progress-circular indeterminate color="primary" size="48" />
-        </div>
+        <!-- Step 2: School detail + year selector (after school selected) -->
+        <template v-if="store.hasSchool && !detailLoading">
+          <SchoolDetail :school="store.selectedSchool!" />
+          <YearSelector @year-changed="onYearChanged" />
 
-        <template v-if="store.selectedSchool && !detailLoading">
-          <SchoolDetail :school="store.selectedSchool" />
-          <ProgramList :programs="store.selectedSchool.programs" />
+          <!-- Step 3: Program selection (after school loads) -->
+          <ProgramList :programs="store.selectedSchool!.programs" />
+
+          <!-- Step 4: Target destination (after school loads — program optional) -->
+          <LocationSelector />
+
+          <!-- Step 5: Budget simulation (after location selected) -->
           <BudgetSimulator v-if="store.canSimulate" />
         </template>
 
-        <v-card v-if="!store.selectedSchool && !detailLoading && !error" class="text-center pa-8" variant="tonal">
+        <!-- Empty state -->
+        <v-card v-if="!store.hasSchool && !detailLoading && !error" class="text-center pa-8" variant="tonal">
           <v-icon size="64" color="primary" class="mb-4">mdi-magnify</v-icon>
           <div class="text-h6 mb-2">Search for a school to get started</div>
           <div class="text-body-2 text-medium-emphasis">
             Explore graduation rates, program data, and median earnings across U.S. colleges and universities.
+            Then pick a target city to see your post-graduation budget.
           </div>
         </v-card>
       </v-container>
