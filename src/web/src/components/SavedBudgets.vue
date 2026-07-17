@@ -63,9 +63,10 @@
             {{ budget.name }}
           </v-list-item-title>
           <v-list-item-subtitle>
-            {{ budget.schoolName }}
-            <span v-if="budget.programTitle"> &middot; {{ budget.programTitle }}</span>
-            &middot; {{ budget.locationName }}
+            {{ budget.context.schoolName }}
+            <span v-if="budget.context.programTitle"> &middot; {{ budget.context.programTitle }}</span>
+            &middot; {{ budget.context.locationName }}
+            &middot; {{ budget.context.housingType === '2bed' ? 'Roommate' : 'Alone' }}
           </v-list-item-subtitle>
           <v-list-item-subtitle>
             <span class="font-weight-medium" :class="'text-' + statusColor(budget.simulation.incomeStatus)">
@@ -77,10 +78,19 @@
 
           <template #append>
             <v-btn
+              icon="mdi-reload"
+              variant="text"
+              size="small"
+              color="primary"
+              title="Load this scenario"
+              @click="onLoad(budget)"
+            />
+            <v-btn
               icon="mdi-delete"
               variant="text"
               size="small"
               color="grey"
+              title="Delete"
               @click="onDelete(budget.id)"
             />
           </template>
@@ -117,8 +127,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { BudgetSimulation } from '../composables/useBudgetSimulator'
-import { useSavedBudgets } from '../composables/useSavedBudgets'
+import { useSavedBudgets, type SavedBudget } from '../composables/useSavedBudgets'
 import { useAppStore } from '../stores/appStore'
+import { useSchoolApi } from '../composables/useSchoolApi'
 
 const props = defineProps<{
   simulation: BudgetSimulation | null
@@ -126,6 +137,7 @@ const props = defineProps<{
 
 const store = useAppStore()
 const { savedBudgets, saveBudget, deleteBudget, clearAll } = useSavedBudgets()
+const { getSchoolDetail } = useSchoolApi()
 
 const newName = ref('')
 const justSaved = ref(false)
@@ -137,16 +149,61 @@ function onSave() {
   if (!newName.value.trim() || !props.simulation) return
 
   saveBudget(
+    {
+      schoolId: store.selectedSchoolId!,
+      schoolName: store.selectedSchool?.name ?? 'Unknown School',
+      programCipCode: store.selectedProgram?.cipCode ?? null,
+      programTitle: store.selectedProgram?.title ?? null,
+      programCredentialName: store.selectedProgram?.credentialName ?? null,
+      cbsaCode: store.selectedLocation!.cbsaCode,
+      locationName: store.selectedLocation!.name,
+      locationState: store.selectedLocation!.state,
+      housingType: store.housingType,
+    },
     newName.value.trim(),
-    store.selectedSchool?.name ?? 'Unknown School',
-    store.selectedProgram?.title ?? null,
-    store.selectedLocation?.name ?? 'Unknown Location',
     props.simulation
   )
 
   newName.value = ''
   justSaved.value = true
   setTimeout(() => { justSaved.value = false }, 3000)
+}
+
+async function onLoad(budget: SavedBudget) {
+  const ctx = budget.context
+
+  // Restore school (without clearing downstream state)
+  const school = await getSchoolDetail(ctx.schoolId)
+  if (school) {
+    store.restoreSchool(school)
+  }
+
+  // Restore program (if one was selected)
+  if (ctx.programCipCode && ctx.programTitle) {
+    store.setProgram({
+      cipCode: ctx.programCipCode,
+      title: ctx.programTitle,
+      credentialName: ctx.programCredentialName ?? '',
+    })
+  } else {
+    store.clearProgram()
+  }
+
+  // Restore location + housing type
+  store.setLocation({
+    cbsaCode: ctx.cbsaCode,
+    name: ctx.locationName,
+    state: ctx.locationState,
+  })
+  store.setHousingType(ctx.housingType)
+
+  // Scroll to simulator
+  setTimeout(() => {
+    document.querySelector('.v-card[class*="elevation-3"]')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    })
+  }, 500)
 }
 
 function onDelete(id: string) {

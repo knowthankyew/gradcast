@@ -1,13 +1,23 @@
 import { ref } from 'vue'
 import type { BudgetSimulation } from './useBudgetSimulator'
 
+export interface SavedBudgetContext {
+  schoolId: number
+  schoolName: string
+  programCipCode: string | null
+  programTitle: string | null
+  programCredentialName: string | null
+  cbsaCode: string
+  locationName: string
+  locationState: string
+  housingType: '1bed' | '2bed'
+}
+
 export interface SavedBudget {
   id: string
   name: string
   savedAt: string
-  schoolName: string
-  programTitle: string | null
-  locationName: string
+  context: SavedBudgetContext
   simulation: BudgetSimulation
 }
 
@@ -19,7 +29,10 @@ export function useSavedBudgets() {
   function loadFromStorage(): SavedBudget[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
-      return raw ? JSON.parse(raw) : []
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      // Handle legacy format (no context field)
+      return parsed.filter((b: any) => b.context || b.schoolName)
     } catch {
       return []
     }
@@ -29,20 +42,12 @@ export function useSavedBudgets() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBudgets.value))
   }
 
-  function saveBudget(
-    name: string,
-    schoolName: string,
-    programTitle: string | null,
-    locationName: string,
-    simulation: BudgetSimulation
-  ) {
+  function saveBudget(context: SavedBudgetContext, name: string, simulation: BudgetSimulation) {
     const entry: SavedBudget = {
       id: crypto.randomUUID(),
       name,
       savedAt: new Date().toISOString(),
-      schoolName,
-      programTitle,
-      locationName,
+      context,
       simulation,
     }
 

@@ -42,6 +42,12 @@ export const useAppStore = defineStore('app', () => {
     selectedLocation.value = null
   }
 
+  /** Restore school without clearing downstream state (used by load-back) */
+  function restoreSchool(school: SchoolDetail) {
+    selectedSchoolId.value = school.id
+    selectedSchool.value = school
+  }
+
   function setYear(year: number | null) {
     selectedYear.value = year
   }
@@ -85,6 +91,7 @@ export const useAppStore = defineStore('app', () => {
     hasLocation,
     canSimulate,
     setSchool,
+    restoreSchool,
     setYear,
     setProgram,
     setLocation,
