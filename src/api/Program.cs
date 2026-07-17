@@ -1,6 +1,8 @@
 using GradCast.Api.Configuration;
 using GradCast.Api.Endpoints;
 using GradCast.Api.Services;
+using GradCast.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,14 +10,35 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<CollegeScorecardOptions>(
     builder.Configuration.GetSection(CollegeScorecardOptions.SectionName));
 
-// HttpClient for College Scorecard API
-builder.Services.AddHttpClient<ICollegeScorecardService, CollegeScorecardService>(client =>
-{
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-    client.Timeout = TimeSpan.FromSeconds(30);
-});
+// Data source mode: "local" uses SQLite, "api" uses the remote College Scorecard API
+var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";
 
-// Caching
+if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
+{
+    // Local SQLite mode — requires running the import tool first
+    var dbPath = builder.Configuration.GetValue<string>("DatabasePath")
+        ?? Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+
+    builder.Services.AddDbContext<GradCastDbContext>(options =>
+        options.UseSqlite($"Data Source={dbPath}"));
+
+    builder.Services.AddScoped<ICollegeScorecardService, LocalCollegeScorecardService>();
+
+    Console.WriteLine($"[GradCast] Using LOCAL data source: {dbPath}");
+}
+else
+{
+    // Remote API mode — calls College Scorecard API directly
+    builder.Services.AddHttpClient<ICollegeScorecardService, CollegeScorecardService>(client =>
+    {
+        client.DefaultRequestHeaders.Add("Accept", "application/json");
+        client.Timeout = TimeSpan.FromSeconds(30);
+    });
+
+    Console.WriteLine("[GradCast] Using REMOTE data source: College Scorecard API");
+}
+
+// Caching (used by remote service; harmless if local)
 builder.Services.AddMemoryCache();
 
 // CORS for Vue dev server
