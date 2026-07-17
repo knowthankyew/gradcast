@@ -110,6 +110,11 @@ Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
 Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
 Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
 
+// Seed CBSA locations (static data, always runs)
+await SeedCbsaLocationsAsync(db);
+
+Console.WriteLine($"  CBSA Locations: {await db.CbsaLocations.CountAsync()}");
+
 if (cleanupWorkDir)
 {
     try { Directory.Delete(workDir, true); } catch { /* best effort */ }
@@ -118,6 +123,32 @@ if (cleanupWorkDir)
 return;
 
 // ─── Helper Methods ────────────────────────────────────────────────────────────
+
+static async Task SeedCbsaLocationsAsync(GradCastDbContext db)
+{
+    var existingCount = await db.CbsaLocations.CountAsync();
+    if (existingCount > 0)
+    {
+        Console.WriteLine($"  CBSA locations already seeded ({existingCount} records). Skipping.");
+        return;
+    }
+
+    Console.WriteLine("Seeding CBSA metro area data...");
+
+    foreach (var entry in GradCast.Data.SeedData.CbsaSeed.Metros)
+    {
+        db.CbsaLocations.Add(new GradCast.Data.Entities.CbsaLocation
+        {
+            CbsaCode = entry.Code,
+            Name = entry.Name,
+            State = entry.State,
+            Type = entry.Type,
+        });
+    }
+
+    await db.SaveChangesAsync();
+    Console.WriteLine($"  Seeded {GradCast.Data.SeedData.CbsaSeed.Metros.Length} CBSA metro areas.");
+}
 
 static string? FindCsvFile(string dir, string[] namePatterns)
 {
