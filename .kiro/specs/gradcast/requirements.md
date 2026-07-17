@@ -42,10 +42,11 @@ GradCast is a single-page application (C# backend / Vue.js frontend) that allows
 - School detail view loads within 2 seconds.
 
 #### NFR-2: Technology Stack
-- **Backend**: C# / ASP.NET Core 8 Minimal API.
+- **Backend**: C# / ASP.NET Core 10 Minimal API.
 - **Frontend**: Vue 3 (Composition API) + TypeScript + Vite.
-- **UI Framework**: Vuetify 3 (Material Design components for Vue 3).
+- **UI Framework**: Vuetify 4 (Material Design components for Vue 3).
 - **HTTP Client**: Backend uses `HttpClient` with typed responses.
+- **State Management**: Pinia (introduced in Phase 2 for cross-component shared state).
 - **Target Hosting**: GitHub portfolio project; designed to be deployable but runs locally for PoC.
 
 #### NFR-3: Developer Experience

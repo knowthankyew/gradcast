@@ -17,7 +17,7 @@
                              │ HTTP (JSON)
                              ▼
 ┌─────────────────────────────────────────────────────────┐
-│              ASP.NET Core 8 Minimal API                  │
+│              ASP.NET Core 10 Minimal API                 │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │  /api/schools│  │/api/schools/ │  │  Middleware   │  │
 │  │   /search    │  │  {id}/detail │  │  (caching,   │  │
@@ -259,14 +259,15 @@ public record CbsaLocation(
     string CbsaCode,        // "12060" (Atlanta)
     string Name,            // "Atlanta-Sandy Springs-Alpharetta, GA"
     string State,           // Primary state
-    string[] Counties       // FIPS codes for constituent counties
+    string[] FipsCodes      // Constituent county FIPS codes (for HUD FMR mapping)
 );
 ```
 
 #### HUD Fair Market Rent
 ```csharp
 public record FairMarketRent(
-    string CbsaCode,
+    string FipsCode,        // County-level FIPS (HUD's native key)
+    string? CbsaCode,       // Linked CBSA (null for non-metro counties)
     int Year,
     int Efficiency,         // Studio
     int OneBedroom,
@@ -353,8 +354,10 @@ App.vue
 
 ### Phase 2 State Management
 - Phase 2 introduces cross-component shared state (selected location affects budget, job pulse, etc.)
-- Introduce Pinia store: `useAppStore` with `selectedSchool`, `selectedLocation`, `housingType`, `selectedYear`
+- Introduce Pinia store at Task 16 (Location Selector): `useAppStore` with `selectedSchool`, `selectedLocation`, `housingType`, `selectedYear`
 - Composables consume store state reactively
+- Budget simulator endpoint uses ONLY local/fast data (Scorecard earnings, HUD rents, tax math) — never calls Adzuna
+- Job pulse widget fires independently on its own async endpoint to keep the dashboard snappy
 
 ### Phase 2 Import Tool Updates
 - Add HUD FMR CSV import (download from huduser.gov/portal/datasets/fmr.html)

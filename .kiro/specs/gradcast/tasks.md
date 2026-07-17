@@ -28,10 +28,11 @@
 - [ ] Create `GET /api/locations/search?q={query}` endpoint (top 10 matches)
 - [ ] Seed import tool with CBSA data (run alongside existing Scorecard import)
 
-### Task 16: Frontend Location Selector Component
+### Task 16: Frontend Location Selector Component + Pinia Store
+- [ ] Install Pinia and initialize `useAppStore` (selectedSchool, selectedLocation, housingType, selectedYear)
+- [ ] Migrate existing App.vue state into Pinia store
 - [ ] Create `LocationSelector.vue` with Vuetify `v-autocomplete` for metro areas
 - [ ] Add housing type toggle: "Live alone (1-Bed)" vs. "Roommate (Shared 2-Bed)"
-- [ ] Add Pinia store (`useAppStore`) for shared state: selectedLocation, housingType
 - [ ] Place component in App.vue between SchoolSearch and SchoolDetail
 - [ ] Only show when a school has been selected
 
