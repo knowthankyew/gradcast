@@ -128,6 +128,60 @@ public class CollegeScorecardService : ICollegeScorecardService
         return detail;
     }
 
+    public async Task<IReadOnlyList<TuitionTrendPoint>> GetTuitionTrendAsync(int schoolId, CancellationToken ct = default)
+    {
+        var cacheKey = $"tuition_trend_{schoolId}";
+        if (_cache.TryGetValue(cacheKey, out IReadOnlyList<TuitionTrendPoint>? cached))
+        {
+            return cached!;
+        }
+
+        var currentYear = DateTime.UtcNow.Year;
+        var years = Enumerable.Range(currentYear - 5, 5).ToList();
+
+        // Build a single request with multiple year fields to minimize API calls
+        var fields = new List<string> { "id" };
+        foreach (var year in years)
+        {
+            fields.Add($"{year}.cost.tuition.in_state");
+            fields.Add($"{year}.cost.tuition.out_of_state");
+        }
+
+        var url = $"{_options.BaseUrl}/schools?api_key={_options.ApiKey}" +
+                  $"&id={schoolId}" +
+                  $"&fields={string.Join(",", fields)}";
+
+        var response = await _httpClient.GetAsync(url, ct);
+        await EnsureSuccessOrThrow(response);
+
+        var json = await response.Content.ReadAsStringAsync(ct);
+        var doc = JsonDocument.Parse(json);
+        var results = doc.RootElement.GetProperty("results");
+
+        if (results.GetArrayLength() == 0)
+        {
+            return [];
+        }
+
+        var item = results[0];
+        var trend = new List<TuitionTrendPoint>();
+
+        foreach (var year in years)
+        {
+            var inState = GetNullableInt(item, $"{year}.cost.tuition.in_state");
+            var outOfState = GetNullableInt(item, $"{year}.cost.tuition.out_of_state");
+
+            // Only include years that have at least one data point
+            if (inState.HasValue || outOfState.HasValue)
+            {
+                trend.Add(new TuitionTrendPoint(year, inState, outOfState));
+            }
+        }
+
+        _cache.Set(cacheKey, (IReadOnlyList<TuitionTrendPoint>)trend, CacheDuration);
+        return trend;
+    }
+
     private SchoolDetail MapSchoolDetail(JsonElement item, string dataPrefix)
     {
         var ownership = GetIntOrDefault(item, "school.ownership");

@@ -79,18 +79,40 @@
           </div>
         </v-col>
       </v-row>
+
+      <v-btn
+        class="mt-4"
+        variant="tonal"
+        color="primary"
+        size="small"
+        :prepend-icon="showTrend ? 'mdi-chart-line-variant' : 'mdi-chart-line'"
+        @click="showTrend = !showTrend"
+      >
+        {{ showTrend ? 'Hide' : 'Show' }} Tuition Trend
+      </v-btn>
+
+      <div v-if="showTrend" class="mt-4">
+        <TuitionTrend :school-id="school.id" />
+      </div>
     </v-card-text>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { SchoolDetail } from '../types'
+import TuitionTrend from './TuitionTrend.vue'
 
 const props = defineProps<{
   school: SchoolDetail
 }>()
 
+const showTrend = ref(false)
+
+// Reset trend visibility when a different school is selected
+watch(() => props.school.id, () => {
+  showTrend.value = false
+})
 const ownershipColor = computed(() => {
   switch (props.school.ownership) {
     case 1: return 'blue'

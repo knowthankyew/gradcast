@@ -17,6 +17,10 @@ public static class SchoolEndpoints
         group.MapGet("/{id:int}", GetSchoolDetail)
              .WithName("GetSchoolDetail")
              .WithDescription("Get detailed school information including programs");
+
+        group.MapGet("/{id:int}/tuition-trend", GetTuitionTrend)
+             .WithName("GetTuitionTrend")
+             .WithDescription("Get 5-year tuition trend data for a school");
     }
 
     private static async Task<IResult> SearchSchools(
@@ -49,7 +53,7 @@ public static class SchoolEndpoints
                     ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
                 });
         }
-        catch (CollegeScorecardApiException ex)
+        catch (CollegeScorecardApiException)
         {
             return Results.Problem(
                 title: "Upstream API error",
@@ -96,7 +100,37 @@ public static class SchoolEndpoints
                     ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
                 });
         }
-        catch (CollegeScorecardApiException ex)
+        catch (CollegeScorecardApiException)
+        {
+            return Results.Problem(
+                title: "Upstream API error",
+                detail: "Unable to retrieve data from College Scorecard.",
+                statusCode: 502);
+        }
+    }
+
+    private static async Task<IResult> GetTuitionTrend(
+        int id,
+        ICollegeScorecardService service,
+        CancellationToken ct)
+    {
+        try
+        {
+            var trend = await service.GetTuitionTrendAsync(id, ct);
+            return Results.Ok(trend);
+        }
+        catch (CollegeScorecardRateLimitException ex)
+        {
+            return Results.Problem(
+                title: "Rate limit exceeded",
+                detail: "The upstream data provider is temporarily unavailable. Please try again later.",
+                statusCode: 503,
+                extensions: new Dictionary<string, object?>
+                {
+                    ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
+                });
+        }
+        catch (CollegeScorecardApiException)
         {
             return Results.Problem(
                 title: "Upstream API error",
