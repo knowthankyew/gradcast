@@ -59,11 +59,66 @@ GradCast is a single-page application (C# backend / Vue.js frontend) that allows
 
 ---
 
-## Phase 2 (Future — Out of Scope for Now)
-- Integration with local job board APIs (Indeed, BLS, etc.).
-- Housing cost data (HUD Fair Market Rents API or similar).
-- Budget simulator: fixed costs (rent, student loan payments) vs. expected starting salary.
-- Career path modeling based on program of study.
+## Phase 2 Scope
+
+### Phase 2A: Location & Career Destination
+
+#### FR-5: Post-Graduation Target Location Selector
+- **FR-5.1**: User can search and select a target metro area (CBSA) where they plan to live after graduation.
+- **FR-5.2**: Location search uses type-ahead autocomplete against a local dataset of ~930 US CBSAs.
+- **FR-5.3**: User selects a housing preference: "Live alone (1-Bed)" or "Have a roommate (Shared 2-Bed)."
+- **FR-5.4**: Selected location persists across views and feeds into budget calculations.
+- **FR-5.5**: UI placed as a "Target Destination" card between school search and school detail.
+
+#### FR-6: Local Job Market Pulse
+- **FR-6.1**: When a program row is expanded, show a "Local Job Pulse" widget for that field of study in the target metro.
+- **FR-6.2**: Display number of active job openings matching the CIP category in the target location.
+- **FR-6.3**: Show comparison: College Scorecard 1-year median earnings vs. local market salary data.
+- **FR-6.4**: Job data sourced from Adzuna API (free tier, 250 req/day) with BLS OEWS as fallback/static baseline.
+- **FR-6.5**: CIP-to-keyword mapping service translates academic program codes to job search terms.
+- **FR-6.6**: Graceful degradation: if job API is unavailable, display Scorecard earnings only with a note.
+
+### Phase 2B: Budget Simulator (The "Consequences Engine")
+
+#### FR-7: Net Take-Home Pay Calculator
+- **FR-7.1**: Given a gross annual salary (from program earnings data or user override), calculate estimated monthly net pay.
+- **FR-7.2**: Apply federal tax brackets (2024 standard deduction, marginal rates).
+- **FR-7.3**: Apply state income tax approximation based on target destination state.
+- **FR-7.4**: Display gross monthly vs. net monthly side-by-side as headline figures.
+- **FR-7.5**: Allow user to override the salary input manually for what-if scenarios.
+
+#### FR-8: Housing & Debt Baseline
+- **FR-8.1**: Auto-populate monthly rent from HUD Fair Market Rents for the selected CBSA and housing type.
+- **FR-8.2**: Calculate estimated monthly student loan payment using the school's median debt at graduation (from Scorecard data) and standard 10-year federal loan amortization at current rates.
+- **FR-8.3**: Display as a line-item breakdown: Rent, Loan Payment, and resulting Net Disposable Income.
+- **FR-8.4**: Support a simple donut/bar chart showing the monthly budget split.
+
+#### FR-9: Budget Simulator Dashboard
+- **FR-9.1**: Aggregate all calculations into a "Post-Grad Monthly Budget Simulator" card.
+- **FR-9.2**: Show: Gross Income → Net Pay → Fixed Costs (Rent + Loans) → Disposable Income.
+- **FR-9.3**: Highlight disposable income with color coding (green if positive, red if negative/tight).
+- **FR-9.4**: Update reactively as user changes school, program, location, or housing type.
+
+### Phase 2 Non-Functional Requirements
+
+#### NFR-5: Data Sources (Phase 2)
+- **HUD FMR**: Import Fair Market Rent data by CBSA into local SQLite (annual CSV download from huduser.gov).
+- **CBSA Lookup**: Static dataset of US metro areas with CBSA codes, names, states, and FIPS codes.
+- **Adzuna API**: Free tier (250 req/day), API key in configuration. Stubbed interface for swap-ability.
+- **Tax Brackets**: Hardcoded in-service, no external dependency. Updated annually as needed.
+
+#### NFR-6: Architecture (Phase 2)
+- All new services follow the same interface pattern (injectable, testable, swappable).
+- Budget calculations are backend-only (keeps financial logic server-side and testable).
+- Frontend components are composable and independently loadable (no budget card shown until location is selected).
+
+---
+
+## Phase 3 (Future — Out of Scope)
+- Multi-year career trajectory modeling (5-year, 10-year salary growth curves)
+- Side-by-side school comparison mode
+- Savings rate projections and emergency fund timelines
+- Geographic arbitrage suggestions (same degree, different cities)
 
 ---
 

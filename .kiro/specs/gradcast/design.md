@@ -194,3 +194,175 @@ App.vue
 2. `dotnet user-secrets set "CollegeScorecard:ApiKey" "YOUR_KEY"` in `src/api/`
 3. `dotnet run --project src/api` → API on `https://localhost:5001`
 4. `cd src/web && npm install && npm run dev` → Vite on `http://localhost:5173` with proxy to API
+
+---
+
+## Phase 2 Design
+
+### Architecture (Extended)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Vue 3 SPA (Vite + Vuetify)                    │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌──────────────────┐ │
+│  │SchoolSearch│ │ Location   │ │SchoolDetail│ │ BudgetSimulator  │ │
+│  │            │ │ Selector   │ │+ Programs  │ │  (dashboard)     │ │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └────────┬─────────┘ │
+│        │               │              │                  │           │
+│        └───────────────┼──────────────┼──────────────────┘           │
+│                        │              │                              │
+│              Composables: useSchoolApi, useLocationApi,               │
+│                          useJobPulse, useBudgetSimulator              │
+└────────────────────────┼──────────────┼──────────────────────────────┘
+                         │              │  HTTP (JSON)
+                         ▼              ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                   ASP.NET Core 10 Minimal API                        │
+│                                                                      │
+│  Endpoints:                                                          │
+│  ┌────────────────┐ ┌───────────────┐ ┌──────────────────────────┐  │
+│  │ /api/schools/* │ │/api/locations/│ │ /api/finance/*           │  │
+│  │ (existing)     │ │  search       │ │  /net-pay               │  │
+│  │                │ │               │ │  /simulator-baseline    │  │
+│  └────────┬───────┘ └───────┬───────┘ └────────────┬─────────────┘  │
+│           │                  │                      │                │
+│  ┌────────┴───────┐ ┌───────┴──────┐ ┌─────────────┴─────────────┐ │
+│  │ College        │ │ Location     │ │ FinanceService             │ │
+│  │ Scorecard Svc  │ │ Service      │ │  - TaxCalculationService  │ │
+│  │ (existing)     │ │ (SQLite)     │ │  - LoanAmortizationSvc    │ │
+│  └────────┬───────┘ └──────────────┘ │  - HousingCostService     │ │
+│           │                           └───────────────────────────┘  │
+│  ┌────────┴───────┐                  ┌──────────────────────────┐   │
+│  │ /api/jobs/     │                  │ /api/jobs/pulse           │   │
+│  │  pulse         │                  │  → Adzuna / BLS fallback  │   │
+│  └────────────────┘                  └──────────────────────────┘   │
+│                                                                      │
+│  SQLite: schools, programs, cbsa_locations, hud_fmr, bls_wages       │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+### Phase 2 API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/locations/search?q={query}` | Search metro areas (CBSA) by name |
+| GET | `/api/locations/{cbsaCode}/housing?type={1bed\|2bed}` | HUD FMR rent for location |
+| GET | `/api/jobs/pulse?cipCode={cip}&cbsa={code}` | Job openings + salary data for field in area |
+| GET | `/api/finance/net-pay?grossSalary={salary}&state={ST}` | Monthly net pay after taxes |
+| POST | `/api/finance/simulator-baseline` | Full budget simulation (accepts school, program, location) |
+
+### Phase 2 Data Models
+
+#### Location / CBSA
+```csharp
+public record CbsaLocation(
+    string CbsaCode,        // "12060" (Atlanta)
+    string Name,            // "Atlanta-Sandy Springs-Alpharetta, GA"
+    string State,           // Primary state
+    string[] Counties       // FIPS codes for constituent counties
+);
+```
+
+#### HUD Fair Market Rent
+```csharp
+public record FairMarketRent(
+    string CbsaCode,
+    int Year,
+    int Efficiency,         // Studio
+    int OneBedroom,
+    int TwoBedroom,
+    int ThreeBedroom,
+    int FourBedroom
+);
+```
+
+#### Budget Simulation Result
+```csharp
+public record BudgetSimulation(
+    decimal GrossAnnualSalary,
+    decimal GrossMonthly,
+    decimal FederalTaxMonthly,
+    decimal StateTaxMonthly,
+    decimal NetMonthly,
+    decimal RentMonthly,
+    decimal LoanPaymentMonthly,
+    decimal DisposableMonthly,
+    string IncomeStatus       // "comfortable" | "tight" | "deficit"
+);
+```
+
+#### Job Pulse Result
+```csharp
+public record JobPulseResult(
+    string CipCode,
+    string CbsaCode,
+    int ActiveOpenings,
+    decimal? LocalMedianSalary,
+    decimal? ScorecardMedianEarnings,
+    string DataSource           // "adzuna" | "bls" | "scorecard_only"
+);
+```
+
+### Phase 2 Services
+
+#### LocationService
+- Queries local SQLite table of ~930 US CBSAs for autocomplete
+- Pre-seeded during import (small static dataset, included in repo or import tool)
+
+#### HousingCostService
+- Queries HUD FMR data by CBSA code and bedroom count
+- Data imported from annual HUD CSV download (same pattern as Scorecard import)
+
+#### TaxCalculationService
+- Zero external dependencies
+- 2024 federal marginal brackets + standard deduction ($14,600 single)
+- State tax: flat lookup table (0% for TX/FL/WA, flat % for most others, simplified progressive for CA/NY)
+- Returns monthly breakdown
+
+#### LoanAmortizationService
+- Input: total debt at graduation (from Scorecard `median_debt` field), interest rate (default 5.5% federal), term (10 years)
+- Output: monthly payment using standard amortization formula
+- No external calls
+
+#### JobPulseService (Interface + Implementations)
+```csharp
+public interface IJobPulseService
+{
+    Task<JobPulseResult?> GetPulseAsync(string cipCode, string cbsaCode, CancellationToken ct);
+}
+```
+- `AdzunaJobPulseService` — live API calls (free tier, key required)
+- `BlsJobPulseService` — static BLS Occupational Employment data (fallback, no key needed)
+- Configurable via DI, same pattern as CollegeScorecardService local/remote/hybrid
+
+### Phase 2 Frontend Components
+
+```
+App.vue
+├── SchoolSearch.vue              (existing)
+├── LocationSelector.vue          ← NEW: CBSA autocomplete + housing type toggle
+├── YearSelector.vue              (existing)
+├── SchoolDetail.vue              (existing, with TuitionTrend)
+├── ProgramList.vue               (existing, MODIFIED: expandable rows)
+│   └── JobPulseWidget.vue        ← NEW: inline job market data per program
+└── BudgetSimulator.vue           ← NEW: the "consequences engine" dashboard
+    ├── IncomeHeader.vue          ← Gross vs. Net headline numbers
+    ├── ExpenseBreakdown.vue      ← Line items: rent, loan, etc.
+    └── DisposableResult.vue      ← Final number + donut chart
+```
+
+### Phase 2 State Management
+- Phase 2 introduces cross-component shared state (selected location affects budget, job pulse, etc.)
+- Introduce Pinia store: `useAppStore` with `selectedSchool`, `selectedLocation`, `housingType`, `selectedYear`
+- Composables consume store state reactively
+
+### Phase 2 Import Tool Updates
+- Add HUD FMR CSV import (download from huduser.gov/portal/datasets/fmr.html)
+- Add CBSA lookup table import (from Census Bureau delineation files)
+- Optional: BLS OEWS data import for static wage baselines
+
+### CIP-to-Keyword Mapping Strategy
+- Maintain a static mapping file (`cipJobKeywords.ts` or DB table) that maps 2-digit CIP categories to job search keywords
+- Example: `"11"` (Computer Science) → `["software engineer", "developer", "data analyst", "IT"]`
+- Example: `"52"` (Business) → `["business analyst", "marketing", "finance", "accounting"]`
+- Used by JobPulseService to translate academic codes into job board search queries
