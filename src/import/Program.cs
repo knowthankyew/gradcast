@@ -6,15 +6,48 @@ using GradCast.Data;
 using GradCast.Data.Entities;
 using Microsoft.EntityFrameworkCore;
 
-const string InstitutionDataUrl = "https://ed-public-download.app.cloud.gov/downloads/Most-Recent-Cohorts-Institution_04192024.zip";
-const string FieldOfStudyDataUrl = "https://ed-public-download.app.cloud.gov/downloads/Most-Recent-Cohorts-Field-of-Study_04192024.zip";
+// ─── Usage ─────────────────────────────────────────────────────────────────────
+// dotnet run --project src/import -- <path-to-scorecard-zip-or-directory> [db-path]
+//
+// Accepts either:
+//   1. Path to the "All Data Files" zip from collegescorecard.ed.gov/data
+//   2. Path to a directory containing extracted CSV files
+//
+// If no arguments are provided, prints usage instructions.
+// ────────────────────────────────────────────────────────────────────────────────
 
-var dbPath = args.Length > 0 ? args[0] : Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
-var downloadDir = Path.Combine(Path.GetTempPath(), "gradcast_import");
-Directory.CreateDirectory(downloadDir);
+if (args.Length == 0)
+{
+    Console.WriteLine("GradCast Data Import Tool");
+    Console.WriteLine();
+    Console.WriteLine("Usage:");
+    Console.WriteLine("  dotnet run --project src/import -- <data-source> [db-path]");
+    Console.WriteLine();
+    Console.WriteLine("Arguments:");
+    Console.WriteLine("  data-source   Path to the College Scorecard 'All Data Files' zip,");
+    Console.WriteLine("                or a directory containing extracted CSV files.");
+    Console.WriteLine("  db-path       Optional. Path to SQLite database file.");
+    Console.WriteLine("                Defaults to ./gradcast.db");
+    Console.WriteLine();
+    Console.WriteLine("Download the data from: https://collegescorecard.ed.gov/data");
+    Console.WriteLine("Click 'All Data Files Download (.zip, 470 MB)' and provide the");
+    Console.WriteLine("downloaded zip file path as the first argument.");
+    return;
+}
 
-Console.WriteLine($"GradCast Data Import");
-Console.WriteLine($"Database: {dbPath}");
+var dataSource = args[0];
+var dbPath = args.Length > 1 ? args[1] : Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+
+if (!File.Exists(dataSource) && !Directory.Exists(dataSource))
+{
+    Console.Error.WriteLine($"Error: '{dataSource}' does not exist.");
+    Console.Error.WriteLine("Provide a path to the downloaded zip or extracted directory.");
+    return;
+}
+
+Console.WriteLine("GradCast Data Import");
+Console.WriteLine($"  Source: {dataSource}");
+Console.WriteLine($"  Database: {dbPath}");
 Console.WriteLine();
 
 // Set up EF Core with SQLite
@@ -23,18 +56,53 @@ optionsBuilder.UseSqlite($"Data Source={dbPath}");
 
 await using var db = new GradCastDbContext(optionsBuilder.Options);
 await db.Database.EnsureCreatedAsync();
-
 Console.WriteLine("Database schema created/verified.");
 
-// Download and import institution data
-var institutionZip = Path.Combine(downloadDir, "institutions.zip");
-await DownloadFileAsync(InstitutionDataUrl, institutionZip);
-await ImportInstitutionDataAsync(db, institutionZip);
+// Determine if we have a zip or directory
+string workDir;
+bool cleanupWorkDir = false;
 
-// Download and import field of study data
-var fieldOfStudyZip = Path.Combine(downloadDir, "fieldofstudy.zip");
-await DownloadFileAsync(FieldOfStudyDataUrl, fieldOfStudyZip);
-await ImportFieldOfStudyDataAsync(db, fieldOfStudyZip);
+if (File.Exists(dataSource) && dataSource.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+{
+    workDir = Path.Combine(Path.GetTempPath(), $"gradcast_import_{Guid.NewGuid():N}");
+    Directory.CreateDirectory(workDir);
+    cleanupWorkDir = true;
+
+    Console.WriteLine("Extracting zip archive...");
+    ZipFile.ExtractToDirectory(dataSource, workDir);
+    Console.WriteLine($"  Extracted to temp directory.");
+}
+else if (Directory.Exists(dataSource))
+{
+    workDir = dataSource;
+}
+else
+{
+    Console.Error.WriteLine("Error: data-source must be a .zip file or a directory.");
+    return;
+}
+
+// Find the institution CSV (Most-Recent-Cohorts-Institution*.csv or MERGED*.csv)
+var institutionCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Institution", "MERGED2"]);
+var fieldOfStudyCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Field-of-Study", "FieldOfStudyData"]);
+
+if (institutionCsv != null)
+{
+    await ImportInstitutionDataAsync(db, institutionCsv);
+}
+else
+{
+    Console.WriteLine("Warning: No institution-level CSV found. Skipping.");
+}
+
+if (fieldOfStudyCsv != null)
+{
+    await ImportFieldOfStudyDataAsync(db, fieldOfStudyCsv);
+}
+else
+{
+    Console.WriteLine("Warning: No field-of-study CSV found. Skipping.");
+}
 
 Console.WriteLine();
 Console.WriteLine("Import complete!");
@@ -42,40 +110,35 @@ Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
 Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
 Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
 
-// Cleanup temp files
-try { Directory.Delete(downloadDir, true); } catch { /* best effort */ }
+if (cleanupWorkDir)
+{
+    try { Directory.Delete(workDir, true); } catch { /* best effort */ }
+}
 
 return;
 
 // ─── Helper Methods ────────────────────────────────────────────────────────────
 
-static async Task DownloadFileAsync(string url, string destPath)
+static string? FindCsvFile(string dir, string[] namePatterns)
 {
-    if (File.Exists(destPath))
+    // Search recursively for CSV files matching any of the name patterns
+    var csvFiles = Directory.GetFiles(dir, "*.csv", SearchOption.AllDirectories);
+
+    foreach (var pattern in namePatterns)
     {
-        Console.WriteLine($"  Using cached: {Path.GetFileName(destPath)}");
-        return;
+        var match = csvFiles.FirstOrDefault(f =>
+            Path.GetFileName(f).Contains(pattern, StringComparison.OrdinalIgnoreCase));
+        if (match != null) return match;
     }
 
-    Console.WriteLine($"  Downloading: {url}");
-    using var httpClient = new HttpClient();
-    httpClient.Timeout = TimeSpan.FromMinutes(10);
-    await using var stream = await httpClient.GetStreamAsync(url);
-    await using var file = File.Create(destPath);
-    await stream.CopyToAsync(file);
-    Console.WriteLine($"  Downloaded: {new FileInfo(destPath).Length / 1_048_576} MB");
+    return null;
 }
 
-static async Task ImportInstitutionDataAsync(GradCastDbContext db, string zipPath)
+static async Task ImportInstitutionDataAsync(GradCastDbContext db, string csvPath)
 {
-    Console.WriteLine("Importing institution data...");
+    Console.WriteLine($"Importing institution data from: {Path.GetFileName(csvPath)}");
 
-    using var archive = ZipFile.OpenRead(zipPath);
-    var csvEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-        ?? throw new InvalidOperationException("No CSV found in institution zip");
-
-    await using var entryStream = csvEntry.Open();
-    using var reader = new StreamReader(entryStream);
+    using var reader = new StreamReader(csvPath);
     using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
     {
         HeaderValidated = null,
@@ -109,7 +172,7 @@ static async Task ImportInstitutionDataAsync(GradCastDbContext db, string zipPat
         var yearData = new SchoolYearData
         {
             SchoolId = unitId.Value,
-            Year = 2024, // "Most Recent Cohorts" file represents latest available
+            Year = 2024, // "Most Recent Cohorts" represents latest available data
             AdmissionRate = ParseDecimal(csv.GetField("ADM_RATE")),
             StudentSize = ParseInt(csv.GetField("UGDS")),
             TuitionInState = ParseInt(csv.GetField("TUITIONFEE_IN")),
@@ -178,16 +241,11 @@ static async Task FlushSchoolBatchAsync(GradCastDbContext db, List<School> schoo
     await db.SaveChangesAsync();
 }
 
-static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string zipPath)
+static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPath)
 {
-    Console.WriteLine("Importing field of study data...");
+    Console.WriteLine($"Importing field of study data from: {Path.GetFileName(csvPath)}");
 
-    using var archive = ZipFile.OpenRead(zipPath);
-    var csvEntry = archive.Entries.FirstOrDefault(e => e.Name.EndsWith(".csv", StringComparison.OrdinalIgnoreCase))
-        ?? throw new InvalidOperationException("No CSV found in field of study zip");
-
-    await using var entryStream = csvEntry.Open();
-    using var reader = new StreamReader(entryStream);
+    using var reader = new StreamReader(csvPath);
     using var csv = new CsvReader(reader, new CsvConfiguration(CultureInfo.InvariantCulture)
     {
         HeaderValidated = null,
@@ -210,14 +268,14 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string zipPa
 
         if (unitId == null || string.IsNullOrEmpty(cipCode) || credLevel == null) continue;
 
-        // Skip aggregate rows (2-digit CIP codes)
+        // Skip aggregate rows (2-digit CIP codes like "01" without sub-detail)
         if (cipCode.Length <= 3) continue;
 
         var program = new GradCast.Data.Entities.Program
         {
             SchoolId = unitId.Value,
             Year = 2024,
-            CipCode = cipCode.Length >= 5 ? cipCode[..5] : cipCode, // Normalize to 4-digit (XX.XX)
+            CipCode = cipCode.Length >= 5 ? cipCode[..5] : cipCode,
             Title = csv.GetField("CIPDESC") ?? "",
             CredentialLevel = credLevel.Value,
             Completions = ParseInt(csv.GetField("IPEDSCOUNT1")),

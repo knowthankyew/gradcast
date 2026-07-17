@@ -82,16 +82,23 @@ Searches and current-year data are served from the local SQLite database (instan
 
 ## Import Tool
 
-The import tool downloads the full College Scorecard dataset (~150MB of CSVs) and loads it into a local SQLite database.
+The import tool loads the College Scorecard dataset into a local SQLite database from files you download manually.
 
-### Usage
+### Step 1: Download the Data
+
+Go to [collegescorecard.ed.gov/data](https://collegescorecard.ed.gov/data) and click **"All Data Files Download (.zip, 470 MB)"**. Save the zip somewhere convenient (e.g., `~/Downloads/`).
+
+### Step 2: Run the Import
 
 ```bash
-# Import to default location (./gradcast.db)
-dotnet run --project src/import
+# Point the tool at the downloaded zip
+dotnet run --project src/import -- ~/Downloads/CollegeScorecard_Raw_Data.zip
 
-# Import to a specific path
-dotnet run --project src/import -- /path/to/gradcast.db
+# Or if you've already extracted it to a directory
+dotnet run --project src/import -- ~/Downloads/scorecard_data/
+
+# Optionally specify a custom database path
+dotnet run --project src/import -- ~/Downloads/CollegeScorecard_Raw_Data.zip ./mydata.db
 ```
 
 ### What it imports
@@ -99,7 +106,7 @@ dotnet run --project src/import -- /path/to/gradcast.db
 - **Institution data**: ~6,500 schools with name, location, ownership, tuition, admission rate, enrollment, and completion rate
 - **Field of study data**: ~100,000+ program records with CIP codes, credential levels, completion counts, and median earnings
 
-The import is idempotent — running it again updates existing records. The downloaded CSVs represent the "Most Recent Cohorts" release from the Department of Education.
+The import is idempotent — running it again updates existing records. The tool searches inside the zip/directory for CSVs matching known Scorecard naming patterns (`Most-Recent-Cohorts-Institution*.csv`, `Most-Recent-Cohorts-Field-of-Study*.csv`).
 
 ### Pointing the API at the database
 
