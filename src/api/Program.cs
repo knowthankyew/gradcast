@@ -36,6 +36,7 @@ builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<HousingCostService>();
 builder.Services.AddSingleton<TaxCalculationService>();
 builder.Services.AddSingleton<LoanAmortizationService>();
+builder.Services.AddScoped<BudgetSimulatorService>();
 
 // College Scorecard data source mode: "local", "api", or "hybrid"
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";

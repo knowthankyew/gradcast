@@ -1,3 +1,4 @@
+using GradCast.Api.Models;
 using GradCast.Api.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,10 @@ public static class FinanceEndpoints
         group.MapGet("/loan-payment", CalculateLoanPayment)
              .WithName("CalculateLoanPayment")
              .WithDescription("Calculate monthly student loan payment");
+
+        group.MapPost("/simulator", RunSimulation)
+             .WithName("RunBudgetSimulation")
+             .WithDescription("Run full budget simulation for school + location + program");
     }
 
     private static IResult CalculateNetPay(
@@ -66,6 +71,42 @@ public static class FinanceEndpoints
         }
 
         var result = loanService.Calculate(principal, rate, termYears);
+        return Results.Ok(result);
+    }
+
+    private static async Task<IResult> RunSimulation(
+        BudgetSimulationRequest request,
+        BudgetSimulatorService simulatorService,
+        CancellationToken ct)
+    {
+        if (request.SchoolId <= 0)
+        {
+            return Results.Problem(
+                title: "Invalid school",
+                detail: "A valid school ID is required.",
+                statusCode: 400);
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CbsaCode))
+        {
+            return Results.Problem(
+                title: "Invalid location",
+                detail: "A CBSA code is required for the target location.",
+                statusCode: 400);
+        }
+
+        var housingType = request.HousingType ?? "1bed";
+        var normalizedRequest = request with { HousingType = housingType };
+
+        var result = await simulatorService.SimulateAsync(normalizedRequest, ct);
+        if (result == null)
+        {
+            return Results.Problem(
+                title: "Simulation failed",
+                detail: "Could not find location data for the given CBSA code.",
+                statusCode: 404);
+        }
+
         return Results.Ok(result);
     }
 }
