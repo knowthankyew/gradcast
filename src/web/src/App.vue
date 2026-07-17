@@ -14,7 +14,9 @@
       <v-container class="py-6" style="max-width: 1100px;">
         <SchoolSearch @school-selected="onSchoolSelected" />
 
-        <YearSelector v-if="currentSchoolId" @year-changed="onYearChanged" />
+        <LocationSelector v-if="store.hasSchool" />
+
+        <YearSelector v-if="store.hasSchool" @year-changed="onYearChanged" />
 
         <v-alert
           v-if="error"
@@ -31,12 +33,12 @@
           <v-progress-circular indeterminate color="primary" size="48" />
         </div>
 
-        <template v-if="schoolDetail && !detailLoading">
-          <SchoolDetail :school="schoolDetail" />
-          <ProgramList :programs="schoolDetail.programs" />
+        <template v-if="store.selectedSchool && !detailLoading">
+          <SchoolDetail :school="store.selectedSchool" />
+          <ProgramList :programs="store.selectedSchool.programs" />
         </template>
 
-        <v-card v-if="!schoolDetail && !detailLoading && !error" class="text-center pa-8" variant="tonal">
+        <v-card v-if="!store.selectedSchool && !detailLoading && !error" class="text-center pa-8" variant="tonal">
           <v-icon size="64" color="primary" class="mb-4">mdi-magnify</v-icon>
           <div class="text-h6 mb-2">Search for a school to get started</div>
           <div class="text-body-2 text-medium-emphasis">
@@ -56,27 +58,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
 import SchoolSearch from './components/SchoolSearch.vue'
 import SchoolDetail from './components/SchoolDetail.vue'
 import ProgramList from './components/ProgramList.vue'
 import YearSelector from './components/YearSelector.vue'
+import LocationSelector from './components/LocationSelector.vue'
 import { useSchoolApi } from './composables/useSchoolApi'
+import { useAppStore } from './stores/appStore'
 
-const { schoolDetail, detailLoading, error, getSchoolDetail } = useSchoolApi()
-
-const currentSchoolId = ref<number | null>(null)
-const selectedYear = ref<number | null>(null)
+const store = useAppStore()
+const { detailLoading, error, getSchoolDetail } = useSchoolApi()
 
 async function onSchoolSelected(id: number) {
-  currentSchoolId.value = id
-  await getSchoolDetail(id, selectedYear.value)
+  const detail = await getSchoolDetail(id, store.selectedYear)
+  if (detail) {
+    store.setSchool(detail)
+  }
 }
 
 async function onYearChanged(year: number | null) {
-  selectedYear.value = year
-  if (currentSchoolId.value) {
-    await getSchoolDetail(currentSchoolId.value, year)
+  store.setYear(year)
+  if (store.selectedSchoolId) {
+    const detail = await getSchoolDetail(store.selectedSchoolId, year)
+    if (detail) {
+      store.setSchool(detail)
+    }
   }
 }
 </script>
