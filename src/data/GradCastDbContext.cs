@@ -15,6 +15,7 @@ public class GradCastDbContext : DbContext
     public DbSet<Program> Programs => Set<Program>();
     public DbSet<CbsaLocation> CbsaLocations => Set<CbsaLocation>();
     public DbSet<CbsaCounty> CbsaCounties => Set<CbsaCounty>();
+    public DbSet<FairMarketRent> FairMarketRents => Set<FairMarketRent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +51,11 @@ public class GradCastDbContext : DbContext
             entity.HasOne(e => e.CbsaLocation)
                   .WithMany(c => c.Counties)
                   .HasForeignKey(e => e.CbsaCode);
+        });
+
+        modelBuilder.Entity<FairMarketRent>(entity =>
+        {
+            entity.HasIndex(e => new { e.CbsaCode, e.Year }).IsUnique();
         });
     }
 }

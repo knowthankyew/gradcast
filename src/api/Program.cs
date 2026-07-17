@@ -33,6 +33,7 @@ builder.Services.AddDbContext<GradCastDbContext>(options =>
 
 // Phase 2 services (always local DB)
 builder.Services.AddScoped<LocationService>();
+builder.Services.AddScoped<HousingCostService>();
 
 // College Scorecard data source mode: "local", "api", or "hybrid"
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";

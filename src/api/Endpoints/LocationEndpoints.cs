@@ -12,6 +12,10 @@ public static class LocationEndpoints
         group.MapGet("/search", SearchLocations)
              .WithName("SearchLocations")
              .WithDescription("Search metro areas by name");
+
+        group.MapGet("/{cbsaCode}/housing", GetHousingCost)
+             .WithName("GetHousingCost")
+             .WithDescription("Get Fair Market Rent for a metro area");
     }
 
     private static async Task<IResult> SearchLocations(
@@ -29,5 +33,32 @@ public static class LocationEndpoints
 
         var results = await service.SearchLocationsAsync(query, ct);
         return Results.Ok(results);
+    }
+
+    private static async Task<IResult> GetHousingCost(
+        string cbsaCode,
+        [FromQuery(Name = "type")] string? housingType,
+        HousingCostService service,
+        CancellationToken ct)
+    {
+        var type = housingType ?? "1bed";
+        if (type != "1bed" && type != "2bed" && type != "studio")
+        {
+            return Results.Problem(
+                title: "Invalid housing type",
+                detail: "Housing type must be 'studio', '1bed', or '2bed'.",
+                statusCode: 400);
+        }
+
+        var result = await service.GetHousingCostAsync(cbsaCode, type, ct);
+        if (result == null)
+        {
+            return Results.Problem(
+                title: "No rent data",
+                detail: $"No Fair Market Rent data found for CBSA code '{cbsaCode}'.",
+                statusCode: 404);
+        }
+
+        return Results.Ok(result);
     }
 }
