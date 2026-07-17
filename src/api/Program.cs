@@ -34,6 +34,8 @@ builder.Services.AddDbContext<GradCastDbContext>(options =>
 // Phase 2 services (always local DB)
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<HousingCostService>();
+builder.Services.AddSingleton<TaxCalculationService>();
+builder.Services.AddSingleton<LoanAmortizationService>();
 
 // College Scorecard data source mode: "local", "api", or "hybrid"
 var dataSource = builder.Configuration.GetValue<string>("DataSource") ?? "api";
@@ -94,5 +96,6 @@ app.UseCors();
 // Map API endpoints
 app.MapSchoolEndpoints();
 app.MapLocationEndpoints();
+app.MapFinanceEndpoints();
 
 app.Run();
