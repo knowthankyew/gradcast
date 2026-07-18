@@ -172,30 +172,42 @@ function onSave() {
 async function onLoad(budget: SavedBudget) {
   const ctx = budget.context
 
-  // Restore school (without clearing downstream state)
-  const school = await getSchoolDetail(ctx.schoolId)
-  if (school) {
+  // Activate mutex — prevents watchers from firing during state hydration
+  store.isRestoring = true
+
+  try {
+    // Restore school (without clearing downstream state)
+    const school = await getSchoolDetail(ctx.schoolId)
+    if (!school) {
+      store.isRestoring = false
+      // School no longer exists in the data
+      alert(`School (ID: ${ctx.schoolId}) could not be loaded. It may no longer exist in the database.`)
+      return
+    }
     store.restoreSchool(school)
-  }
 
-  // Restore program (if one was selected)
-  if (ctx.programCipCode && ctx.programTitle) {
-    store.setProgram({
-      cipCode: ctx.programCipCode,
-      title: ctx.programTitle,
-      credentialName: ctx.programCredentialName ?? '',
+    // Restore program (if one was selected)
+    if (ctx.programCipCode && ctx.programTitle) {
+      store.setProgram({
+        cipCode: ctx.programCipCode,
+        title: ctx.programTitle,
+        credentialName: ctx.programCredentialName ?? '',
+      })
+    } else {
+      store.clearProgram()
+    }
+
+    // Restore location + housing type
+    store.setLocation({
+      cbsaCode: ctx.cbsaCode,
+      name: ctx.locationName,
+      state: ctx.locationState,
     })
-  } else {
-    store.clearProgram()
+    store.setHousingType(ctx.housingType)
+  } finally {
+    // Release mutex — canSimulate becomes true, watcher fires once
+    store.isRestoring = false
   }
-
-  // Restore location + housing type
-  store.setLocation({
-    cbsaCode: ctx.cbsaCode,
-    name: ctx.locationName,
-    state: ctx.locationState,
-  })
-  store.setHousingType(ctx.housingType)
 
   // Scroll to simulator
   setTimeout(() => {

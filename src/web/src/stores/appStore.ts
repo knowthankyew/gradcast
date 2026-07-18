@@ -27,11 +27,14 @@ export const useAppStore = defineStore('app', () => {
   const selectedLocation = ref<LocationSelection | null>(null)
   const housingType = ref<'1bed' | '2bed'>('1bed')
 
+  // Restoration mutex — prevents watchers from firing during scenario load-back
+  const isRestoring = ref(false)
+
   // Computed — progressive disclosure gates
   const hasSchool = computed(() => selectedSchool.value !== null)
   const hasProgram = computed(() => selectedProgram.value !== null)
   const hasLocation = computed(() => selectedLocation.value !== null)
-  const canSimulate = computed(() => hasSchool.value && hasLocation.value)
+  const canSimulate = computed(() => hasSchool.value && hasLocation.value && !isRestoring.value)
 
   // Actions
   function setSchool(school: SchoolDetail) {
@@ -86,6 +89,7 @@ export const useAppStore = defineStore('app', () => {
     selectedProgram,
     selectedLocation,
     housingType,
+    isRestoring,
     hasSchool,
     hasProgram,
     hasLocation,

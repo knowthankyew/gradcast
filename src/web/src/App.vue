@@ -13,6 +13,9 @@
     <v-main>
       <v-container class="py-6" style="max-width: 1100px;">
 
+        <!-- Legal disclaimer (dismissible, persisted to localStorage) -->
+        <DisclaimerBanner />
+
         <!-- Step 1: Search for a school -->
         <SchoolSearch @school-selected="onSchoolSelected" />
 
@@ -78,6 +81,7 @@
 
 <script setup lang="ts">
 import SchoolSearch from './components/SchoolSearch.vue'
+import DisclaimerBanner from './components/DisclaimerBanner.vue'
 import SchoolDetail from './components/SchoolDetail.vue'
 import ProgramList from './components/ProgramList.vue'
 import YearSelector from './components/YearSelector.vue'
