@@ -1,131 +1,151 @@
 # GradCast - Requirements
 
 ## Overview
-GradCast is a single-page application (C# backend / Vue.js frontend) that allows students to explore college data from the U.S. Department of Education's College Scorecard API. Phase 1 focuses on school search and program-level graduation/completion data. Phase 2 (future) will layer in local job boards, housing costs, and budget projections.
 
-## Phase 1 Scope
+GradCast is a local-first single-page application (C# backend / Vue.js frontend) that simulates a student's post-graduation financial reality. It combines federal education data (College Scorecard), housing market data (HUD Fair Market Rents), job market signals (Adzuna), and tax/loan calculations into a "consequences engine" that answers: *"If I study X at School Y and move to City Z, what does my monthly budget actually look like?"*
 
-### Functional Requirements
+**Core philosophy**: Runs locally or not at all. No cloud hosting dependencies. All reference data is either seeded statically or imported from downloadable government datasets. External APIs (Scorecard, Adzuna) are optional enhancements, not hard dependencies.
 
-#### FR-1: School Search (Type-Ahead Autocomplete)
-- **FR-1.1**: User can type a partial school name into an input field and receive matching suggestions in real-time (debounced, ~300ms).
-- **FR-1.2**: Suggestions display school name, city, and state.
-- **FR-1.3**: Minimum 2 characters before triggering search.
-- **FR-1.4**: Results are limited to 10 suggestions per query.
-- **FR-1.5**: User selects a school from the dropdown to load its detail view.
+## Current State (Built)
 
-#### FR-2: School Overview (Summary Card)
-- **FR-2.1**: Display school name, city, state, and school URL.
-- **FR-2.2**: Display institution type (public/private/for-profit).
-- **FR-2.3**: Display overall admission rate (if available).
-- **FR-2.4**: Display total undergraduate enrollment.
-- **FR-2.5**: Display in-state and out-of-state tuition costs.
-- **FR-2.6**: Display overall completion/graduation rate (150% time).
+### Phase 1: College Data Explorer (Complete)
 
-#### FR-3: Program-Level Graduation/Completion Data
-- **FR-3.1**: Retrieve field-of-study (program) data for the selected school, using CIP 4-digit codes.
-- **FR-3.2**: Group programs by CIP 2-digit category (e.g., "Engineering," "Business," "Health Professions").
-- **FR-3.3**: For each program, display: program title, credential level (certificate, associate, bachelor's, etc.), and number of completions.
-- **FR-3.4**: Allow expanding/collapsing program categories.
-- **FR-3.5**: Sort programs within a category by number of completions (descending).
+#### FR-1: School Search
+- Type-ahead autocomplete with debounced input (300ms, min 2 chars)
+- Optional state filter
+- Results: school name, city, state (top 10)
 
-#### FR-4: API Integration
-- **FR-4.1**: Backend proxies all calls to College Scorecard API (API key not exposed to frontend).
-- **FR-4.2**: API key stored in configuration (appsettings.json / environment variable), never in source control.
-- **FR-4.3**: Backend implements basic in-memory caching for school detail responses (5 minute TTL).
-- **FR-4.4**: Handle API rate limits gracefully (1000 req/hour) — return appropriate error to frontend.
+#### FR-2: School Overview
+- School name, city, state, URL, institution type (public/private/for-profit)
+- Admission rate, undergraduate enrollment, in-state/out-of-state tuition
+- Completion rate with tooltip explaining "150% time"
 
-### Non-Functional Requirements
+#### FR-3: Program Data
+- Field-of-study data grouped by CIP 2-digit category
+- Selectable program rows (clicked → feeds earnings data into budget simulator)
+- Per-program: title, credential level, completions, median earnings (1 yr post-grad)
+- Expand/collapse by department, sorted by completions descending
 
-#### NFR-1: Performance
-- Autocomplete suggestions return within 500ms perceived latency.
-- School detail view loads within 2 seconds.
+#### FR-4: Historical Data
+- Year selector (Latest + past 10 years)
+- 5-year tuition trend line chart (in-state vs. out-of-state)
+- Tooltip explaining data completeness lag for recent years
 
-#### NFR-2: Technology Stack
-- **Backend**: C# / ASP.NET Core 10 Minimal API.
-- **Frontend**: Vue 3 (Composition API) + TypeScript + Vite.
-- **UI Framework**: Vuetify 4 (Material Design components for Vue 3).
-- **HTTP Client**: Backend uses `HttpClient` with typed responses.
-- **State Management**: Pinia (introduced in Phase 2 for cross-component shared state).
-- **Target Hosting**: GitHub portfolio project; designed to be deployable but runs locally for PoC.
+#### FR-5: Data Modes
+- **API mode**: Live College Scorecard API calls (needs API key)
+- **Local mode**: All queries from local SQLite (needs import)
+- **Hybrid mode** (recommended): Local for imported data, API fallback for historic years
 
-#### NFR-3: Developer Experience
-- Solution structured as a monorepo with `/src/api` (C#) and `/src/web` (Vue).
-- `dotnet run` starts the API; `npm run dev` starts the Vue dev server with proxy to API.
-- README with setup instructions including API key registration link.
+### Phase 2: The Consequences Engine (Complete)
 
-#### NFR-4: Error Handling
-- Frontend displays user-friendly messages when API is unreachable or returns errors.
-- Backend returns structured error responses (ProblemDetails).
+#### FR-6: Target Location Selector
+- Type-ahead search across 156 seeded US metro areas (CBSA)
+- Housing type toggle: "Live Alone (1-Bed)" / "Roommate (Shared 2-Bed)"
+- Progressive disclosure: appears after school is selected
 
----
+#### FR-7: Job Market Pulse
+- Appears when both a program AND location are selected
+- Displays: active openings, local salary, Scorecard national median
+- CIP-to-keyword mapping (37 categories → job search terms)
+- Data source badge: "Live data" (Adzuna) vs. "National baseline" (Scorecard only)
+- Gracefully degrades when Adzuna isn't configured
 
-## Phase 2 Scope
+#### FR-8: Budget Simulator
+- Net take-home pay: federal marginal brackets + FICA + state tax
+- Housing cost: HUD FMR by CBSA + housing type (1-bed full, 2-bed split)
+- Student loan payment: standard 10-year amortization from estimated debt
+- Disposable income with status: comfortable / manageable / tight / deficit
+- Budget split percentage bars
+- Salary override for what-if scenarios
 
-### Phase 2A: Location & Career Destination
-
-#### FR-5: Post-Graduation Target Location Selector
-- **FR-5.1**: User can search and select a target metro area (CBSA) where they plan to live after graduation.
-- **FR-5.2**: Location search uses type-ahead autocomplete against a local dataset of 156 major US metro areas (expandable to full ~930 CBSAs via Census import).
-- **FR-5.3**: User selects a housing preference: "Live alone (1-Bed)" or "Have a roommate (Shared 2-Bed)."
-- **FR-5.4**: Selected location persists across views and feeds into budget calculations.
-- **FR-5.5**: UI placed as a "Target Destination" card between school search and school detail.
-
-#### FR-6: Local Job Market Pulse
-- **FR-6.1**: When a program row is expanded, show a "Local Job Pulse" widget for that field of study in the target metro.
-- **FR-6.2**: Display number of active job openings matching the CIP category in the target location.
-- **FR-6.3**: Show comparison: College Scorecard 1-year median earnings vs. local market salary data.
-- **FR-6.4**: Job data sourced from Adzuna API (free tier, 250 req/day) with BLS OEWS as fallback/static baseline.
-- **FR-6.5**: CIP-to-keyword mapping service translates academic program codes to job search terms.
-- **FR-6.6**: Graceful degradation: if job API is unavailable, display Scorecard earnings only with a note.
-
-### Phase 2B: Budget Simulator (The "Consequences Engine")
-
-#### FR-7: Net Take-Home Pay Calculator
-- **FR-7.1**: Given a gross annual salary (from program earnings data or user override), calculate estimated monthly net pay.
-- **FR-7.2**: Apply federal tax brackets (2024 standard deduction, marginal rates).
-- **FR-7.3**: Apply state income tax approximation based on target destination state.
-- **FR-7.4**: Display gross monthly vs. net monthly side-by-side as headline figures.
-- **FR-7.5**: Allow user to override the salary input manually for what-if scenarios.
-
-#### FR-8: Housing & Debt Baseline
-- **FR-8.1**: Auto-populate monthly rent from HUD Fair Market Rents for the selected CBSA and housing type.
-- **FR-8.2**: Calculate estimated monthly student loan payment using the school's median debt at graduation (from Scorecard data) and standard 10-year federal loan amortization at current rates.
-- **FR-8.3**: Display as a line-item breakdown: Rent, Loan Payment, and resulting Net Disposable Income.
-- **FR-8.4**: Support a simple donut/bar chart showing the monthly budget split.
-
-#### FR-9: Budget Simulator Dashboard
-- **FR-9.1**: Aggregate all calculations into a "Post-Grad Monthly Budget Simulator" card.
-- **FR-9.2**: Show: Gross Income → Net Pay → Fixed Costs (Rent + Loans) → Disposable Income.
-- **FR-9.3**: Highlight disposable income with color coding (green if positive, red if negative/tight).
-- **FR-9.4**: Update reactively as user changes school, program, location, or housing type.
-
-### Phase 2 Non-Functional Requirements
-
-#### NFR-5: Data Sources (Phase 2)
-- **HUD FMR**: Import Fair Market Rent data by CBSA into local SQLite (annual CSV download from huduser.gov).
-- **CBSA Lookup**: Static dataset of US metro areas with CBSA codes, names, states, and FIPS codes.
-- **Adzuna API**: Free tier (250 req/day), API key in configuration. Stubbed interface for swap-ability.
-- **Tax Brackets**: Hardcoded in-service, no external dependency. Updated annually as needed.
-
-#### NFR-6: Architecture (Phase 2)
-- All new services follow the same interface pattern (injectable, testable, swappable).
-- Budget calculations are backend-only (keeps financial logic server-side and testable).
-- Frontend components are composable and independently loadable (no budget card shown until location is selected).
+#### FR-9: Saved Scenarios
+- Name and save budget simulations to localStorage
+- Load-back: restores school/program/location/housing into app state
+- Delete individual or clear all
+- Persists across page reloads
 
 ---
 
-## Phase 3 (Future — Out of Scope)
-- Multi-year career trajectory modeling (5-year, 10-year salary growth curves)
-- Side-by-side school comparison mode
+## Non-Functional Requirements
+
+### NFR-1: Technology Stack
+- **Backend**: C# / ASP.NET Core 10 Minimal API
+- **Frontend**: Vue 3 (Composition API) + TypeScript + Vite + Vuetify 4
+- **State**: Pinia (cross-component shared state)
+- **Data**: SQLite via EF Core (local/hybrid modes)
+- **Target**: Local development only. GitHub portfolio piece. No cloud deployment planned.
+
+### NFR-2: Data Externalization (No Hardcoded Reference Data)
+All mutable reference data lives in external configuration files or SQLite, not in compiled code:
+- **Tax brackets**: Versioned JSON files (`Configuration/TaxData/tax_config_YYYY.json`). Update annually by adding a new file — no recompile.
+- **CBSA metro areas**: Seeded from static class, expandable via Census Bureau import.
+- **HUD Fair Market Rents**: Seeded from static class, expandable via HUD CSV import.
+- **CIP-to-keyword mapping**: Static dictionary in code (acceptable — changes infrequently). Future: move to JSON or DB table.
+- **Loan rates**: Configurable per-request (default 5.5%, overridable).
+
+### NFR-3: Graceful Degradation
+- Every external API call has a fallback path (local DB or static data).
+- Adzuna unconfigured → Scorecard-only earnings displayed.
+- Scorecard API down → local SQLite data served.
+- Missing data fields → "N/A" shown, never errors to the user.
+
+### NFR-4: Progressive Disclosure UX
+- Each step in the flow only appears after the previous completes.
+- Flow: Search → School Detail → Programs → Location → Job Pulse → Budget
+- Prevents cognitive overload; guides the user toward the "aha" moment.
+
+### NFR-5: State Race Condition Prevention
+- `isRestoring` mutex in Pinia store prevents watchers from firing duplicate API calls during saved scenario load-back.
+- Budget simulator watcher skips execution while `isRestoring` is true.
+
+---
+
+## In Progress
+
+### Feedback Integration (Current Sprint)
+- [x] Tax brackets externalized to versioned JSON config (2026 values live)
+- [ ] `isRestoring` mutex in Pinia store (prevents watcher race conditions on load-back)
+- [ ] CIP keyword map enhanced to 4-digit granularity with 2-digit fallback
+- [ ] Legal/data disclaimer banner in UI
+- [ ] Spec docs brought current (this document)
+
+---
+
+## Future Consideration (Phase 3)
+
+### Comparison & Planning
+- Side-by-side comparison mode (2-3 saved scenarios as columns)
+- Multi-year career trajectory modeling (5yr/10yr salary growth curves)
 - Savings rate projections and emergency fund timelines
-- Geographic arbitrage suggestions (same degree, different cities)
+- Geographic arbitrage suggestions (same degree, different city = better budget)
+
+### Data Enrichment
+- Import per-year historic Scorecard CSVs (full tuition trend without API)
+- Import full Census Bureau CBSA delineation (~930 metros + FIPS mapping)
+- Import HUD FMR by county FIPS (non-metro coverage)
+- BLS Occupational Employment data (static wage baselines, no API key)
+- 4-digit CIP keyword mapping moved to JSON or DB for easier maintenance
+
+### UX Polish
+- Mobile responsive testing (progressive disclosure card stacking)
+- Loading skeleton states
+- Export budget to PDF (for parents/counselors)
+- Screenshot tour in README
+
+### Structural
+- Integration tests for tax + loan + rent math (deterministic, high-value)
+- Disclaimer/legal text (data lag, not financial advice, individual results vary)
+- Error boundary component for graceful failure recovery
 
 ---
 
-## Decisions
-1. **State/city filter**: Yes — include optional state filter alongside name search.
-2. **Median earnings**: Include in Phase 1 — per-program median earnings 1 year after graduation.
-3. **UI Framework**: Vuetify 4 (Material Design, Bootstrap-familiar grid system).
-4. **Component library**: Vuetify 4 provides autocomplete, expansion panels, cards, data tables.
-5. **Portfolio goal**: This is a GitHub portfolio piece to demonstrate C#/Vue.js skills and show investors a tangible PoC of the GradCast vision.
+## Decisions Log
+1. **Runs locally only** — no cloud deployment, no hosting cost concerns.
+2. **Hybrid mode recommended** — local DB for speed, API fallback for completeness.
+3. **Tax config externalized** — JSON files versioned by year, loaded at startup.
+4. **Seed data in code** — CBSAs + FMR are small, stable datasets. Import tool expands if needed.
+5. **Adzuna optional** — graceful fallback means the app is fully functional without it.
+6. **No BLS import yet** — noted as future enhancement, Scorecard median is sufficient baseline.
+7. **localStorage for saves** — no user accounts, no backend persistence for user data.
+8. **Progressive disclosure** — guided flow, not a dashboard dump.
+9. **Budget endpoint decoupled from Adzuna** — only uses fast local data. Job pulse is async/independent.
