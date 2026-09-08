@@ -38,3 +38,7 @@ src/web/dist/
 *.db
 *.db-shm
 *.db-wal
+
+# Screenshots
+*.png
+*.jpg
