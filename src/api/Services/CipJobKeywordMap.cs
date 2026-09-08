@@ -27,12 +27,21 @@ public static class CipJobKeywordMap
     }
 
     /// <summary>
-    /// Returns a search query string joining the top keywords.
+    /// Returns the primary job search term for the given CIP code.
+    /// Uses only the first/best keyword — Adzuna doesn't support OR syntax reliably.
+    /// </summary>
+    public static string GetPrimaryKeyword(string cipCode)
+    {
+        return GetKeywords(cipCode).First();
+    }
+
+    /// <summary>
+    /// Returns a display string of all keywords (for UI transparency).
     /// </summary>
     public static string GetSearchQuery(string cipCode, int maxTerms = 3)
     {
         var keywords = GetKeywords(cipCode);
-        return string.Join(" OR ", keywords.Take(maxTerms));
+        return string.Join(", ", keywords.Take(maxTerms));
     }
 
     // ─── 4-digit CIP → specific job keywords ──────────────────────────────────

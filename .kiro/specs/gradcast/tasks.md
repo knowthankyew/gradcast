@@ -41,23 +41,31 @@
 
 ## In Progress: Structural Hardening
 
-### Task 30: isRestoring Mutex (Pinia)
-- [ ] Add `isRestoring` ref to useAppStore
-- [ ] `canSimulate` returns false while isRestoring is true
-- [ ] SavedBudgets.onLoad sets isRestoring=true before state changes, false after
-- [ ] Prevents budget simulator watcher from firing duplicate calls during hydration
+### Task 30: isRestoring Mutex (Pinia) ✅ Complete
+- [x] Add `isRestoring` ref to useAppStore
+- [x] `canSimulate` returns false while isRestoring is true
+- [x] SavedBudgets.onLoad sets isRestoring=true before state changes, false after
+- [x] Prevents budget simulator watcher from firing duplicate calls during hydration
 
-### Task 31: 4-Digit CIP Keyword Granularity
-- [ ] Extend CipJobKeywordMap to accept 4-digit codes (e.g., "1107" → "computer science", "1101" → "information systems")
-- [ ] Maintain 2-digit fallback for codes without specific 4-digit mappings
-- [ ] Update AdzunaJobPulseService to pass full CIP code to the map
-- [ ] More precise job search results for specific programs
+### Task 31: 4-Digit CIP Keyword Granularity ✅ Complete
+- [x] Extend CipJobKeywordMap to accept 4-digit codes (e.g., "1107" → "software engineer")
+- [x] Maintain 2-digit fallback for codes without specific 4-digit mappings
+- [x] More precise job search results for specific programs
 
-### Task 32: Legal/Data Disclaimer
-- [ ] Add a dismissible v-alert or v-banner at top of App.vue
-- [ ] Text: "This tool provides estimates for planning purposes only. It is not financial advice. Data may lag 1-2 years. Individual outcomes vary."
-- [ ] Store dismissal in localStorage so it doesn't reappear every session
-- [ ] Add brief disclaimer text to the budget simulator card subtitle
+### Task 32: Legal/Data Disclaimer ✅ Complete
+- [x] Add dismissible v-banner at top of App.vue (DisclaimerBanner.vue)
+- [x] "Planning tool only. Not financial advice. Data may lag 1-2 years."
+- [x] Dismissal persisted to localStorage (key: gradcast_disclaimer_dismissed)
+
+---
+
+## One Bug Remaining
+
+### Task 33: Fix Adzuna UTF-8 Encoding Bug
+- [ ] Adzuna API returns `Content-Type: charset=utf8` (missing dash)
+- [ ] .NET's `ReadAsStringAsync` throws: `'utf8' is not a supported encoding name`
+- [ ] Fix: read response as bytes, decode with `System.Text.Encoding.UTF8` explicitly
+- [ ] After fix: Job Pulse widget will show live openings count + local salary data
 
 ---
 

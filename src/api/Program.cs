@@ -41,6 +41,10 @@ builder.Services.AddScoped<BudgetSimulatorService>();
 // Job Pulse (Adzuna API — graceful fallback if unconfigured)
 builder.Services.Configure<AdzunaOptions>(
     builder.Configuration.GetSection(AdzunaOptions.SectionName));
+
+var adzunaConfig = builder.Configuration.GetSection("Adzuna");
+Console.WriteLine($"[GradCast] Adzuna: AppId={adzunaConfig["AppId"] ?? "(empty)"}, Key={(string.IsNullOrEmpty(adzunaConfig["AppKey"]) ? "(empty)" : "****" + adzunaConfig["AppKey"]?[^4..])}");
+
 builder.Services.AddHttpClient<IJobPulseService, AdzunaJobPulseService>(client =>
 {
     client.DefaultRequestHeaders.Add("Accept", "application/json");

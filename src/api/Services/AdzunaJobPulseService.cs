@@ -42,7 +42,8 @@ public class AdzunaJobPulseService : IJobPulseService
         var scorecardEarnings = await GetScorecardEarningsAsync(cipCode, ct);
 
         // Build search keywords from CIP code
-        var keywords = CipJobKeywordMap.GetSearchQuery(cipCode);
+        var displayKeywords = CipJobKeywordMap.GetSearchQuery(cipCode);
+        var searchKeyword = CipJobKeywordMap.GetPrimaryKeyword(cipCode);
 
         // If Adzuna isn't configured, return Scorecard-only result
         if (string.IsNullOrEmpty(_options.AppId) || string.IsNullOrEmpty(_options.AppKey))
@@ -51,7 +52,7 @@ public class AdzunaJobPulseService : IJobPulseService
             return new JobPulseResult(
                 CipCode: cipCode,
                 CbsaCode: cbsaCode,
-                SearchKeywords: keywords,
+                SearchKeywords: displayKeywords,
                 ActiveOpenings: 0,
                 LocalMedianSalary: null,
                 ScorecardMedianEarnings: scorecardEarnings,
@@ -64,13 +65,15 @@ public class AdzunaJobPulseService : IJobPulseService
         try
         {
             var locationQuery = ExtractCityForSearch(location.Name);
+            // Use + encoding for spaces (Adzuna requires this, not %20)
+            var encodedKeyword = searchKeyword.Replace(" ", "+");
+            var encodedLocation = locationQuery.Replace(" ", "+");
             var url = $"{_options.BaseUrl}/jobs/{_options.Country}/search/1" +
                       $"?app_id={_options.AppId}" +
                       $"&app_key={_options.AppKey}" +
-                      $"&what={Uri.EscapeDataString(keywords)}" +
-                      $"&where={Uri.EscapeDataString(locationQuery)}" +
-                      $"&results_per_page=0" +   // We only need count + salary stats
-                      $"&content-type=application/json";
+                      $"&what={encodedKeyword}" +
+                      $"&where={encodedLocation}" +
+                      $"&results_per_page=0";
 
             var response = await _httpClient.GetAsync(url, ct);
 
@@ -79,10 +82,11 @@ public class AdzunaJobPulseService : IJobPulseService
                 _logger.LogWarning("Adzuna returned {Status} for CIP {Cip} in {Location}",
                     response.StatusCode, cipCode, locationQuery);
 
-                return FallbackResult(cipCode, cbsaCode, keywords, scorecardEarnings, location.Name);
+                return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, location.Name);
             }
 
-            var json = await response.Content.ReadAsStringAsync(ct);
+            var json = System.Text.Encoding.UTF8.GetString(
+                await response.Content.ReadAsByteArrayAsync(ct));
             var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
@@ -97,7 +101,7 @@ public class AdzunaJobPulseService : IJobPulseService
             return new JobPulseResult(
                 CipCode: cipCode,
                 CbsaCode: cbsaCode,
-                SearchKeywords: keywords,
+                SearchKeywords: displayKeywords,
                 ActiveOpenings: count,
                 LocalMedianSalary: meanSalary,
                 ScorecardMedianEarnings: scorecardEarnings,
@@ -107,17 +111,17 @@ public class AdzunaJobPulseService : IJobPulseService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Adzuna API call failed for CIP {Cip} in {Cbsa}", cipCode, cbsaCode);
-            return FallbackResult(cipCode, cbsaCode, keywords, scorecardEarnings, location.Name);
+            _logger.LogWarning(ex, "Adzuna API call failed for CIP {Cip} in {Cbsa}. Message: {Message}", cipCode, cbsaCode, ex.Message);
+            return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, location.Name);
         }
     }
 
-    private JobPulseResult FallbackResult(string cipCode, string cbsaCode, string keywords, decimal? scorecardEarnings, string locationName)
+    private JobPulseResult FallbackResult(string cipCode, string cbsaCode, string displayKeywords, decimal? scorecardEarnings, string locationName)
     {
         return new JobPulseResult(
             CipCode: cipCode,
             CbsaCode: cbsaCode,
-            SearchKeywords: keywords,
+            SearchKeywords: displayKeywords,
             ActiveOpenings: 0,
             LocalMedianSalary: null,
             ScorecardMedianEarnings: scorecardEarnings,
