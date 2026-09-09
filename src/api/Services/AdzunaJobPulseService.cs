@@ -85,8 +85,9 @@ public class AdzunaJobPulseService : IJobPulseService
                 return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, location.Name);
             }
 
-            var json = System.Text.Encoding.UTF8.GetString(
-                await response.Content.ReadAsByteArrayAsync(ct));
+            await using var stream = await response.Content.ReadAsStreamAsync(ct);
+            using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
+            var json = await reader.ReadToEndAsync(ct);
             var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
