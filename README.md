@@ -64,7 +64,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 
 1. Clone the repo:
    ```bash
-   git clone https://github.com/yourusername/gradcast.git
+   git clone https://github.com/knowthankyew/gradcast.git
    cd gradcast
    ```
 
@@ -184,6 +184,12 @@ gradcast/
 │   │       ├── AdzunaJobPulseService.cs        # Live job openings via Adzuna
 │   │       ├── CipJobKeywordMap.cs             # CIP code to job search keywords
 │   │       └── BudgetSimulatorService.cs       # Orchestrates the full sim
+│   ├── api.tests/                        # xUnit backend test suites
+│   │   ├── Configuration/                # Options binding & DI registration tests
+│   │   ├── Data/                         # Reference data seeder integration tests
+│   │   ├── Endpoints/                    # Route contracts & API validation tests
+│   │   ├── Services/                     # Service unit tests (Budget, Tax, Loan, etc.)
+│   │   └── TestDoubles/                  # Shared test doubles & stubs
 │   ├── data/                             # EF Core class library
 │   │   ├── Entities/                     # School, Program, CbsaLocation, FairMarketRent, etc.
 │   │   ├── SeedData/                     # Static seed (metros + FMR values)
