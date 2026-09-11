@@ -1,7 +1,9 @@
-﻿using GradCast.Api.Models;
+﻿using GradCast.Api.Endpoints;
+using GradCast.Api.Models;
 using GradCast.Api.Services;
 using GradCast.Data.Entities;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -198,6 +200,19 @@ public class BudgetSimulatorServiceTests
         var result = service.SimulateAsync(request).GetAwaiter().GetResult();
         Assert.NotNull(result);
         Assert.Contains(result!.IncomeStatus, new[] { "tight", "deficit", "manageable", "comfortable" });
+    }
+}
+
+public class FinanceEndpointValidationContractTests
+{
+    [Fact]
+    public void FinanceEndpointValidationFailureKeepsAStableProblemShape()
+    {
+        var error = FinanceEndpoints.ValidateLoanRequest(-1m, 0.02m);
+
+        Assert.NotNull(error);
+        var problem = error as IResult;
+        Assert.NotNull(problem);
     }
 }
 

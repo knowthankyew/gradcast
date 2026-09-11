@@ -23,25 +23,72 @@ public static class FinanceEndpoints
              .WithDescription("Run full budget simulation for school + location + program");
     }
 
+    public static IResult? ValidateNetPayRequest(decimal grossSalary, string? state)
+    {
+        if (grossSalary <= 0 || grossSalary > 10_000_000)
+        {
+            return ValidationFailure(
+                title: "Invalid salary",
+                detail: "Gross salary must be between $1 and $10,000,000.");
+        }
+
+        if (string.IsNullOrWhiteSpace(state) || state.Length < 2)
+        {
+            return ValidationFailure(
+                title: "Invalid state",
+                detail: "State must be a valid 2-letter US state code.");
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateLoanRequest(decimal principal, decimal? rate)
+    {
+        if (principal < 0 || principal > 1_000_000)
+        {
+            return ValidationFailure(
+                title: "Invalid principal",
+                detail: "Loan principal must be between $0 and $1,000,000.");
+        }
+
+        if (rate.HasValue && (rate.Value <= 0 || rate.Value > 0.30m))
+        {
+            return ValidationFailure(
+                title: "Invalid rate",
+                detail: "Annual interest rate must be between 0 and 0.30 (30%).");
+        }
+
+        return null;
+    }
+
+    public static IResult? ValidateSimulationRequest(BudgetSimulationRequest request)
+    {
+        if (request.SchoolId <= 0)
+        {
+            return ValidationFailure(
+                title: "Invalid school",
+                detail: "A valid school ID is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.CbsaCode))
+        {
+            return ValidationFailure(
+                title: "Invalid location",
+                detail: "A CBSA code is required for the target location.");
+        }
+
+        return null;
+    }
+
     private static IResult CalculateNetPay(
         [FromQuery] decimal grossSalary,
         [FromQuery] string state,
         ITaxCalculationService taxService)
     {
-        if (grossSalary <= 0 || grossSalary > 10_000_000)
+        var invalid = ValidateNetPayRequest(grossSalary, state);
+        if (invalid != null)
         {
-            return Results.Problem(
-                title: "Invalid salary",
-                detail: "Gross salary must be between $1 and $10,000,000.",
-                statusCode: 400);
-        }
-
-        if (string.IsNullOrWhiteSpace(state) || state.Length < 2)
-        {
-            return Results.Problem(
-                title: "Invalid state",
-                detail: "State must be a valid 2-letter US state code.",
-                statusCode: 400);
+            return invalid;
         }
 
         var result = taxService.Calculate(grossSalary, state);
@@ -54,20 +101,10 @@ public static class FinanceEndpoints
         [FromQuery] int? termYears,
         ILoanAmortizationService loanService)
     {
-        if (principal < 0 || principal > 1_000_000)
+        var invalid = ValidateLoanRequest(principal, rate);
+        if (invalid != null)
         {
-            return Results.Problem(
-                title: "Invalid principal",
-                detail: "Loan principal must be between $0 and $1,000,000.",
-                statusCode: 400);
-        }
-
-        if (rate.HasValue && (rate.Value <= 0 || rate.Value > 0.30m))
-        {
-            return Results.Problem(
-                title: "Invalid rate",
-                detail: "Annual interest rate must be between 0 and 0.30 (30%).",
-                statusCode: 400);
+            return invalid;
         }
 
         var result = loanService.Calculate(principal, rate, termYears);
@@ -79,20 +116,10 @@ public static class FinanceEndpoints
         IBudgetSimulatorService simulatorService,
         CancellationToken ct)
     {
-        if (request.SchoolId <= 0)
+        var invalid = ValidateSimulationRequest(request);
+        if (invalid != null)
         {
-            return Results.Problem(
-                title: "Invalid school",
-                detail: "A valid school ID is required.",
-                statusCode: 400);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.CbsaCode))
-        {
-            return Results.Problem(
-                title: "Invalid location",
-                detail: "A CBSA code is required for the target location.",
-                statusCode: 400);
+            return invalid;
         }
 
         var housingType = request.HousingType ?? "1bed";
@@ -101,7 +128,7 @@ public static class FinanceEndpoints
         var result = await simulatorService.SimulateAsync(normalizedRequest, ct);
         if (result == null)
         {
-            return Results.Problem(
+            return ValidationFailure(
                 title: "Simulation failed",
                 detail: "Could not find location data for the given CBSA code.",
                 statusCode: 404);
@@ -109,4 +136,10 @@ public static class FinanceEndpoints
 
         return Results.Ok(result);
     }
+
+    private static IResult ValidationFailure(
+        string title,
+        string detail,
+        int statusCode = 400)
+        => Results.Problem(title: title, detail: detail, statusCode: statusCode);
 }
