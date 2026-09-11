@@ -119,6 +119,7 @@ gradcast/
 │   └── web/                              # Vue 3 + Vuetify 4 + Pinia
 │       └── src/
 │           ├── components/
+│           │   ├── DisclaimerBanner.vue
 │           │   ├── SchoolSearch.vue
 │           │   ├── SchoolDetail.vue
 │           │   ├── ProgramList.vue       # Selectable rows

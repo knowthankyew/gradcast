@@ -104,10 +104,10 @@ All mutable reference data lives in external configuration files or SQLite, not 
 
 ### Feedback Integration (Current Sprint)
 - [x] Tax brackets externalized to versioned JSON config (2026 values live)
-- [ ] `isRestoring` mutex in Pinia store (prevents watcher race conditions on load-back)
-- [ ] CIP keyword map enhanced to 4-digit granularity with 2-digit fallback
-- [ ] Legal/data disclaimer banner in UI
-- [ ] Spec docs brought current (this document)
+- [x] `isRestoring` mutex in Pinia store (prevents watcher race conditions on load-back)
+- [x] CIP keyword map enhanced to 4-digit granularity with 2-digit fallback
+- [x] Legal/data disclaimer banner in UI
+- [x] Spec docs brought current (this document)
 
 ---
 

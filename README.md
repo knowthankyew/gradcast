@@ -45,8 +45,6 @@ An AI-generated proof-of-concept web application that helps students simulate th
 2. View school details          → Tuition, admission rate, completion rate, trend chart
 3. Browse/select a program      → Click to lock in earnings data (optional)
 4. Pick target destination      → Metro area + housing preference
-5. Budget simulator appears     → Real numbers, real consequences
-6. Save scenarios               → Compare different school/city/program combinations
 5. Job market pulse appears     → Active job openings & local salary vs. Scorecard earnings
 6. Budget simulator appears     → Real numbers, real consequences
 7. Save scenarios               → Compare different school/city/program combinations
@@ -138,16 +136,21 @@ The import is idempotent and also seeds:
 ```
 gradcast/
 ├── src/
-│   ├── api/                        # ASP.NET Core 10 backend
-│   │   ├── Configuration/          # Options classes
-│   │   ├── Endpoints/              # Minimal API route handlers
-│   │   │   ├── SchoolEndpoints.cs      # /api/schools/*
-│   │   │   ├── LocationEndpoints.cs    # /api/locations/*
-│   │   │   └── FinanceEndpoints.cs     # /api/finance/*
-│   │   │   ├── FinanceEndpoints.cs     # /api/finance/*
-│   │   │   └── JobEndpoints.cs         # /api/jobs/*
-│   │   ├── Models/                 # DTOs
-│   │   └── Services/               # Business logic
+│   ├── api/                              # ASP.NET Core 10 backend
+│   │   ├── Program.cs                    # DI, middleware, endpoint mapping
+│   │   ├── Configuration/                # Options classes & tax configuration
+│   │   │   ├── CollegeScorecardOptions.cs
+│   │   │   ├── AdzunaOptions.cs
+│   │   │   └── TaxData/
+│   │   │       └── tax_config_2026.json  # Versioned federal/state tax brackets
+│   │   ├── Endpoints/                    # Minimal API route handlers
+│   │   │   ├── SchoolEndpoints.cs        # /api/schools/*
+│   │   │   ├── LocationEndpoints.cs      # /api/locations/*
+│   │   │   ├── FinanceEndpoints.cs       # /api/finance/*
+│   │   │   └── JobEndpoints.cs           # /api/jobs/*
+│   │   ├── Models/                       # DTOs
+│   │   └── Services/                     # Business logic
+│   │       ├── ICollegeScorecardService.cs
 │   │       ├── CollegeScorecardService.cs      # Remote Scorecard API
 │   │       ├── LocalCollegeScorecardService.cs # SQLite queries
 │   │       ├── HybridCollegeScorecardService.cs
@@ -155,28 +158,40 @@ gradcast/
 │   │       ├── HousingCostService.cs           # HUD FMR lookup
 │   │       ├── TaxCalculationService.cs        # Federal + state tax math
 │   │       ├── LoanAmortizationService.cs      # Student loan payments
+│   │       ├── IJobPulseService.cs             # Job pulse contract
 │   │       ├── AdzunaJobPulseService.cs        # Live job openings via Adzuna
+│   │       ├── CipJobKeywordMap.cs             # CIP code to job search keywords
 │   │       └── BudgetSimulatorService.cs       # Orchestrates the full sim
-│   ├── data/                       # EF Core class library
-│   │   ├── Entities/               # School, Program, CbsaLocation, FairMarketRent, etc.
-│   │   ├── SeedData/               # Static seed (metros + FMR values)
+│   ├── data/                             # EF Core class library
+│   │   ├── Entities/                     # School, Program, CbsaLocation, FairMarketRent, etc.
+│   │   ├── SeedData/                     # Static seed (metros + FMR values)
 │   │   └── GradCastDbContext.cs
-│   ├── import/                     # CLI import tool
-│   └── web/                        # Vue 3 + Vuetify 4 frontend
+│   ├── import/                           # CLI import tool
+│   │   └── Program.cs                    # Bulk Scorecard import & reference data seeder
+│   └── web/                              # Vue 3 + Vuetify 4 frontend
 │       └── src/
-│           ├── components/         # UI components
+│           ├── components/               # UI components
+│           │   ├── DisclaimerBanner.vue  # Legal/data disclaimer banner
 │           │   ├── SchoolSearch.vue
 │           │   ├── SchoolDetail.vue
-│           │   ├── ProgramList.vue         # Selectable program rows
-│           │   ├── LocationSelector.vue    # Metro + housing type
-│           │   ├── JobPulseWidget.vue      # Active openings & salary comparison
-│           │   ├── BudgetSimulator.vue     # The "consequences engine"
-│           │   └── SavedBudgets.vue        # localStorage scenarios
-│           ├── composables/        # API + logic composables
-│           ├── stores/             # Pinia state management
-│           ├── data/               # Static lookup data (CIP categories)
-│           └── types/              # TypeScript interfaces
-├── GradCast.slnx                   # .NET solution
+│           │   ├── ProgramList.vue       # Selectable program rows
+│           │   ├── YearSelector.vue      # Historic data year selector
+│           │   ├── TuitionTrend.vue      # 5-year tuition history chart
+│           │   ├── LocationSelector.vue  # Metro + housing type
+│           │   ├── JobPulseWidget.vue    # Active openings & salary comparison
+│           │   ├── BudgetSimulator.vue   # The "consequences engine"
+│           │   └── SavedBudgets.vue      # localStorage scenarios
+│           ├── composables/              # API + logic composables
+│           │   ├── useSchoolApi.ts
+│           │   ├── useBudgetSimulator.ts
+│           │   ├── useJobPulse.ts
+│           │   └── useSavedBudgets.ts
+│           ├── stores/                   # Pinia state management
+│           │   └── appStore.ts           # Shared state + isRestoring mutex
+│           ├── data/                     # Static lookup data (CIP categories)
+│           │   └── cipCategories.ts
+│           └── types/                    # TypeScript interfaces
+├── GradCast.slnx                         # .NET solution
 └── README.md
 ```
 
@@ -196,7 +211,6 @@ gradcast/
 
 ## Phase 3 Vision
 
-- Job market pulse (Adzuna API integration for live job openings by CIP + metro)
 - Multi-year career trajectory modeling
 - Side-by-side school/city comparison mode
 - Savings rate projections and emergency fund timelines
