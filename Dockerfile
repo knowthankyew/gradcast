@@ -32,6 +32,9 @@ RUN dotnet publish -c Release -o /app/publish
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-alpine AS runtime
 WORKDIR /app
 
+# Install wget for container health checks
+RUN apk add --no-cache wget
+
 # Ensure data directory exists with correct permissions for non-root user
 RUN mkdir -p /app/data && chown -R $APP_UID:$APP_UID /app/data
 
@@ -48,7 +51,7 @@ USER $APP_UID
 VOLUME ["/app/data"]
 EXPOSE 5062
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://localhost:5062/health || exit 1
 
 ENTRYPOINT ["dotnet", "GradCast.Api.dll"]

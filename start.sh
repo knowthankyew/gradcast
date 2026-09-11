@@ -89,14 +89,19 @@ fi
 check_port() {
     local port=$1
     local name=$2
+    local pid=""
     if command -v lsof >/dev/null 2>&1; then
-        local pid
         pid=$(lsof -ti :"$port" 2>/dev/null || true)
-        if [ -n "$pid" ]; then
-            echo -e "${RED}Error: Port $port ($name) is already in use by process PID $pid.${NC}"
-            echo -e "To free it, run: ${BOLD}kill -9 $pid${NC}"
-            exit 1
-        fi
+    elif command -v ss >/dev/null 2>&1; then
+        pid=$(ss -lptn "sport = :$port" 2>/dev/null | grep -o 'pid=[0-9]*' | head -n1 | cut -d= -f2 || true)
+    elif command -v netstat >/dev/null 2>&1; then
+        pid=$(netstat -tlpn 2>/dev/null | grep ":$port " | awk '{print $7}' | cut -d/ -f1 | head -n1 || true)
+    fi
+
+    if [ -n "$pid" ]; then
+        echo -e "${RED}Error: Port $port ($name) is already in use by process PID $pid.${NC}"
+        echo -e "To free it, run: ${BOLD}kill -9 $pid${NC}"
+        exit 1
     fi
 }
 
