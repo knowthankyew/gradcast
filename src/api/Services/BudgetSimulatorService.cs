@@ -101,7 +101,11 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         // Try program-specific median earnings
         if (!string.IsNullOrEmpty(request.CipCode))
         {
-            var programEarnings = await _repo.GetProgramMedianEarningsAsync(request.SchoolId, request.CipCode, ct);
+            var programEarnings = await _repo.GetProgramMedianEarningsAsync(
+                request.SchoolId,
+                request.CipCode,
+                request.CredentialLevel,
+                ct);
             if (programEarnings.HasValue && programEarnings.Value > 0)
             {
                 return programEarnings.Value;

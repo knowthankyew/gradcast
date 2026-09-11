@@ -342,14 +342,16 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
             continue;
         }
 
-        // Skip aggregate rows (2-digit CIP codes like "01" without sub-detail)
-        if (cipCode.Length <= 3) continue;
+        // Store each program at GradCast's canonical 4-digit category level.
+        // This accepts source formats such as both "11.0701" and "1107".
+        var normalizedCipCode = CipCode.NormalizeToFourDigit(cipCode);
+        if (normalizedCipCode is null) continue;
 
         var program = new GradCast.Data.Entities.Program
         {
             SchoolId = unitId.Value,
             Year = 2024,
-            CipCode = cipCode.Length >= 5 ? cipCode[..5] : cipCode,
+            CipCode = normalizedCipCode,
             Title = csv.GetField("CIPDESC") ?? "",
             CredentialLevel = credLevel.Value,
             Completions = ParseInt(csv.GetField("IPEDSCOUNT1")),

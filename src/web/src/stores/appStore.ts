@@ -11,6 +11,7 @@ export interface LocationSelection {
 export interface ProgramSelection {
   cipCode: string
   title: string
+  credentialLevel: number
   credentialName: string
 }
 

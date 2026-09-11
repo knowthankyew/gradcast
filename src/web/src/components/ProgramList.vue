@@ -145,6 +145,7 @@ function selectProgram(program: ProgramData) {
     store.setProgram({
       cipCode: program.code,
       title: program.title,
+      credentialLevel: program.credentialLevel,
       credentialName: program.credentialName,
     })
   }

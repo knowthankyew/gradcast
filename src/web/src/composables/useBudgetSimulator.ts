@@ -38,6 +38,7 @@ export function useBudgetSimulator() {
       const body = {
         schoolId: store.selectedSchoolId,
         cipCode: store.selectedProgram?.cipCode ?? null,
+        credentialLevel: store.selectedProgram?.credentialLevel ?? null,
         cbsaCode: store.selectedLocation!.cbsaCode,
         housingType: store.housingType,
         salaryOverride: salaryOverride ?? null,

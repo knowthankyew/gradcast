@@ -27,13 +27,33 @@ public class GradCastRepository : IGradCastRepository
             .FirstOrDefaultAsync(ct);
     }
 
-    public async Task<decimal?> GetProgramMedianEarningsAsync(int schoolId, string cipCode, CancellationToken ct = default)
+    public async Task<decimal?> GetProgramMedianEarningsAsync(
+        int schoolId,
+        string cipCode,
+        int? credentialLevel = null,
+        CancellationToken ct = default)
     {
-        return await _db.Programs
-            .Where(p => p.SchoolId == schoolId && p.CipCode.StartsWith(cipCode) && p.MedianEarnings.HasValue)
-            .OrderByDescending(p => p.MedianEarnings)
-            .Select(p => p.MedianEarnings)
-            .FirstOrDefaultAsync(ct);
+        var normalizedCipCode = CipCode.NormalizeToFourDigit(cipCode);
+        if (normalizedCipCode is null) return null;
+
+        var earnings = await _db.Programs
+            .Where(p => p.SchoolId == schoolId &&
+                        p.CipCode.Replace(".", "") == normalizedCipCode &&
+                        p.MedianEarnings.HasValue &&
+                        (!credentialLevel.HasValue || p.CredentialLevel == credentialLevel.Value))
+            .Select(p => p.MedianEarnings!.Value)
+            .OrderBy(value => value)
+            .ToListAsync(ct);
+
+        if (earnings.Count == 0) return null;
+
+        // A selected program supplies its credential level and resolves to its exact row.
+        // Older saved scenarios do not have that field, so use the statistical median of
+        // matching credentials rather than biasing the simulation toward the highest salary.
+        var middle = earnings.Count / 2;
+        return earnings.Count % 2 == 1
+            ? earnings[middle]
+            : (earnings[middle - 1] + earnings[middle]) / 2;
     }
 
     public async Task<List<decimal>> GetSchoolMedianEarningsAsync(int schoolId, CancellationToken ct = default)

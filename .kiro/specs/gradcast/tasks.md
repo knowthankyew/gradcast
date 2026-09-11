@@ -62,10 +62,63 @@
 ## One Bug Remaining
 
 ### Task 33: Fix Adzuna UTF-8 Encoding Bug
-- [ ] Adzuna API returns `Content-Type: charset=utf8` (missing dash)
-- [ ] .NET's `ReadAsStringAsync` throws: `'utf8' is not a supported encoding name`
-- [ ] Fix: read response as bytes, decode with `System.Text.Encoding.UTF8` explicitly
-- [ ] After fix: Job Pulse widget will show live openings count + local salary data
+- [x] Adzuna API returns `Content-Type: charset=utf8` (missing dash)
+- [x] .NET's `ReadAsStringAsync` throws: `'utf8' is not a supported encoding name`
+- [x] Fix: read response as bytes, decode with `System.Text.Encoding.UTF8` explicitly
+- [x] After fix: Job Pulse widget will show live openings count + local salary data
+
+---
+
+## Backend Review Follow-Up (Planned)
+
+### Task 34: Normalize CIP Codes for Budget Salary Resolution ✅ Complete
+- [x] Establish one canonical stored/query format for CIP codes (digits only, 4-digit category level).
+- [x] Normalize imported `CIPCODE` values before persisting program rows.
+- [x] Normalize incoming simulator CIP codes before querying program earnings.
+- [x] Replace the current prefix/max-earnings lookup with the selected program's matching earnings value; define and document a deterministic fallback when multiple credential rows match.
+- [x] Add regression coverage proving a selected local program resolves its own median earnings rather than the school-wide fallback.
+
+### Task 35: Validate and Harden Finance Inputs
+- [ ] Validate loan `termYears` as a positive, bounded integer before amortization (for example, 1–50 years).
+- [ ] Validate simulator `housingType` against the supported values: `studio`, `1bed`, and `2bed`.
+- [ ] Validate `salaryOverride` as a positive, bounded annual salary when provided.
+- [ ] Return consistent RFC 7807 problem responses for invalid finance input; do not allow invalid input to produce a 500.
+- [ ] Add endpoint-level tests for zero/negative loan terms, unsupported housing types, and invalid salary overrides.
+
+### Task 36: Treat Missing Housing Data as Unavailable, Not Free
+- [ ] Make budget simulation return an explicit unavailable result when no FMR record exists for the selected CBSA.
+- [ ] Map that result to a clear client error/status rather than returning a successful simulation with `$0` rent.
+- [ ] Preserve the existing successful response shape for simulations with valid housing data.
+- [ ] Add regression coverage for a valid location with missing FMR data.
+
+### Task 37: Refresh Import Dependencies and Remove Vulnerable SQLite Native Package
+- [ ] Replace the preview EF Core SQLite package in `src/import` with the same supported stable version used by API/data projects.
+- [ ] Restore packages and verify `dotnet list GradCast.slnx package --include-transitive --vulnerable` reports no known vulnerabilities.
+- [ ] Run the import tool against a representative Scorecard extract to confirm compatibility.
+
+### Task 38: Make Reference-Data Seeding Updatable
+- [ ] Change CBSA and FMR seeding from "skip when table has rows" to idempotent upsert behavior.
+- [ ] Key FMR updates by `(CbsaCode, Year)` so a newly added annual seed is inserted without deleting prior-year history.
+- [ ] Update existing rows when corrected seed values are re-imported.
+- [ ] Add an import integration test covering a second run with a new FMR year.
+
+### Task 39: Restore Local-First Default Behavior
+- [ ] Change the default data mode to `hybrid` after a local import, or document and implement an explicit startup mode selection.
+- [ ] When API credentials are absent, serve local data when available and return an actionable configuration error only when remote fallback is actually required.
+- [ ] Document the intended first-run workflow: import data, optional API credentials, then run the app.
+- [ ] Add startup/service-selection coverage for unconfigured API credentials and each data mode.
+
+### Task 40: Secure Development Credentials
+- [ ] Rotate any currently active College Scorecard and Adzuna credentials.
+- [ ] Store credentials in .NET user secrets or environment variables; keep only empty/example values in config files.
+- [ ] Add `appsettings.Development.example.json` (or equivalent setup documentation) without secrets.
+- [ ] Verify ignored local config is not tracked and no credentials appear in application logs.
+
+### Task 41: Strengthen Backend Test Coverage and Spec Compliance
+- [ ] Replace permissive assertions with deterministic expected values for tax, loan, rent, and simulation calculations.
+- [ ] Add integration tests for finance endpoint status codes and problem-response bodies.
+- [ ] Add tests for malformed/missing tax-config fields and ensure provider exceptions follow the documented contract.
+- [ ] Dispose parsed JSON documents and use read-only EF queries where appropriate.
 
 ---
 

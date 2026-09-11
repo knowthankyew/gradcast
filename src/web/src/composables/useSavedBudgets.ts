@@ -6,6 +6,7 @@ export interface SavedBudgetContext {
   schoolName: string
   programCipCode: string | null
   programTitle: string | null
+  programCredentialLevel: number | null
   programCredentialName: string | null
   cbsaCode: string
   locationName: string

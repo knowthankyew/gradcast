@@ -154,6 +154,7 @@ function onSave() {
       schoolName: store.selectedSchool?.name ?? 'Unknown School',
       programCipCode: store.selectedProgram?.cipCode ?? null,
       programTitle: store.selectedProgram?.title ?? null,
+      programCredentialLevel: store.selectedProgram?.credentialLevel ?? null,
       programCredentialName: store.selectedProgram?.credentialName ?? null,
       cbsaCode: store.selectedLocation!.cbsaCode,
       locationName: store.selectedLocation!.name,
@@ -191,6 +192,7 @@ async function onLoad(budget: SavedBudget) {
       store.setProgram({
         cipCode: ctx.programCipCode,
         title: ctx.programTitle,
+        credentialLevel: ctx.programCredentialLevel ?? 0,
         credentialName: ctx.programCredentialName ?? '',
       })
     } else {

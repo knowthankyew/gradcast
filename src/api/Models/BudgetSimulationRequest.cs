@@ -5,5 +5,6 @@ public record BudgetSimulationRequest(
     string? CipCode,
     string CbsaCode,
     string HousingType,
-    decimal? SalaryOverride
+    decimal? SalaryOverride,
+    int? CredentialLevel = null
 );
