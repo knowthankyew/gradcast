@@ -97,10 +97,10 @@
 - [x] Run the import tool against a representative Scorecard extract to confirm compatibility.
 
 ### Task 38: Make Reference-Data Seeding Updatable
-- [ ] Change CBSA and FMR seeding from "skip when table has rows" to idempotent upsert behavior.
-- [ ] Key FMR updates by `(CbsaCode, Year)` so a newly added annual seed is inserted without deleting prior-year history.
-- [ ] Update existing rows when corrected seed values are re-imported.
-- [ ] Add an import integration test covering a second run with a new FMR year.
+- [x] Change CBSA and FMR seeding from "skip when table has rows" to idempotent upsert behavior.
+- [x] Key FMR updates by `(CbsaCode, Year)` so a newly added annual seed is inserted without deleting prior-year history.
+- [x] Update existing rows when corrected seed values are re-imported.
+- [x] Add an import integration test covering a second run with a new FMR year.
 
 ### Task 39: Restore Local-First Default Behavior
 - [ ] Change the default data mode to `hybrid` after a local import, or document and implement an explicit startup mode selection.

@@ -110,9 +110,12 @@ Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
 Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
 Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
 
-// Seed CBSA locations (static data, always runs)
-await SeedCbsaLocationsAsync(db);
-await SeedFairMarketRentsAsync(db);
+// Upsert curated reference data on every import so corrected values and new FMR years apply.
+var referenceDataResult = await ReferenceDataSeeder.SeedAsync(db);
+Console.WriteLine(
+    $"  Reference data: {referenceDataResult.CbsaInserted} CBSA inserted, " +
+    $"{referenceDataResult.CbsaUpdated} CBSA updated, " +
+    $"{referenceDataResult.FmrInserted} FMR inserted, {referenceDataResult.FmrUpdated} FMR updated.");
 
 Console.WriteLine($"  CBSA Locations: {await db.CbsaLocations.CountAsync()}");
 Console.WriteLine($"  Fair Market Rents: {await db.FairMarketRents.CountAsync()}");
@@ -125,61 +128,6 @@ if (cleanupWorkDir)
 return;
 
 // ─── Helper Methods ────────────────────────────────────────────────────────────
-
-static async Task SeedCbsaLocationsAsync(GradCastDbContext db)
-{
-    var existingCount = await db.CbsaLocations.CountAsync();
-    if (existingCount > 0)
-    {
-        Console.WriteLine($"  CBSA locations already seeded ({existingCount} records). Skipping.");
-        return;
-    }
-
-    Console.WriteLine("Seeding CBSA metro area data...");
-
-    foreach (var entry in GradCast.Data.SeedData.CbsaSeed.Metros)
-    {
-        db.CbsaLocations.Add(new GradCast.Data.Entities.CbsaLocation
-        {
-            CbsaCode = entry.Code,
-            Name = entry.Name,
-            State = entry.State,
-            Type = entry.Type,
-        });
-    }
-
-    await db.SaveChangesAsync();
-    Console.WriteLine($"  Seeded {GradCast.Data.SeedData.CbsaSeed.Metros.Length} CBSA metro areas.");
-}
-
-static async Task SeedFairMarketRentsAsync(GradCastDbContext db)
-{
-    var existingCount = await db.FairMarketRents.CountAsync();
-    if (existingCount > 0)
-    {
-        Console.WriteLine($"  Fair Market Rents already seeded ({existingCount} records). Skipping.");
-        return;
-    }
-
-    Console.WriteLine("Seeding Fair Market Rent data...");
-
-    foreach (var entry in GradCast.Data.SeedData.FmrSeed.Rents)
-    {
-        db.FairMarketRents.Add(new GradCast.Data.Entities.FairMarketRent
-        {
-            CbsaCode = entry.CbsaCode,
-            Year = entry.Year,
-            Efficiency = entry.Efficiency,
-            OneBedroom = entry.OneBed,
-            TwoBedroom = entry.TwoBed,
-            ThreeBedroom = entry.ThreeBed,
-            FourBedroom = entry.FourBed,
-        });
-    }
-
-    await db.SaveChangesAsync();
-    Console.WriteLine($"  Seeded {GradCast.Data.SeedData.FmrSeed.Rents.Length} Fair Market Rent records.");
-}
 
 static string? FindCsvFile(string dir, string[] namePatterns)
 {
