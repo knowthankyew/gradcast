@@ -9,7 +9,7 @@
             v-model:search="searchQuery"
             :items="items"
             :loading="loading"
-            item-title="displayName"
+            :item-title="getSchoolDisplayName"
             item-value="id"
             return-object
             label="Search by school name"
@@ -21,6 +21,9 @@
             hide-no-data
             @update:model-value="onSchoolSelected"
           >
+            <template #selection="{ item }">
+              <span>{{ getSchoolDisplayName((item as any)?.raw || item) }}</span>
+            </template>
             <template #item="{ props, item }">
               <v-list-item v-bind="props">
                 <template #subtitle>
@@ -64,16 +67,26 @@ const selectedState = ref<string | null>(null)
 const results = ref<SchoolSearchResult[]>([])
 const loading = computed(() => searchLoading.value)
 
+function getSchoolDisplayName(item: any): string {
+  if (!item) return ''
+  if (typeof item === 'string') return item
+  if (item.displayName) return item.displayName
+  if (item.name) {
+    return item.city && item.state ? `${item.name} — ${item.city}, ${item.state}` : item.name
+  }
+  return ''
+}
+
 const items = computed(() => {
   const list = results.value.map((s) => ({
     ...s,
-    displayName: `${s.name} — ${s.city}, ${s.state}`,
+    displayName: getSchoolDisplayName(s),
   }))
   if (selectedSchool.value && !list.some((s) => s.id === selectedSchool.value?.id)) {
     return [
       {
         ...selectedSchool.value,
-        displayName: `${selectedSchool.value.name} — ${selectedSchool.value.city}, ${selectedSchool.value.state}`,
+        displayName: getSchoolDisplayName(selectedSchool.value),
       },
       ...list,
     ]
@@ -117,13 +130,17 @@ watch(
   (school) => {
     if (!school) {
       selectedSchool.value = null
+      searchQuery.value = ''
     } else if (selectedSchool.value?.id !== school.id) {
+      const displayName = getSchoolDisplayName(school)
       selectedSchool.value = {
         id: school.id,
         name: school.name,
         city: school.city,
         state: school.state,
+        displayName,
       }
+      searchQuery.value = displayName
     }
   },
   { immediate: true }

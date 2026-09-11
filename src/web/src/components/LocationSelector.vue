@@ -27,6 +27,9 @@
             hide-no-data
             @update:model-value="onLocationSelected"
           >
+            <template #selection="{ item }">
+              <span>{{ (item as any)?.name || (item as any)?.raw?.name }}</span>
+            </template>
             <template #item="{ props, item }">
               <v-list-item v-bind="props">
                 <template #subtitle>
@@ -124,6 +127,7 @@ watch(
   (newLoc) => {
     if (!newLoc) {
       selectedItem.value = null
+      searchQuery.value = ''
     } else if (selectedItem.value?.cbsaCode !== newLoc.cbsaCode) {
       selectedItem.value = {
         cbsaCode: newLoc.cbsaCode,
@@ -131,6 +135,7 @@ watch(
         state: newLoc.state,
         type: '',
       }
+      searchQuery.value = newLoc.name
     }
   },
   { immediate: true }

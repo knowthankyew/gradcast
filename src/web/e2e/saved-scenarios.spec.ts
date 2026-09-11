@@ -45,6 +45,9 @@ test.describe('Saved Scenarios Lifecycle', () => {
 
     // Verify school, program, and simulation restored
     await expect(page.getByRole('heading', { name: mockSchoolDetail.name })).toBeVisible()
+    await expect(page.getByText(/\[object Object\]/i)).not.toBeVisible()
+    const schoolSearchField = page.locator('.v-autocomplete').first()
+    await expect(schoolSearchField).toContainText('The University of Texas at Austin')
     await expect(page.getByText('$4,150', { exact: true })).toBeVisible()
 
     // 4. Delete the scenario

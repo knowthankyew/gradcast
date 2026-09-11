@@ -47,7 +47,7 @@ test.describe('What-If Scenarios & State Integrity', () => {
 
   test('changing data year preserves target destination and simulation', async ({ page }) => {
     // Destination city is currently Austin
-    await expect(page.locator('.v-autocomplete__selection-text', { hasText: 'Austin-Round Rock-Georgetown' })).toBeVisible()
+    await expect(page.locator('.v-autocomplete__selection', { hasText: 'Austin-Round Rock-Georgetown' })).toBeVisible()
     await expect(page.getByText('Post-Grad Monthly Budget Simulator')).toBeVisible()
 
     // Change Data Year dropdown
@@ -60,7 +60,7 @@ test.describe('What-If Scenarios & State Integrity', () => {
 
     // Verify that the destination and budget simulator are STILL visible and NOT wiped out
     await expect(page.getByText('Post-Grad Monthly Budget Simulator')).toBeVisible()
-    await expect(page.locator('.v-autocomplete__selection-text', { hasText: 'Austin-Round Rock-Georgetown' })).toBeVisible()
+    await expect(page.locator('.v-autocomplete__selection', { hasText: 'Austin-Round Rock-Georgetown' })).toBeVisible()
   })
 
   test('clearing school search resets downstream state to empty display', async ({ page }) => {
