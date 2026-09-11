@@ -55,7 +55,7 @@
         </template>
 
         <!-- Empty state -->
-        <v-card v-if="!store.hasSchool && !detailLoading && !error" class="text-center pa-8" variant="tonal">
+        <v-card v-if="!store.hasSchool && !detailLoading && !error" class="text-center pa-8 mb-6" variant="tonal">
           <v-icon size="64" color="primary" class="mb-4">mdi-magnify</v-icon>
           <div class="text-h6 mb-2">Search for a school to get started</div>
           <div class="text-body-2 text-medium-emphasis">
@@ -63,6 +63,9 @@
             Then pick a target city to see your post-graduation budget.
           </div>
         </v-card>
+
+        <!-- Saved scenarios (accessible whenever scenarios are saved or simulation is active) -->
+        <SavedBudgets />
       </v-container>
     </v-main>
 
@@ -88,6 +91,7 @@ import YearSelector from './components/YearSelector.vue'
 import LocationSelector from './components/LocationSelector.vue'
 import JobPulseWidget from './components/JobPulseWidget.vue'
 import BudgetSimulator from './components/BudgetSimulator.vue'
+import SavedBudgets from './components/SavedBudgets.vue'
 import { useSchoolApi } from './composables/useSchoolApi'
 import { useAppStore } from './stores/appStore'
 
@@ -106,7 +110,7 @@ async function onYearChanged(year: number | null) {
   if (store.selectedSchoolId) {
     const detail = await getSchoolDetail(store.selectedSchoolId, year)
     if (detail) {
-      store.setSchool(detail)
+      store.updateSchoolDetail(detail)
     }
   }
 }

@@ -18,10 +18,11 @@ export interface BudgetSimulation {
   state: string
 }
 
+const simulation = ref<BudgetSimulation | null>(null)
+const loading = ref(false)
+const error = ref<string | null>(null)
+
 export function useBudgetSimulator() {
-  const simulation = ref<BudgetSimulation | null>(null)
-  const loading = ref(false)
-  const error = ref<string | null>(null)
 
   const store = useAppStore()
 

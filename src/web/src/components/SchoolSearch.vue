@@ -46,14 +46,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import type { SchoolSearchResult } from '../types'
 import { useSchoolApi } from '../composables/useSchoolApi'
+import { useAppStore } from '../stores/appStore'
 
 const emit = defineEmits<{
   schoolSelected: [id: number]
 }>()
 
+const store = useAppStore()
 const { searchSchools, searchLoading } = useSchoolApi()
 
 const searchQuery = ref('')
@@ -62,14 +64,25 @@ const selectedState = ref<string | null>(null)
 const results = ref<SchoolSearchResult[]>([])
 const loading = computed(() => searchLoading.value)
 
-const items = computed(() =>
-  results.value.map((s) => ({
+const items = computed(() => {
+  const list = results.value.map((s) => ({
     ...s,
     displayName: `${s.name} — ${s.city}, ${s.state}`,
   }))
-)
+  if (selectedSchool.value && !list.some((s) => s.id === selectedSchool.value?.id)) {
+    return [
+      {
+        ...selectedSchool.value,
+        displayName: `${selectedSchool.value.name} — ${selectedSchool.value.city}, ${selectedSchool.value.state}`,
+      },
+      ...list,
+    ]
+  }
+  return list
+})
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let currentRequestId = 0
 
 watch(searchQuery, (val) => {
   if (debounceTimer) clearTimeout(debounceTimer)
@@ -80,22 +93,51 @@ watch(searchQuery, (val) => {
   }
 
   debounceTimer = setTimeout(async () => {
+    const reqId = ++currentRequestId
     const data = await searchSchools(val, selectedState.value ?? undefined)
-    results.value = data
+    if (reqId === currentRequestId) {
+      results.value = data
+    }
   }, 300)
 })
 
 watch(selectedState, () => {
   if (searchQuery.value && searchQuery.value.length >= 2) {
+    const reqId = ++currentRequestId
     searchSchools(searchQuery.value, selectedState.value ?? undefined).then((data) => {
-      results.value = data
+      if (reqId === currentRequestId) {
+        results.value = data
+      }
     })
   }
+})
+
+watch(
+  () => store.selectedSchool,
+  (school) => {
+    if (!school) {
+      selectedSchool.value = null
+    } else if (selectedSchool.value?.id !== school.id) {
+      selectedSchool.value = {
+        id: school.id,
+        name: school.name,
+        city: school.city,
+        state: school.state,
+      }
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
 })
 
 function onSchoolSelected(school: any) {
   if (school) {
     emit('schoolSelected', school.id)
+  } else {
+    store.clearSchool()
   }
 }
 

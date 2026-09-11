@@ -52,6 +52,24 @@ export const useAppStore = defineStore('app', () => {
     selectedSchool.value = school
   }
 
+  /** Update school detail (e.g. year change) without clearing destination.
+   * Keeps selected program if it exists in the updated school's programs.
+   */
+  function updateSchoolDetail(school: SchoolDetail) {
+    selectedSchoolId.value = school.id
+    selectedSchool.value = school
+    if (selectedProgram.value) {
+      const stillExists = school.programs.some(
+        (p) =>
+          p.code === selectedProgram.value?.cipCode &&
+          p.credentialName === selectedProgram.value?.credentialName
+      )
+      if (!stillExists) {
+        selectedProgram.value = null
+      }
+    }
+  }
+
   function setYear(year: number | null) {
     selectedYear.value = year
   }
@@ -97,6 +115,7 @@ export const useAppStore = defineStore('app', () => {
     canSimulate,
     setSchool,
     restoreSchool,
+    updateSchoolDetail,
     setYear,
     setProgram,
     setLocation,

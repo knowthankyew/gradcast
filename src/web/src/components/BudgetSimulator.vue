@@ -50,7 +50,7 @@
 
         <!-- Expense Breakdown -->
         <div class="text-subtitle-2 mb-3">Monthly Fixed Costs</div>
-        <v-row dense>
+        <v-row density="comfortable">
           <v-col cols="12">
             <div class="d-flex align-center justify-space-between py-2">
               <div class="d-flex align-center">
@@ -114,15 +114,40 @@
             <div class="text-caption text-medium-emphasis mb-2">Budget Split</div>
             <div class="d-flex flex-column ga-1">
               <div class="d-flex align-center">
-                <div class="budget-bar bg-orange-lighten-1" :style="{ width: rentPct + '%' }" />
+                <div
+                  class="budget-bar bg-orange-lighten-1"
+                  :style="{ width: rentPct + '%' }"
+                  role="progressbar"
+                  :aria-valuenow="rentPct"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-label="`Rent takes ${rentPct}% of net pay`"
+                />
                 <span class="text-caption ml-2">Rent {{ rentPct }}%</span>
               </div>
               <div class="d-flex align-center">
-                <div class="budget-bar bg-deep-purple-lighten-2" :style="{ width: loanPct + '%' }" />
+                <div
+                  class="budget-bar bg-deep-purple-lighten-2"
+                  :style="{ width: loanPct + '%' }"
+                  role="progressbar"
+                  :aria-valuenow="loanPct"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-label="`Student loans take ${loanPct}% of net pay`"
+                />
                 <span class="text-caption ml-2">Loans {{ loanPct }}%</span>
               </div>
               <div class="d-flex align-center">
-                <div class="budget-bar" :class="disposablePct > 0 ? 'bg-green-lighten-1' : 'bg-red-lighten-1'" :style="{ width: Math.abs(disposablePct) + '%' }" />
+                <div
+                  class="budget-bar"
+                  :class="disposablePct > 0 ? 'bg-green-lighten-1' : 'bg-red-lighten-1'"
+                  :style="{ width: Math.abs(disposablePct) + '%' }"
+                  role="progressbar"
+                  :aria-valuenow="disposablePct"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                  :aria-label="`Disposable income is ${disposablePct}% of net pay`"
+                />
                 <span class="text-caption ml-2">Disposable {{ disposablePct }}%</span>
               </div>
             </div>
@@ -132,7 +157,7 @@
         <!-- Salary override -->
         <v-divider class="my-4" />
         <v-row align="center">
-          <v-col cols="12" sm="8">
+          <v-col cols="12" sm="7">
             <v-text-field
               v-model.number="salaryOverrideInput"
               label="What-if salary override"
@@ -143,10 +168,9 @@
               hint="Enter a custom salary to explore different scenarios"
               persistent-hint
               clearable
-              @update:model-value="onSalaryOverrideChanged"
             />
           </v-col>
-          <v-col cols="12" sm="4">
+          <v-col cols="12" sm="5" class="d-flex align-center ga-2">
             <v-btn
               variant="tonal"
               color="primary"
@@ -156,20 +180,25 @@
               <v-icon start>mdi-refresh</v-icon>
               Recalculate
             </v-btn>
+            <v-btn
+              v-if="sim.salarySource === 'user_override'"
+              variant="text"
+              color="secondary"
+              @click="resetOverride"
+            >
+              <v-icon start>mdi-undo</v-icon>
+              Reset
+            </v-btn>
           </v-col>
         </v-row>
       </template>
     </v-card-text>
   </v-card>
-
-  <!-- Saved scenarios -->
-  <SavedBudgets :simulation="sim" />
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useBudgetSimulator } from '../composables/useBudgetSimulator'
-import SavedBudgets from './SavedBudgets.vue'
 
 const { simulation: sim, loading, error, runSimulation } = useBudgetSimulator()
 
@@ -244,14 +273,15 @@ const disposablePct = computed(() => {
   return Math.round((sim.value.disposableMonthly / sim.value.netMonthly) * 100)
 })
 
-function onSalaryOverrideChanged() {
-  // Don't auto-run, wait for button click
-}
-
 function runWithOverride() {
   if (salaryOverrideInput.value && salaryOverrideInput.value > 0) {
     runSimulation(salaryOverrideInput.value)
   }
+}
+
+function resetOverride() {
+  salaryOverrideInput.value = null
+  runSimulation()
 }
 
 function formatCurrency(value: number): string {

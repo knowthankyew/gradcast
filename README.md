@@ -6,6 +6,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 
 - **Backend**: C# / ASP.NET Core 10 Minimal API
 - **Frontend**: Vue 3 (Composition API) + TypeScript + Vuetify 4 + Pinia
+- **Testing**: Playwright (Frontend E2E) + xUnit (.NET Backend)
 - **Data Layer**: SQLite via EF Core (local/hybrid mode) or live API calls (remote mode)
 - **Build**: .NET CLI + Vite
 
@@ -190,6 +191,12 @@ gradcast/
 │   ├── import/                           # CLI import tool
 │   │   └── Program.cs                    # Bulk Scorecard import & reference data seeder
 │   └── web/                              # Vue 3 + Vuetify 4 frontend
+│       ├── e2e/                          # Playwright end-to-end tests
+│       │   ├── fixtures/mockData.ts      # Deterministic route mocks
+│       │   ├── gradcast-flow.spec.ts     # Core progressive disclosure flow
+│       │   ├── saved-scenarios.spec.ts   # Scenario persistence & hydration
+│       │   └── what-if-scenarios.spec.ts # Salary override & state integrity
+│       ├── playwright.config.ts          # Playwright test configuration
 │       └── src/
 │           ├── components/               # UI components
 │           │   ├── DisclaimerBanner.vue  # Legal/data disclaimer banner
@@ -214,6 +221,28 @@ gradcast/
 │           └── types/                    # TypeScript interfaces
 ├── GradCast.slnx                         # .NET solution
 └── README.md
+```
+
+## Testing
+
+### Frontend (Playwright E2E)
+The frontend includes end-to-end test suites powered by Playwright with realistic network mocking:
+
+```bash
+cd src/web
+npm run test:e2e        # Run all tests headless
+npm run test:e2e:ui     # Interactive UI mode with DOM inspection and time-travel debugging
+npm run test:e2e:headed # Run in visible browser window
+```
+
+Test coverage:
+- **Core User Flow**: Progressive disclosure from school search to full budget simulation.
+- **Saved Scenarios**: Saving, reloading/hydrating from empty state, deleting, and bulk clearing.
+- **What-If Simulations**: Salary overrides, scorecard median resets, and historic year selector resilience.
+
+### Backend (xUnit)
+```bash
+dotnet test
 ```
 
 ## API Endpoints

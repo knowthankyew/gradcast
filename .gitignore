@@ -42,3 +42,8 @@ src/web/dist/
 # Screenshots
 *.png
 *.jpg
+
+# Agent & Testing
+.gemini/
+test-results/
+playwright-report/

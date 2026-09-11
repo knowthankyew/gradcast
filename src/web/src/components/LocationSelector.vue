@@ -62,7 +62,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useAppStore, type LocationSelection } from '../stores/appStore'
 
 interface LocationResult {
@@ -80,12 +80,19 @@ const results = ref<LocationResult[]>([])
 const loading = ref(false)
 const housingChoice = ref<'1bed' | '2bed'>(store.housingType)
 
-const items = computed(() => results.value)
+const items = computed(() => {
+  if (selectedItem.value && !results.value.some((r) => r.cbsaCode === selectedItem.value?.cbsaCode)) {
+    return [selectedItem.value, ...results.value]
+  }
+  return results.value
+})
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
+let abortController: AbortController | null = null
 
 watch(searchQuery, (val) => {
   if (debounceTimer) clearTimeout(debounceTimer)
+  if (abortController) abortController.abort()
 
   if (!val || val.length < 2) {
     results.value = []
@@ -94,17 +101,53 @@ watch(searchQuery, (val) => {
 
   debounceTimer = setTimeout(async () => {
     loading.value = true
+    abortController = new AbortController()
     try {
-      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(val)}`)
+      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(val)}`, {
+        signal: abortController.signal,
+      })
       if (response.ok) {
         results.value = await response.json()
       }
-    } catch {
-      results.value = []
+    } catch (e: any) {
+      if (e.name !== 'AbortError') {
+        results.value = []
+      }
     } finally {
       loading.value = false
     }
   }, 300)
+})
+
+watch(
+  () => store.selectedLocation,
+  (newLoc) => {
+    if (!newLoc) {
+      selectedItem.value = null
+    } else if (selectedItem.value?.cbsaCode !== newLoc.cbsaCode) {
+      selectedItem.value = {
+        cbsaCode: newLoc.cbsaCode,
+        name: newLoc.name,
+        state: newLoc.state,
+        type: '',
+      }
+    }
+  },
+  { immediate: true }
+)
+
+watch(
+  () => store.housingType,
+  (newType) => {
+    if (newType && housingChoice.value !== newType) {
+      housingChoice.value = newType
+    }
+  }
+)
+
+onUnmounted(() => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  if (abortController) abortController.abort()
 })
 
 function onLocationSelected(item: LocationResult | null) {

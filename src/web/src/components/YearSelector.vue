@@ -42,11 +42,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useAppStore } from '../stores/appStore'
 
 const emit = defineEmits<{
   yearChanged: [year: number | null]
 }>()
+
+const store = useAppStore()
 
 const currentYear = new Date().getFullYear()
 
@@ -58,7 +61,16 @@ const yearOptions = [
   }),
 ]
 
-const selectedYear = ref<number | null>(null)
+const selectedYear = ref<number | null>(store.selectedYear)
+
+watch(
+  () => store.selectedYear,
+  (newYear) => {
+    if (selectedYear.value !== newYear) {
+      selectedYear.value = newYear
+    }
+  }
+)
 
 function onYearChanged(value: number | null) {
   emit('yearChanged', value)

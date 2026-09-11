@@ -1,6 +1,6 @@
 <template>
   <v-card v-if="school" elevation="2" class="mb-6">
-    <v-card-title class="d-flex align-center">
+    <v-card-title class="d-flex align-center" role="heading" aria-level="2">
       <v-icon class="mr-2">mdi-school</v-icon>
       {{ school.name }}
       <v-chip class="ml-3" size="small" :color="ownershipColor">

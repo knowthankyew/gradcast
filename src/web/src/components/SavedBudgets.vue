@@ -1,6 +1,6 @@
 <template>
-  <v-card elevation="2" class="mb-6">
-    <v-card-title class="d-flex align-center">
+  <v-card v-if="savedBudgets.length > 0 || canSave" elevation="2" class="mb-6">
+    <v-card-title class="d-flex align-center" role="heading" aria-level="2">
       <v-icon class="mr-2">mdi-content-save-all</v-icon>
       Saved Scenarios
       <v-chip v-if="savedBudgets.length > 0" class="ml-3" size="small" variant="tonal">
@@ -39,6 +39,10 @@
 
       <v-alert v-if="justSaved" type="success" variant="tonal" density="compact" class="mb-4" closable>
         Scenario saved!
+      </v-alert>
+
+      <v-alert v-if="errorMessage" type="error" variant="tonal" density="compact" class="mb-4" closable @click:close="errorMessage = null">
+        {{ errorMessage }}
       </v-alert>
 
       <!-- Saved list -->
@@ -82,6 +86,7 @@
               variant="text"
               size="small"
               color="primary"
+              :aria-label="`Load scenario: ${budget.name}`"
               title="Load this scenario"
               @click="onLoad(budget)"
             />
@@ -90,6 +95,7 @@
               variant="text"
               size="small"
               color="grey"
+              :aria-label="`Delete scenario: ${budget.name}`"
               title="Delete"
               @click="onDelete(budget.id)"
             />
@@ -126,15 +132,12 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { BudgetSimulation } from '../composables/useBudgetSimulator'
+import { useBudgetSimulator } from '../composables/useBudgetSimulator'
 import { useSavedBudgets, type SavedBudget } from '../composables/useSavedBudgets'
 import { useAppStore } from '../stores/appStore'
 import { useSchoolApi } from '../composables/useSchoolApi'
 
-const props = defineProps<{
-  simulation: BudgetSimulation | null
-}>()
-
+const { simulation } = useBudgetSimulator()
 const store = useAppStore()
 const { savedBudgets, saveBudget, deleteBudget, clearAll } = useSavedBudgets()
 const { getSchoolDetail } = useSchoolApi()
@@ -142,11 +145,12 @@ const { getSchoolDetail } = useSchoolApi()
 const newName = ref('')
 const justSaved = ref(false)
 const showClearConfirm = ref(false)
+const errorMessage = ref<string | null>(null)
 
-const canSave = computed(() => props.simulation !== null)
+const canSave = computed(() => simulation.value !== null)
 
 function onSave() {
-  if (!newName.value.trim() || !props.simulation) return
+  if (!newName.value.trim() || !simulation.value) return
 
   saveBudget(
     {
@@ -162,7 +166,7 @@ function onSave() {
       housingType: store.housingType,
     },
     newName.value.trim(),
-    props.simulation
+    simulation.value
   )
 
   newName.value = ''
@@ -172,6 +176,7 @@ function onSave() {
 
 async function onLoad(budget: SavedBudget) {
   const ctx = budget.context
+  errorMessage.value = null
 
   // Activate mutex — prevents watchers from firing during state hydration
   store.isRestoring = true
@@ -181,8 +186,7 @@ async function onLoad(budget: SavedBudget) {
     const school = await getSchoolDetail(ctx.schoolId)
     if (!school) {
       store.isRestoring = false
-      // School no longer exists in the data
-      alert(`School (ID: ${ctx.schoolId}) could not be loaded. It may no longer exist in the database.`)
+      errorMessage.value = `School (ID: ${ctx.schoolId}) could not be loaded. It may no longer exist in the database.`
       return
     }
     store.restoreSchool(school)
