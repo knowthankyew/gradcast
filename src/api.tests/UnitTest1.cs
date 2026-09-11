@@ -146,7 +146,7 @@ public class HousingCostServiceTests
                 FourBedroom = 1600
             });
 
-        var service = new HousingCostService(repo);
+        IHousingCostService service = new HousingCostService(repo);
         var result = service.GetHousingCostAsync("12345", "2bed").GetAwaiter().GetResult();
 
         Assert.NotNull(result);
@@ -154,6 +154,17 @@ public class HousingCostServiceTests
         Assert.Equal("2bed", result.HousingType);
         Assert.Equal(600, result.MonthlyRent);
         Assert.Equal(1200, result.FullRent);
+    }
+
+    [Fact]
+    public void HousingCostServiceReturnsNullWhenTheRepositoryCannotFindHousingData()
+    {
+        var repo = new StubGradCastRepository();
+        IHousingCostService service = new HousingCostService(repo);
+
+        var result = service.GetHousingCostAsync("missing", "1bed").GetAwaiter().GetResult();
+
+        Assert.Null(result);
     }
 }
 
@@ -163,7 +174,7 @@ public class BudgetSimulatorServiceTests
     public void BudgetSimulationStatusClassifiesDisposableIncomeAsTightWhenResultIsPositiveButSmall()
     {
         var repo = new StubGradCastRepository();
-        var housing = new HousingCostService(repo);
+        IHousingCostService housing = new HousingCostService(repo);
         var provider = new StubTaxConfigProvider(new TaxConfig
         {
             TaxYear = 2026,

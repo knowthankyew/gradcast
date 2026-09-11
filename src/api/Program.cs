@@ -33,7 +33,7 @@ builder.Services.AddDbContext<GradCastDbContext>(options =>
 
 // Phase 2 services (always local DB)
 builder.Services.AddScoped<LocationService>();
-builder.Services.AddScoped<HousingCostService>();
+builder.Services.AddScoped<IHousingCostService, HousingCostService>();
 builder.Services.AddSingleton<ITaxConfigProvider, FileTaxConfigProvider>();
 builder.Services.AddSingleton<ITaxCalculationService, TaxCalculationService>();
 builder.Services.AddSingleton<ILoanAmortizationService, LoanAmortizationService>();

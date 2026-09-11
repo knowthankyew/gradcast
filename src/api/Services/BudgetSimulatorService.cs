@@ -14,13 +14,13 @@ namespace GradCast.Api.Services;
 public class BudgetSimulatorService : IBudgetSimulatorService
 {
     private readonly IGradCastRepository _repo;
-    private readonly HousingCostService _housingService;
+    private readonly IHousingCostService _housingService;
     private readonly ITaxCalculationService _taxService;
     private readonly ILoanAmortizationService _loanService;
 
     public BudgetSimulatorService(
         IGradCastRepository repo,
-        HousingCostService housingService,
+        IHousingCostService housingService,
         ITaxCalculationService taxService,
         ILoanAmortizationService loanService)
     {

@@ -2,7 +2,7 @@ using GradCast.Api.Models;
 
 namespace GradCast.Api.Services;
 
-public class HousingCostService
+public class HousingCostService : IHousingCostService
 {
     private readonly IGradCastRepository _repo;
 
