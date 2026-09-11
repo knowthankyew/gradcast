@@ -48,3 +48,4 @@ src/web/dist/
 .gemini/
 test-results/
 playwright-report/
+docs/assets/*.webm
