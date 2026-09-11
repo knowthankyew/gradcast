@@ -2,8 +2,11 @@
 using GradCast.Api.Models;
 using GradCast.Api.Services;
 using GradCast.Data.Entities;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -211,9 +214,87 @@ public class FinanceEndpointValidationContractTests
         var error = FinanceEndpoints.ValidateLoanRequest(-1m, 0.02m);
 
         Assert.NotNull(error);
-        var problem = error as IResult;
-        Assert.NotNull(problem);
+        var result = error as IResult;
+        Assert.NotNull(result);
     }
+}
+
+public class FinanceEndpointSmokeTests
+{
+    [Fact]
+    public void FinanceRoutesExposeTheExpectedRouteContract()
+    {
+        var builder = WebApplication.CreateBuilder();
+
+        builder.Services.AddSingleton<ITaxCalculationService>(new StubTaxCalculationService());
+        builder.Services.AddSingleton<ILoanAmortizationService>(new LoanAmortizationService());
+        builder.Services.AddSingleton<IBudgetSimulatorService>(new StubBudgetSimulatorService());
+
+        var app = builder.Build();
+
+        app.MapFinanceEndpoints();
+
+        IEndpointRouteBuilder routeBuilder = app;
+        var endpoints = routeBuilder.DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()
+            .ToList();
+
+        var routePaths = endpoints
+            .Select(e => e.RoutePattern.RawText)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.Contains("/api/finance/net-pay", routePaths);
+        Assert.Contains("/api/finance/loan-payment", routePaths);
+        Assert.Contains("/api/finance/simulator", routePaths);
+
+        var netPayEndpoint = endpoints.Single(e => e.RoutePattern.RawText == "/api/finance/net-pay");
+        var loanEndpoint = endpoints.Single(e => e.RoutePattern.RawText == "/api/finance/loan-payment");
+        var simulationEndpoint = endpoints.Single(e => e.RoutePattern.RawText == "/api/finance/simulator");
+
+        Assert.Contains(netPayEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("GET"));
+        Assert.Contains(loanEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("GET"));
+        Assert.Contains(simulationEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("POST"));
+    }
+}
+
+public sealed class StubTaxCalculationService : ITaxCalculationService
+{
+    public int TaxYear => 2026;
+    public NetPayResult Calculate(decimal grossAnnualSalary, string state)
+        => new NetPayResult(
+            GrossAnnual: grossAnnualSalary,
+            GrossMonthly: Math.Round(grossAnnualSalary / 12, 2),
+            FederalTaxAnnual: 0,
+            FederalTaxMonthly: 0,
+            FicaAnnual: 0,
+            FicaMonthly: 0,
+            StateTaxAnnual: 0,
+            StateTaxMonthly: 0,
+            StateTaxRate: 0,
+            NetAnnual: grossAnnualSalary,
+            NetMonthly: Math.Round(grossAnnualSalary / 12, 2),
+            EffectiveTaxRate: 0);
+}
+
+public sealed class StubBudgetSimulatorService : IBudgetSimulatorService
+{
+    public Task<BudgetSimulationResult?> SimulateAsync(BudgetSimulationRequest request, CancellationToken ct = default)
+        => Task.FromResult<BudgetSimulationResult?>(new BudgetSimulationResult(
+            GrossAnnualSalary: 100000m,
+            GrossMonthly: 8333.33m,
+            NetMonthly: 6200.00m,
+            EffectiveTaxRate: 0.10m,
+            SalarySource: "stub",
+            RentMonthly: 1200m,
+            HousingType: request.HousingType,
+            LoanPaymentMonthly: 300m,
+            LoanPrincipal: 12000m,
+            FixedCostsMonthly: 1500m,
+            DisposableMonthly: 4700m,
+            IncomeStatus: "comfortable",
+            LocationName: "Stub City",
+            State: "CA"));
 }
 
 public sealed class StubTaxConfigProvider : ITaxConfigProvider
