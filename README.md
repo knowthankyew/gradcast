@@ -34,9 +34,9 @@ An AI-generated proof-of-concept web application that helps students simulate th
 - **Saved Scenarios**: name and save budget simulations to localStorage for comparison
 
 ### Data Modes
-- **`api`** (default): All Scorecard requests go to the live API
-- **`local`**: All requests query local SQLite database
-- **`hybrid`** (recommended): Local DB for imported data, API fallback for historic years
+- **`hybrid`** (default): Local DB for imported data, API fallback for historic years
+- **`local`**: All requests query local SQLite database only
+- **`api`**: All Scorecard requests go to the live API
 
 ## User Flow
 
@@ -103,9 +103,9 @@ An AI-generated proof-of-concept web application that helps students simulate th
    # Edit src/api/appsettings.Development.json with your keys (gitignored)
    ```
 
-5. Run the API in hybrid mode:
+5. Run the API (hybrid mode is enabled by default):
    ```bash
-   DataSource=hybrid dotnet run --project src/api
+   dotnet run --project src/api
    ```
    API starts on `http://localhost:5062`
 

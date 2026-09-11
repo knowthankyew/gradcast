@@ -77,7 +77,12 @@ public static class GradCastServiceCollectionExtensions
             client.Timeout = TimeSpan.FromSeconds(15);
         });
 
-        var dataSource = configuration.GetValue<string>("DataSource") ?? "api";
+        var dataSource = configuration.GetValue<string>("DataSource");
+        if (string.IsNullOrWhiteSpace(dataSource))
+        {
+            dataSource = "hybrid";
+        }
+
         if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<ICollegeScorecardService, LocalCollegeScorecardService>();

@@ -102,11 +102,11 @@
 - [x] Update existing rows when corrected seed values are re-imported.
 - [x] Add an import integration test covering a second run with a new FMR year.
 
-### Task 39: Restore Local-First Default Behavior
-- [ ] Change the default data mode to `hybrid` after a local import, or document and implement an explicit startup mode selection.
-- [ ] When API credentials are absent, serve local data when available and return an actionable configuration error only when remote fallback is actually required.
-- [ ] Document the intended first-run workflow: import data, optional API credentials, then run the app.
-- [ ] Add startup/service-selection coverage for unconfigured API credentials and each data mode.
+### Task 39: Restore Local-First Default Behavior ✅ Complete
+- [x] Change the default data mode to `hybrid` after a local import, or document and implement an explicit startup mode selection.
+- [x] When API credentials are absent, serve local data when available and return an actionable configuration error only when remote fallback is actually required.
+- [x] Document the intended first-run workflow: import data, optional API credentials, then run the app.
+- [x] Add startup/service-selection coverage for unconfigured API credentials and each data mode.
 
 ### Task 40: Secure Development Credentials ✅ Complete
 - [x] Rotate/migrate active credentials into .NET user secrets or environment variables; kept only empty values in config files.

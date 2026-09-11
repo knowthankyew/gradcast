@@ -50,6 +50,8 @@ public class CollegeScorecardService : ICollegeScorecardService
     public async Task<IReadOnlyList<SchoolSearchResult>> SearchSchoolsAsync(
         string query, string? state, CancellationToken ct = default)
     {
+        EnsureApiKeyConfigured();
+
         var url = $"{_options.BaseUrl}/schools?api_key={_options.ApiKey}" +
                   $"&school.name={Uri.EscapeDataString(query)}" +
                   $"&fields=id,school.name,school.city,school.state" +
@@ -89,6 +91,8 @@ public class CollegeScorecardService : ICollegeScorecardService
         {
             return cached;
         }
+
+        EnsureApiKeyConfigured();
 
         var fields = string.Join(",",
             "id",
@@ -135,6 +139,8 @@ public class CollegeScorecardService : ICollegeScorecardService
         {
             return cached!;
         }
+
+        EnsureApiKeyConfigured();
 
         var currentYear = DateTime.UtcNow.Year;
         var years = Enumerable.Range(currentYear - 5, 5).ToList();
@@ -266,6 +272,14 @@ public class CollegeScorecardService : ICollegeScorecardService
             response.StatusCode);
     }
 
+    private void EnsureApiKeyConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        {
+            throw new CollegeScorecardMissingApiKeyException();
+        }
+    }
+
     private static string GetStringOrDefault(JsonElement el, string prop) =>
         el.TryGetProperty(prop, out var val) && val.ValueKind == JsonValueKind.String
             ? val.GetString() ?? ""
@@ -301,6 +315,14 @@ public class CollegeScorecardService : ICollegeScorecardService
             return childEl.GetInt32();
         }
         return null;
+    }
+}
+
+public class CollegeScorecardMissingApiKeyException : Exception
+{
+    public CollegeScorecardMissingApiKeyException()
+        : base("College Scorecard API key is not configured. Set 'CollegeScorecard:ApiKey' (or 'COLLEGE_SCORECARD_API_KEY') to enable remote data fallback.")
+    {
     }
 }
 

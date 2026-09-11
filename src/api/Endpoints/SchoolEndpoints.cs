@@ -53,6 +53,13 @@ public static class SchoolEndpoints
                     ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
                 });
         }
+        catch (CollegeScorecardMissingApiKeyException ex)
+        {
+            return Results.Problem(
+                title: "College Scorecard API key not configured",
+                detail: ex.Message,
+                statusCode: 503);
+        }
         catch (CollegeScorecardApiException)
         {
             return Results.Problem(
@@ -100,6 +107,13 @@ public static class SchoolEndpoints
                     ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
                 });
         }
+        catch (CollegeScorecardMissingApiKeyException ex)
+        {
+            return Results.Problem(
+                title: "College Scorecard API key not configured",
+                detail: ex.Message,
+                statusCode: 503);
+        }
         catch (CollegeScorecardApiException)
         {
             return Results.Problem(
@@ -129,6 +143,13 @@ public static class SchoolEndpoints
                 {
                     ["retryAfterSeconds"] = (int)ex.RetryAfter.TotalSeconds
                 });
+        }
+        catch (CollegeScorecardMissingApiKeyException ex)
+        {
+            return Results.Problem(
+                title: "College Scorecard API key not configured",
+                detail: ex.Message,
+                statusCode: 503);
         }
         catch (CollegeScorecardApiException)
         {
