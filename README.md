@@ -101,7 +101,7 @@ If you just want to try it without downloading the bulk data:
 
 ```bash
 # Set your API key in src/api/appsettings.Development.json, then:
-dotnet run --project src/import -- /dev/null  # Creates empty DB with metro/FMR seed data
+dotnet run --project src/import -- --seed-only  # Creates empty DB with metro/FMR seed data
 dotnet run --project src/api
 cd src/web && npm install && npm run dev
 ```
@@ -116,6 +116,9 @@ dotnet run --project src/import -- ~/Downloads/CollegeScorecard_Raw_Data.zip
 
 # Or an extracted directory
 dotnet run --project src/import -- ~/Downloads/scorecard_data/
+
+# Seed reference data only (no bulk data download required)
+dotnet run --project src/import -- --seed-only
 
 # Custom database path
 dotnet run --project src/import -- ~/Downloads/CollegeScorecard_Raw_Data.zip ./custom.db

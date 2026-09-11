@@ -8,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 
 // ─── Usage ─────────────────────────────────────────────────────────────────────
 // dotnet run --project src/import -- <path-to-scorecard-zip-or-directory> [db-path]
+// dotnet run --project src/import -- --seed-only [db-path]
 //
 // Accepts either:
 //   1. Path to the "All Data Files" zip from collegescorecard.ed.gov/data
 //   2. Path to a directory containing extracted CSV files
+//   3. --seed-only flag to seed reference data without importing Scorecard data
 //
 // If no arguments are provided, prints usage instructions.
 // ────────────────────────────────────────────────────────────────────────────────
@@ -22,6 +24,11 @@ if (args.Length == 0)
     Console.WriteLine();
     Console.WriteLine("Usage:");
     Console.WriteLine("  dotnet run --project src/import -- <data-source> [db-path]");
+    Console.WriteLine("  dotnet run --project src/import -- --seed-only [db-path]");
+    Console.WriteLine();
+    Console.WriteLine("Options:");
+    Console.WriteLine("  --seed-only   Seed reference data (CBSA locations and Fair Market");
+    Console.WriteLine("                Rents) into the database without importing Scorecard data.");
     Console.WriteLine();
     Console.WriteLine("Arguments:");
     Console.WriteLine("  data-source   Path to the College Scorecard 'All Data Files' zip,");
@@ -35,18 +42,54 @@ if (args.Length == 0)
     return;
 }
 
-var dataSource = args[0];
-var dbPath = args.Length > 1 ? args[1] : Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+var isSeedOnly = args.Any(a => string.Equals(a, "--seed-only", StringComparison.OrdinalIgnoreCase));
+var positionalArgs = args.Where(a => !a.StartsWith("--", StringComparison.OrdinalIgnoreCase)).ToArray();
 
-if (!File.Exists(dataSource) && !Directory.Exists(dataSource))
+// Backwards compatibility for legacy quickstart passing /dev/null or NUL
+if (!isSeedOnly && positionalArgs.Length > 0 &&
+    (string.Equals(positionalArgs[0], "/dev/null", StringComparison.OrdinalIgnoreCase) ||
+     string.Equals(positionalArgs[0], "nul", StringComparison.OrdinalIgnoreCase)))
 {
-    Console.Error.WriteLine($"Error: '{dataSource}' does not exist.");
-    Console.Error.WriteLine("Provide a path to the downloaded zip or extracted directory.");
-    return;
+    isSeedOnly = true;
+    positionalArgs = positionalArgs.Skip(1).ToArray();
+}
+
+string? dataSource = null;
+string dbPath;
+
+if (isSeedOnly)
+{
+    dbPath = positionalArgs.Length > 0 ? positionalArgs[0] : Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+}
+else
+{
+    if (positionalArgs.Length == 0)
+    {
+        Console.Error.WriteLine("Error: data-source argument is required unless --seed-only is specified.");
+        Console.Error.WriteLine("Provide a path to the downloaded zip or extracted directory.");
+        return;
+    }
+
+    dataSource = positionalArgs[0];
+    dbPath = positionalArgs.Length > 1 ? positionalArgs[1] : Path.Combine(Directory.GetCurrentDirectory(), "gradcast.db");
+
+    if (!File.Exists(dataSource) && !Directory.Exists(dataSource))
+    {
+        Console.Error.WriteLine($"Error: '{dataSource}' does not exist.");
+        Console.Error.WriteLine("Provide a path to the downloaded zip or extracted directory.");
+        return;
+    }
 }
 
 Console.WriteLine("GradCast Data Import");
-Console.WriteLine($"  Source: {dataSource}");
+if (isSeedOnly)
+{
+    Console.WriteLine("  Mode: Reference Data Only (--seed-only)");
+}
+else
+{
+    Console.WriteLine($"  Source: {dataSource}");
+}
 Console.WriteLine($"  Database: {dbPath}");
 Console.WriteLine();
 
@@ -58,57 +101,65 @@ await using var db = new GradCastDbContext(optionsBuilder.Options);
 await db.Database.EnsureCreatedAsync();
 Console.WriteLine("Database schema created/verified.");
 
-// Determine if we have a zip or directory
-string workDir;
-bool cleanupWorkDir = false;
+if (!isSeedOnly)
+{
+    // Determine if we have a zip or directory
+    string workDir;
+    bool cleanupWorkDir = false;
 
-if (File.Exists(dataSource) && dataSource.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
-{
-    workDir = Path.Combine(Path.GetTempPath(), $"gradcast_import_{Guid.NewGuid():N}");
-    Directory.CreateDirectory(workDir);
-    cleanupWorkDir = true;
+    if (File.Exists(dataSource!) && dataSource!.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+    {
+        workDir = Path.Combine(Path.GetTempPath(), $"gradcast_import_{Guid.NewGuid():N}");
+        Directory.CreateDirectory(workDir);
+        cleanupWorkDir = true;
 
-    Console.WriteLine("Extracting zip archive...");
-    ZipFile.ExtractToDirectory(dataSource, workDir);
-    Console.WriteLine($"  Extracted to temp directory.");
-}
-else if (Directory.Exists(dataSource))
-{
-    workDir = dataSource;
-}
-else
-{
-    Console.Error.WriteLine("Error: data-source must be a .zip file or a directory.");
-    return;
-}
+        Console.WriteLine("Extracting zip archive...");
+        ZipFile.ExtractToDirectory(dataSource!, workDir);
+        Console.WriteLine($"  Extracted to temp directory.");
+    }
+    else if (Directory.Exists(dataSource!))
+    {
+        workDir = dataSource!;
+    }
+    else
+    {
+        Console.Error.WriteLine("Error: data-source must be a .zip file or a directory.");
+        return;
+    }
 
-// Find the institution CSV (Most-Recent-Cohorts-Institution*.csv or MERGED*.csv)
-var institutionCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Institution", "MERGED2"]);
-var fieldOfStudyCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Field-of-Study", "FieldOfStudyData"]);
+    // Find the institution CSV (Most-Recent-Cohorts-Institution*.csv or MERGED*.csv)
+    var institutionCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Institution", "MERGED2"]);
+    var fieldOfStudyCsv = FindCsvFile(workDir, ["Most-Recent-Cohorts-Field-of-Study", "FieldOfStudyData"]);
 
-if (institutionCsv != null)
-{
-    await ImportInstitutionDataAsync(db, institutionCsv);
-}
-else
-{
-    Console.WriteLine("Warning: No institution-level CSV found. Skipping.");
-}
+    if (institutionCsv != null)
+    {
+        await ImportInstitutionDataAsync(db, institutionCsv);
+    }
+    else
+    {
+        Console.WriteLine("Warning: No institution-level CSV found. Skipping.");
+    }
 
-if (fieldOfStudyCsv != null)
-{
-    await ImportFieldOfStudyDataAsync(db, fieldOfStudyCsv);
-}
-else
-{
-    Console.WriteLine("Warning: No field-of-study CSV found. Skipping.");
-}
+    if (fieldOfStudyCsv != null)
+    {
+        await ImportFieldOfStudyDataAsync(db, fieldOfStudyCsv);
+    }
+    else
+    {
+        Console.WriteLine("Warning: No field-of-study CSV found. Skipping.");
+    }
 
-Console.WriteLine();
-Console.WriteLine("Import complete!");
-Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
-Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
-Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
+    Console.WriteLine();
+    Console.WriteLine("Import complete!");
+    Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
+    Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
+    Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
+
+    if (cleanupWorkDir)
+    {
+        try { Directory.Delete(workDir, true); } catch { /* best effort */ }
+    }
+}
 
 // Upsert curated reference data on every import so corrected values and new FMR years apply.
 var referenceDataResult = await ReferenceDataSeeder.SeedAsync(db);
@@ -120,9 +171,10 @@ Console.WriteLine(
 Console.WriteLine($"  CBSA Locations: {await db.CbsaLocations.CountAsync()}");
 Console.WriteLine($"  Fair Market Rents: {await db.FairMarketRents.CountAsync()}");
 
-if (cleanupWorkDir)
+if (isSeedOnly)
 {
-    try { Directory.Delete(workDir, true); } catch { /* best effort */ }
+    Console.WriteLine();
+    Console.WriteLine("Seeding complete!");
 }
 
 return;
