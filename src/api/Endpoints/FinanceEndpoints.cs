@@ -26,7 +26,7 @@ public static class FinanceEndpoints
     private static IResult CalculateNetPay(
         [FromQuery] decimal grossSalary,
         [FromQuery] string state,
-        TaxCalculationService taxService)
+        ITaxCalculationService taxService)
     {
         if (grossSalary <= 0 || grossSalary > 10_000_000)
         {
