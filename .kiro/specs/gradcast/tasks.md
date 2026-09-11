@@ -78,12 +78,12 @@
 - [x] Replace the current prefix/max-earnings lookup with the selected program's matching earnings value; define and document a deterministic fallback when multiple credential rows match.
 - [x] Add regression coverage proving a selected local program resolves its own median earnings rather than the school-wide fallback.
 
-### Task 35: Validate and Harden Finance Inputs
-- [ ] Validate loan `termYears` as a positive, bounded integer before amortization (for example, 1–50 years).
-- [ ] Validate simulator `housingType` against the supported values: `studio`, `1bed`, and `2bed`.
-- [ ] Validate `salaryOverride` as a positive, bounded annual salary when provided.
-- [ ] Return consistent RFC 7807 problem responses for invalid finance input; do not allow invalid input to produce a 500.
-- [ ] Add endpoint-level tests for zero/negative loan terms, unsupported housing types, and invalid salary overrides.
+### Task 35: Validate and Harden Finance Inputs ✅ Complete
+- [x] Validate loan `termYears` as a positive, bounded integer before amortization (1–50 years).
+- [x] Validate simulator `housingType` against the supported values: `studio`, `1bed`, and `2bed`.
+- [x] Validate `salaryOverride` as a positive, bounded annual salary when provided.
+- [x] Return consistent RFC 7807 problem responses for invalid finance input; do not allow invalid input to produce a 500.
+- [x] Add endpoint-level tests for zero/negative loan terms, unsupported housing types, and invalid salary overrides.
 
 ### Task 36: Treat Missing Housing Data as Unavailable, Not Free
 - [ ] Make budget simulation return an explicit unavailable result when no FMR record exists for the selected CBSA.

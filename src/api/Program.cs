@@ -22,3 +22,7 @@ app.MapFinanceEndpoints();
 app.MapJobEndpoints();
 
 app.Run();
+
+public partial class Program
+{
+}

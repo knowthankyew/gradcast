@@ -1,4 +1,5 @@
-﻿using GradCast.Api.Endpoints;
+﻿using System.Net.Http.Json;
+using GradCast.Api.Endpoints;
 using GradCast.Api.Models;
 using GradCast.Api.Services;
 using GradCast.Data.Entities;
@@ -8,7 +9,10 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 
@@ -298,6 +302,81 @@ public class FinanceEndpointSmokeTests
         Assert.Contains(netPayEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("GET"));
         Assert.Contains(loanEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("GET"));
         Assert.Contains(simulationEndpoint.Metadata, m => m is HttpMethodMetadata metadata && metadata.HttpMethods.Contains("POST"));
+    }
+}
+
+public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public FinanceEndpointHttpValidationTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<ITaxCalculationService>();
+                services.AddSingleton<ITaxCalculationService>(new StubTaxCalculationService());
+                services.RemoveAll<ILoanAmortizationService>();
+                services.AddSingleton<ILoanAmortizationService>(new LoanAmortizationService());
+                services.RemoveAll<IBudgetSimulatorService>();
+                services.AddSingleton<IBudgetSimulatorService>(new StubBudgetSimulatorService());
+            });
+        }).CreateClient();
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(51)]
+    public async Task LoanPaymentRejectsInvalidTermsWithProblemDetails(int termYears)
+    {
+        var response = await _client.GetAsync($"/api/finance/loan-payment?principal=10000&termYears={termYears}");
+
+        await AssertProblemResponse(response, "Invalid loan term");
+    }
+
+    [Fact]
+    public async Task SimulatorRejectsUnsupportedHousingTypeWithProblemDetails()
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode = "12345",
+            housingType = "penthouse"
+        });
+
+        await AssertProblemResponse(response, "Invalid housing type");
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(10000001)]
+    public async Task SimulatorRejectsInvalidSalaryOverrideWithProblemDetails(decimal salaryOverride)
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode = "12345",
+            housingType = "1bed",
+            salaryOverride
+        });
+
+        await AssertProblemResponse(response, "Invalid salary override");
+    }
+
+    private static async Task AssertProblemResponse(HttpResponseMessage response, string expectedTitle)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        Assert.True(
+            response.StatusCode == System.Net.HttpStatusCode.BadRequest,
+            $"Expected 400 but received {(int)response.StatusCode}: {responseBody}");
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal(expectedTitle, problem!.Title);
     }
 }
 

@@ -10,6 +10,8 @@ public class LoanAmortizationService : ILoanAmortizationService
 {
     private const decimal DefaultAnnualRate = 0.055m;  // 5.5% federal direct loan rate
     private const int DefaultTermYears = 10;            // Standard repayment plan
+    private const int MinTermYears = 1;
+    private const int MaxTermYears = 50;
 
     public LoanPaymentResult Calculate(
         decimal principalBalance,
@@ -18,6 +20,12 @@ public class LoanAmortizationService : ILoanAmortizationService
     {
         var rate = annualRate ?? DefaultAnnualRate;
         var years = termYears ?? DefaultTermYears;
+
+        if (rate < 0 || rate > 0.30m)
+            throw new ArgumentOutOfRangeException(nameof(annualRate), "Annual interest rate must be between 0 and 0.30.");
+
+        if (years < MinTermYears || years > MaxTermYears)
+            throw new ArgumentOutOfRangeException(nameof(termYears), $"Loan term must be between {MinTermYears} and {MaxTermYears} years.");
 
         if (principalBalance <= 0)
         {

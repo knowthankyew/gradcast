@@ -38,7 +38,7 @@ public static class LocationEndpoints
     private static async Task<IResult> GetHousingCost(
         string cbsaCode,
         [FromQuery(Name = "type")] string? housingType,
-        HousingCostService service,
+        IHousingCostService service,
         CancellationToken ct)
     {
         var type = housingType ?? "1bed";

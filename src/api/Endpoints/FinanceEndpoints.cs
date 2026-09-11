@@ -6,6 +6,14 @@ namespace GradCast.Api.Endpoints;
 
 public static class FinanceEndpoints
 {
+    private const decimal MaxSalary = 10_000_000m;
+    private const int MinLoanTermYears = 1;
+    private const int MaxLoanTermYears = 50;
+    private static readonly HashSet<string> SupportedHousingTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "studio", "1bed", "2bed"
+    };
+
     public static void MapFinanceEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/finance");
@@ -25,7 +33,7 @@ public static class FinanceEndpoints
 
     public static IResult? ValidateNetPayRequest(NetPayRequest request)
     {
-        if (request.GrossSalary <= 0 || request.GrossSalary > 10_000_000)
+        if (request.GrossSalary <= 0 || request.GrossSalary > MaxSalary)
         {
             return ValidationFailure(
                 title: "Invalid salary",
@@ -51,11 +59,19 @@ public static class FinanceEndpoints
                 detail: "Loan principal must be between $0 and $1,000,000.");
         }
 
-        if (request.Rate.HasValue && (request.Rate.Value <= 0 || request.Rate.Value > 0.30m))
+        if (request.Rate.HasValue && (request.Rate.Value < 0 || request.Rate.Value > 0.30m))
         {
             return ValidationFailure(
                 title: "Invalid rate",
                 detail: "Annual interest rate must be between 0 and 0.30 (30%).");
+        }
+
+        if (request.TermYears.HasValue &&
+            (request.TermYears.Value < MinLoanTermYears || request.TermYears.Value > MaxLoanTermYears))
+        {
+            return ValidationFailure(
+                title: "Invalid loan term",
+                detail: $"Loan term must be between {MinLoanTermYears} and {MaxLoanTermYears} years.");
         }
 
         return null;
@@ -75,6 +91,21 @@ public static class FinanceEndpoints
             return ValidationFailure(
                 title: "Invalid location",
                 detail: "A CBSA code is required for the target location.");
+        }
+
+        if (!SupportedHousingTypes.Contains(request.HousingType))
+        {
+            return ValidationFailure(
+                title: "Invalid housing type",
+                detail: "Housing type must be 'studio', '1bed', or '2bed'.");
+        }
+
+        if (request.SalaryOverride.HasValue &&
+            (request.SalaryOverride.Value <= 0 || request.SalaryOverride.Value > MaxSalary))
+        {
+            return ValidationFailure(
+                title: "Invalid salary override",
+                detail: "Salary override must be between $1 and $10,000,000.");
         }
 
         return null;
@@ -118,14 +149,16 @@ public static class FinanceEndpoints
         IBudgetSimulatorService simulatorService,
         CancellationToken ct)
     {
-        var invalid = ValidateSimulationRequest(request);
+        // Preserve the original default for clients that omit housingType, while rejecting
+        // unsupported values before the simulation or its dependencies are invoked.
+        var housingType = request.HousingType ?? "1bed";
+        var normalizedRequest = request with { HousingType = housingType.ToLowerInvariant() };
+
+        var invalid = ValidateSimulationRequest(normalizedRequest);
         if (invalid != null)
         {
             return invalid;
         }
-
-        var housingType = request.HousingType ?? "1bed";
-        var normalizedRequest = request with { HousingType = housingType };
 
         var result = await simulatorService.SimulateAsync(normalizedRequest, ct);
         if (result == null)
