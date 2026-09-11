@@ -1,0 +1,34 @@
+{
+  "name": "GradCast Dev Container",
+  "image": "mcr.microsoft.com/devcontainers/base:noble",
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+  "forwardPorts": [5062, 5173],
+  "portsAttributes": {
+    "5062": {
+      "label": "GradCast API",
+      "onAutoForward": "notify"
+    },
+    "5173": {
+      "label": "GradCast Web (Vite)",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm --prefix src/web install && dotnet run --project src/import -- --seed-only",
+  "postStartCommand": "echo 'Ready! Run ./start.sh to launch GradCast.'",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.csdevkit",
+        "Vue.volar"
+      ]
+    }
+  }
+}

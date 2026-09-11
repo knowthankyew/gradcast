@@ -16,4 +16,11 @@
     <ProjectReference Include="..\data\GradCast.Data.csproj" />
   </ItemGroup>
 
+  <Target Name="IncludeWebDistOnPublish" AfterTargets="ComputeFilesToPublish" Condition="Exists('../web/dist')">
+    <ItemGroup>
+      <DistFiles Include="../web/dist/**/*.*" />
+      <ResolvedFileToPublish Include="@(DistFiles)" RelativePath="wwwroot/%(RecursiveDir)%(Filename)%(Extension)" />
+    </ItemGroup>
+  </Target>
+
 </Project>

@@ -53,7 +53,47 @@ An AI-generated proof-of-concept web application that helps students simulate th
 
 ## Getting Started
 
-### Prerequisites
+### Quickest Start ("Just Run")
+
+GradCast includes zero-friction options so you can run the app immediately without downloading 470 MB datasets or manually managing multiple terminals:
+
+#### Option 1: Docker Compose (Zero local SDKs required)
+Runs both the backend API and frontend SPA in a single container with auto-seeded reference data:
+```bash
+docker compose up --build
+```
+- Open **http://localhost:5062** in your browser.
+- Health check: `http://localhost:5062/health`
+- Database is persisted in the `gradcast-data` volume. (To mount an existing local `gradcast.db`, see the volume comment in `docker-compose.yml`).
+- Optional: set `COLLEGE_SCORECARD_API_KEY` and `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` in your environment or a `.env` file for remote data fallback and live job pulses.
+
+#### Option 2: One-Command Local Script (`./start.sh`)
+For local development on macOS/Linux:
+```bash
+./start.sh
+```
+What `./start.sh` does:
+- Validates `.NET 10 SDK` and `Node.js 20+` prerequisites.
+- Installs `npm` dependencies automatically if `node_modules` is missing.
+- Checks for port conflicts on `5062` and `5173`.
+- Auto-seeds reference data (`gradcast.db`) on API startup if missing.
+- Launches both the API (`http://localhost:5062`) and Vite dev server (`http://localhost:5173`) with hot reloading, and cleanly terminates both processes on `Ctrl+C`.
+
+**Additional script modes:**
+```bash
+./start.sh --single     # Builds frontend into dist and runs unified single-process ASP.NET server (port 5062)
+./start.sh --api-only   # Runs backend API only (port 5062)
+```
+
+#### Option 3: GitHub Codespaces / Dev Container
+1. Open this repository on GitHub.
+2. Click **Code → Codespaces → Create codespace on main**.
+3. Once the environment loads, run `./start.sh` in the terminal.
+4. Ports `5062` (API) and `5173` (Web) are forwarded automatically for browser preview.
+
+---
+
+### Prerequisites (For Manual Local Development)
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 20+](https://nodejs.org/)

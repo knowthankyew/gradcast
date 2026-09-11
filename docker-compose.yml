@@ -1,0 +1,22 @@
+services:
+  gradcast:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gradcast
+    ports:
+      - "5062:5062"
+    environment:
+      - COLLEGE_SCORECARD_API_KEY=${COLLEGE_SCORECARD_API_KEY:-}
+      - ADZUNA_APP_ID=${ADZUNA_APP_ID:-}
+      - ADZUNA_APP_KEY=${ADZUNA_APP_KEY:-}
+      - ASPNETCORE_ENVIRONMENT=Production
+    volumes:
+      # Named volume for SQLite database persistence
+      - gradcast-data:/app/data
+      # To use an existing local database with full Scorecard data instead, uncomment:
+      # - ./gradcast.db:/app/data/gradcast.db
+    restart: unless-stopped
+
+volumes:
+  gradcast-data:
