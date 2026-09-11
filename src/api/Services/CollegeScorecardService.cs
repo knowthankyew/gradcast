@@ -66,7 +66,7 @@ public class CollegeScorecardService : ICollegeScorecardService
         await EnsureSuccessOrThrow(response);
 
         var json = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var results = doc.RootElement.GetProperty("results");
 
         var schools = new List<SchoolSearchResult>();
@@ -117,7 +117,7 @@ public class CollegeScorecardService : ICollegeScorecardService
         await EnsureSuccessOrThrow(response);
 
         var json = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var results = doc.RootElement.GetProperty("results");
 
         if (results.GetArrayLength() == 0)
@@ -161,7 +161,7 @@ public class CollegeScorecardService : ICollegeScorecardService
         await EnsureSuccessOrThrow(response);
 
         var json = await response.Content.ReadAsStringAsync(ct);
-        var doc = JsonDocument.Parse(json);
+        using var doc = JsonDocument.Parse(json);
         var results = doc.RootElement.GetProperty("results");
 
         if (results.GetArrayLength() == 0)

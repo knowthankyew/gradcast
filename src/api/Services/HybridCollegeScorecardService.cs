@@ -61,6 +61,7 @@ public class HybridCollegeScorecardService : ICollegeScorecardService
         {
             // Specific year requested — check if we have year data locally
             var hasLocalYear = await _db.SchoolYearData
+                .AsNoTracking()
                 .AnyAsync(yd => yd.SchoolId == schoolId && yd.Year == year.Value, ct);
 
             if (hasLocalYear)

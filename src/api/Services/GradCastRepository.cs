@@ -16,12 +16,14 @@ public class GradCastRepository : IGradCastRepository
     public async Task<CbsaLocation?> GetLocationByCbsaCodeAsync(string cbsaCode, CancellationToken ct = default)
     {
         return await _db.CbsaLocations
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.CbsaCode == cbsaCode, ct);
     }
 
     public async Task<FairMarketRent?> GetLatestFairMarketRentAsync(string cbsaCode, CancellationToken ct = default)
     {
         return await _db.FairMarketRents
+            .AsNoTracking()
             .Where(f => f.CbsaCode == cbsaCode)
             .OrderByDescending(f => f.Year)
             .FirstOrDefaultAsync(ct);
@@ -37,6 +39,7 @@ public class GradCastRepository : IGradCastRepository
         if (normalizedCipCode is null) return null;
 
         var earnings = await _db.Programs
+            .AsNoTracking()
             .Where(p => p.SchoolId == schoolId &&
                         p.CipCode.Replace(".", "") == normalizedCipCode &&
                         p.MedianEarnings.HasValue &&
@@ -59,6 +62,7 @@ public class GradCastRepository : IGradCastRepository
     public async Task<List<decimal>> GetSchoolMedianEarningsAsync(int schoolId, CancellationToken ct = default)
     {
         return await _db.Programs
+            .AsNoTracking()
             .Where(p => p.SchoolId == schoolId && p.MedianEarnings.HasValue)
             .Select(p => p.MedianEarnings!.Value)
             .ToListAsync(ct);
@@ -67,6 +71,7 @@ public class GradCastRepository : IGradCastRepository
     public async Task<decimal> GetMedianDebtAsync(int schoolId, CancellationToken ct = default)
     {
         var yearData = await _db.SchoolYearData
+            .AsNoTracking()
             .Where(yd => yd.SchoolId == schoolId)
             .OrderByDescending(yd => yd.Year)
             .FirstOrDefaultAsync(ct);

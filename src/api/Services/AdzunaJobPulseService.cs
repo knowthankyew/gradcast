@@ -34,6 +34,7 @@ public class AdzunaJobPulseService : IJobPulseService
     {
         // Get location name for the search
         var location = await _db.CbsaLocations
+            .AsNoTracking()
             .FirstOrDefaultAsync(c => c.CbsaCode == cbsaCode, ct);
 
         if (location == null) return null;
@@ -88,7 +89,7 @@ public class AdzunaJobPulseService : IJobPulseService
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
             using var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8);
             var json = await reader.ReadToEndAsync(ct);
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
 
             var count = root.TryGetProperty("count", out var countEl) ? countEl.GetInt32() : 0;
@@ -136,6 +137,7 @@ public class AdzunaJobPulseService : IJobPulseService
         var prefix = cipCode.Length >= 2 ? cipCode[..2] : cipCode;
 
         var earnings = await _db.Programs
+            .AsNoTracking()
             .Where(p => p.CipCode.StartsWith(prefix) && p.MedianEarnings.HasValue)
             .Select(p => p.MedianEarnings!.Value)
             .ToListAsync(ct);

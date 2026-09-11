@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using GradCast.Api.Endpoints;
 using GradCast.Api.Models;
 using GradCast.Api.Services;
@@ -52,7 +53,17 @@ public class TaxCalculationServiceTests
 
         var result = service.Calculate(75000m, "ca");
         Assert.Equal(75000m, result.GrossAnnual);
+        Assert.Equal(6250.00m, result.GrossMonthly);
         Assert.Equal(0.06m, result.StateTaxRate);
+        Assert.Equal(7500.00m, result.FederalTaxAnnual);
+        Assert.Equal(625.00m, result.FederalTaxMonthly);
+        Assert.Equal(4500.00m, result.StateTaxAnnual);
+        Assert.Equal(375.00m, result.StateTaxMonthly);
+        Assert.Equal(5737.50m, result.FicaAnnual);
+        Assert.Equal(478.12m, result.FicaMonthly);
+        Assert.Equal(57262.50m, result.NetAnnual);
+        Assert.Equal(4771.88m, result.NetMonthly);
+        Assert.Equal(0.2365m, result.EffectiveTaxRate);
     }
 
     [Fact]
@@ -127,6 +138,115 @@ public class TaxCalculationServiceTests
 
         Directory.Delete(root, recursive: true);
     }
+
+    [Fact]
+    public void FileTaxConfigProviderThrowsWhenJsonIsMalformed()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(root, "Configuration", "TaxData");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "tax_config_2026.json"), "{ invalid-json-syntax }");
+
+        var env = new StubWebHostEnvironment(root);
+        var provider = new FileTaxConfigProvider(env);
+
+        try
+        {
+            Assert.ThrowsAny<JsonException>(() => provider.GetConfig());
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData("taxYear")]
+    [InlineData("standardDeduction")]
+    [InlineData("socialSecurityRate")]
+    [InlineData("socialSecurityWageCap")]
+    [InlineData("medicareRate")]
+    [InlineData("federalBrackets")]
+    [InlineData("stateTaxRates")]
+    public void FileTaxConfigProviderThrowsWhenRequiredFieldIsMissing(string missingField)
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(root, "Configuration", "TaxData");
+        Directory.CreateDirectory(dir);
+
+        var dict = new Dictionary<string, object>
+        {
+            ["taxYear"] = 2026,
+            ["standardDeduction"] = 15000,
+            ["socialSecurityRate"] = 0.062,
+            ["socialSecurityWageCap"] = 176100,
+            ["medicareRate"] = 0.0145,
+            ["federalBrackets"] = Array.Empty<object>(),
+            ["stateTaxRates"] = new Dictionary<string, decimal> { ["CA"] = 0.06m }
+        };
+        dict.Remove(missingField);
+
+        File.WriteAllText(Path.Combine(dir, "tax_config_2026.json"), JsonSerializer.Serialize(dict));
+
+        var env = new StubWebHostEnvironment(root);
+        var provider = new FileTaxConfigProvider(env);
+
+        try
+        {
+            var ex = Assert.Throws<InvalidOperationException>(() => provider.GetConfig());
+            Assert.Contains(missingField, ex.Message);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FileTaxConfigProviderSelectsLatestLexicographicalConfigFile()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+        var dir = Path.Combine(root, "Configuration", "TaxData");
+        Directory.CreateDirectory(dir);
+
+        var config2025 = new
+        {
+            taxYear = 2025,
+            standardDeduction = 14600,
+            socialSecurityRate = 0.062,
+            socialSecurityWageCap = 168600,
+            medicareRate = 0.0145,
+            federalBrackets = Array.Empty<object>(),
+            stateTaxRates = new Dictionary<string, decimal> { ["CA"] = 0.05m }
+        };
+        var config2026 = new
+        {
+            taxYear = 2026,
+            standardDeduction = 15000,
+            socialSecurityRate = 0.062,
+            socialSecurityWageCap = 176100,
+            medicareRate = 0.0145,
+            federalBrackets = Array.Empty<object>(),
+            stateTaxRates = new Dictionary<string, decimal> { ["CA"] = 0.06m }
+        };
+
+        File.WriteAllText(Path.Combine(dir, "tax_config_2025.json"), JsonSerializer.Serialize(config2025));
+        File.WriteAllText(Path.Combine(dir, "tax_config_2026.json"), JsonSerializer.Serialize(config2026));
+
+        var env = new StubWebHostEnvironment(root);
+        var provider = new FileTaxConfigProvider(env);
+
+        try
+        {
+            var config = provider.GetConfig();
+            Assert.Equal(2026, config.TaxYear);
+            Assert.Equal(15000m, config.StandardDeduction);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }
 
 public class LoanAmortizationServiceTests
@@ -139,9 +259,25 @@ public class LoanAmortizationServiceTests
         var result = loan.Calculate(12000m, 0.12m, 1);
 
         Assert.Equal(12_000m, result.Principal);
-        Assert.True(result.MonthlyPayment > 0m);
-        Assert.True(result.TotalPaid >= result.Principal);
+        Assert.Equal(1066.19m, result.MonthlyPayment);
+        Assert.Equal(12794.23m, result.TotalPaid);
+        Assert.Equal(794.23m, result.TotalInterest);
         Assert.Equal(0.12m, result.AnnualRate);
+        Assert.Equal(1, result.TermYears);
+    }
+
+    [Fact]
+    public void LoanAmortizationServiceCalculatesZeroInterestCorrectly()
+    {
+        var loan = new LoanAmortizationService();
+
+        var result = loan.Calculate(12000m, 0m, 1);
+
+        Assert.Equal(12_000m, result.Principal);
+        Assert.Equal(1000m, result.MonthlyPayment);
+        Assert.Equal(12000m, result.TotalPaid);
+        Assert.Equal(0m, result.TotalInterest);
+        Assert.Equal(0m, result.AnnualRate);
         Assert.Equal(1, result.TermYears);
     }
 }
@@ -188,7 +324,7 @@ public class HousingCostServiceTests
 public class BudgetSimulatorServiceTests
 {
     [Fact]
-    public async Task BudgetSimulationStatusClassifiesDisposableIncomeAsTightWhenResultIsPositiveButSmall()
+    public async Task BudgetSimulationCalculatesDeterministicBreakdownAndStatus()
     {
         var repo = new StubGradCastRepository(new FairMarketRent
         {
@@ -217,11 +353,33 @@ public class BudgetSimulatorServiceTests
         var amortization = new LoanAmortizationService();
         var service = new BudgetSimulatorService(repo, housing, taxService, amortization);
 
-        var request = new BudgetSimulationRequest(1, string.Empty, "12345", "1bed", 1000m);
+        // Low salary scenario -> Deficit
+        var deficitRequest = new BudgetSimulationRequest(1, string.Empty, "12345", "1bed", 1000m);
+        var deficitResult = await service.SimulateAsync(deficitRequest);
+        var deficitSuccess = Assert.IsType<BudgetSimulationSuccess>(deficitResult);
+        var sim = deficitSuccess.Simulation;
+        Assert.Equal("deficit", sim.IncomeStatus);
+        Assert.Equal(1000m, sim.GrossAnnualSalary);
+        Assert.Equal(83.33m, sim.GrossMonthly);
+        Assert.Equal(76.96m, sim.NetMonthly);
+        Assert.Equal(900m, sim.RentMonthly);
+        Assert.Equal(108.53m, sim.LoanPaymentMonthly);
+        Assert.Equal(1008.53m, sim.FixedCostsMonthly);
+        Assert.Equal(-931.57m, sim.DisposableMonthly);
 
-        var result = await service.SimulateAsync(request);
-        var success = Assert.IsType<BudgetSimulationSuccess>(result);
-        Assert.Contains(success.Simulation.IncomeStatus, new[] { "tight", "deficit", "manageable", "comfortable" });
+        // High salary scenario -> Comfortable
+        var comfortableRequest = new BudgetSimulationRequest(1, string.Empty, "12345", "1bed", 60000m);
+        var comfortableResult = await service.SimulateAsync(comfortableRequest);
+        var comfortableSuccess = Assert.IsType<BudgetSimulationSuccess>(comfortableResult);
+        var comfSim = comfortableSuccess.Simulation;
+        Assert.Equal("comfortable", comfSim.IncomeStatus);
+        Assert.Equal(60000m, comfSim.GrossAnnualSalary);
+        Assert.Equal(5000m, comfSim.GrossMonthly);
+        Assert.Equal(4617.50m, comfSim.NetMonthly);
+        Assert.Equal(900m, comfSim.RentMonthly);
+        Assert.Equal(108.53m, comfSim.LoanPaymentMonthly);
+        Assert.Equal(1008.53m, comfSim.FixedCostsMonthly);
+        Assert.Equal(3608.97m, comfSim.DisposableMonthly);
     }
 
     [Fact]
@@ -414,6 +572,56 @@ public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFa
     }
 
     [Theory]
+    [InlineData(-1)]
+    [InlineData(0)]
+    [InlineData(10000001)]
+    public async Task NetPayRejectsInvalidSalaryWithProblemDetails(decimal salary)
+    {
+        var response = await _client.GetAsync($"/api/finance/net-pay?grossSalary={salary}&state=CA");
+        await AssertProblemResponse(response, "Invalid salary");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("A")]
+    public async Task NetPayRejectsInvalidStateWithProblemDetails(string state)
+    {
+        var response = await _client.GetAsync($"/api/finance/net-pay?grossSalary=75000&state={Uri.EscapeDataString(state)}");
+        await AssertProblemResponse(response, "Invalid state");
+    }
+
+    [Fact]
+    public async Task NetPayReturnsSuccessfulNetPayResult()
+    {
+        var response = await _client.GetAsync("/api/finance/net-pay?grossSalary=75000&state=CA");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<NetPayResult>();
+        Assert.NotNull(result);
+        Assert.Equal(75000m, result!.GrossAnnual);
+        Assert.Equal(6250.00m, result.GrossMonthly);
+        Assert.Equal(75000m, result.NetAnnual);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(1000001)]
+    public async Task LoanPaymentRejectsInvalidPrincipalWithProblemDetails(decimal principal)
+    {
+        var response = await _client.GetAsync($"/api/finance/loan-payment?principal={principal}&rate=0.05&termYears=10");
+        await AssertProblemResponse(response, "Invalid principal");
+    }
+
+    [Theory]
+    [InlineData(-0.01)]
+    [InlineData(0.31)]
+    public async Task LoanPaymentRejectsInvalidRateWithProblemDetails(decimal rate)
+    {
+        var response = await _client.GetAsync($"/api/finance/loan-payment?principal=10000&rate={rate}&termYears=10");
+        await AssertProblemResponse(response, "Invalid rate");
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(-1)]
     [InlineData(51)]
@@ -422,6 +630,49 @@ public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFa
         var response = await _client.GetAsync($"/api/finance/loan-payment?principal=10000&termYears={termYears}");
 
         await AssertProblemResponse(response, "Invalid loan term");
+    }
+
+    [Fact]
+    public async Task LoanPaymentReturnsSuccessfulLoanPaymentResult()
+    {
+        var response = await _client.GetAsync("/api/finance/loan-payment?principal=12000&rate=0.12&termYears=1");
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<LoanPaymentResult>();
+        Assert.NotNull(result);
+        Assert.Equal(12000m, result!.Principal);
+        Assert.Equal(1066.19m, result.MonthlyPayment);
+        Assert.Equal(12794.23m, result.TotalPaid);
+        Assert.Equal(794.23m, result.TotalInterest);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public async Task SimulatorRejectsInvalidSchoolWithProblemDetails(int schoolId)
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId,
+            cbsaCode = "12345",
+            housingType = "1bed"
+        });
+
+        await AssertProblemResponse(response, "Invalid school");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task SimulatorRejectsMissingLocationWithProblemDetails(string cbsaCode)
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode,
+            housingType = "1bed"
+        });
+
+        await AssertProblemResponse(response, "Invalid location");
     }
 
     [Fact]
@@ -484,6 +735,8 @@ public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFa
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.Equal(expectedTitle, problem!.Title);
+        Assert.Equal((int)expectedStatus, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Detail));
     }
 }
 
@@ -518,6 +771,27 @@ public class FinanceEndpointUnavailableDataTests : IClassFixture<WebApplicationF
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.Equal("Housing data unavailable", problem!.Title);
+        Assert.Equal(422, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Detail));
+    }
+
+    [Fact]
+    public async Task SimulatorReportsMissingLocationAsAnUnavailableDataProblem()
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode = "99999",
+            housingType = "1bed"
+        });
+
+        Assert.Equal(System.Net.HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal("Location not found", problem!.Title);
+        Assert.Equal(404, problem.Status);
+        Assert.False(string.IsNullOrWhiteSpace(problem.Detail));
     }
 }
 
@@ -563,9 +837,18 @@ public sealed class StubBudgetSimulatorService : IBudgetSimulatorService
 public sealed class UnavailableBudgetSimulatorService : IBudgetSimulatorService
 {
     public Task<BudgetSimulationOutcome> SimulateAsync(BudgetSimulationRequest request, CancellationToken ct = default)
-        => Task.FromResult<BudgetSimulationOutcome>(new BudgetSimulationUnavailable(
+    {
+        if (request.CbsaCode == "99999")
+        {
+            return Task.FromResult<BudgetSimulationOutcome>(new BudgetSimulationUnavailable(
+                BudgetSimulationUnavailableReason.LocationNotFound,
+                "No location found for CBSA code '99999'."));
+        }
+
+        return Task.FromResult<BudgetSimulationOutcome>(new BudgetSimulationUnavailable(
             BudgetSimulationUnavailableReason.HousingDataUnavailable,
             "No Fair Market Rent data is available for CBSA code '12345'."));
+    }
 }
 
 public sealed class StubTaxConfigProvider : ITaxConfigProvider

@@ -117,10 +117,10 @@
 - [x] Add test coverage for hierarchical and flat configuration bindings.
 
 ### Task 41: Strengthen Backend Test Coverage and Spec Compliance
-- [ ] Replace permissive assertions with deterministic expected values for tax, loan, rent, and simulation calculations.
-- [ ] Add integration tests for finance endpoint status codes and problem-response bodies.
-- [ ] Add tests for malformed/missing tax-config fields and ensure provider exceptions follow the documented contract.
-- [ ] Dispose parsed JSON documents and use read-only EF queries where appropriate.
+- [x] Replace permissive assertions with deterministic expected values for tax, loan, rent, and simulation calculations.
+- [x] Add integration tests for finance endpoint status codes and problem-response bodies.
+- [x] Add tests for malformed/missing tax-config fields and ensure provider exceptions follow the documented contract.
+- [x] Dispose parsed JSON documents and use read-only EF queries where appropriate.
 
 ---
 

@@ -33,31 +33,53 @@ public class FileTaxConfigProvider : ITaxConfigProvider
 
         var latestFile = configFiles[0];
         var json = File.ReadAllText(latestFile);
-        var raw = JsonDocument.Parse(json).RootElement;
+        using var doc = JsonDocument.Parse(json);
+        var raw = doc.RootElement;
 
         var federalBrackets = new List<TaxBracket>();
-        foreach (var bracket in raw.GetProperty("federalBrackets").EnumerateArray())
+        var bracketsProp = GetRequiredProperty(raw, "federalBrackets");
+        if (bracketsProp.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidOperationException("Tax configuration property 'federalBrackets' must be an array.");
+        }
+
+        foreach (var bracket in bracketsProp.EnumerateArray())
         {
             federalBrackets.Add(new TaxBracket(
-                bracket.GetProperty("upperBound").GetDecimal(),
-                bracket.GetProperty("rate").GetDecimal()));
+                GetRequiredProperty(bracket, "upperBound").GetDecimal(),
+                GetRequiredProperty(bracket, "rate").GetDecimal()));
         }
 
         var stateTaxRates = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-        foreach (var prop in raw.GetProperty("stateTaxRates").EnumerateObject())
+        var stateRatesProp = GetRequiredProperty(raw, "stateTaxRates");
+        if (stateRatesProp.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidOperationException("Tax configuration property 'stateTaxRates' must be an object.");
+        }
+
+        foreach (var prop in stateRatesProp.EnumerateObject())
         {
             stateTaxRates[prop.Name.ToUpperInvariant()] = prop.Value.GetDecimal();
         }
 
         return new TaxConfig
         {
-            TaxYear = raw.GetProperty("taxYear").GetInt32(),
-            StandardDeduction = raw.GetProperty("standardDeduction").GetDecimal(),
-            SocialSecurityRate = raw.GetProperty("socialSecurityRate").GetDecimal(),
-            SocialSecurityWageCap = raw.GetProperty("socialSecurityWageCap").GetDecimal(),
-            MedicareRate = raw.GetProperty("medicareRate").GetDecimal(),
+            TaxYear = GetRequiredProperty(raw, "taxYear").GetInt32(),
+            StandardDeduction = GetRequiredProperty(raw, "standardDeduction").GetDecimal(),
+            SocialSecurityRate = GetRequiredProperty(raw, "socialSecurityRate").GetDecimal(),
+            SocialSecurityWageCap = GetRequiredProperty(raw, "socialSecurityWageCap").GetDecimal(),
+            MedicareRate = GetRequiredProperty(raw, "medicareRate").GetDecimal(),
             FederalBrackets = federalBrackets,
             StateTaxRates = stateTaxRates
         };
+    }
+
+    private static JsonElement GetRequiredProperty(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var prop))
+        {
+            throw new InvalidOperationException($"Tax configuration is missing required property: '{propertyName}'.");
+        }
+        return prop;
     }
 }

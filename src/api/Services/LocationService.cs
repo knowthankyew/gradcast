@@ -17,6 +17,7 @@ public class LocationService
         string query, CancellationToken ct = default)
     {
         return await _db.CbsaLocations
+            .AsNoTracking()
             .Where(c => EF.Functions.Like(c.Name, $"%{query}%"))
             .OrderBy(c => c.Name)
             .Take(10)

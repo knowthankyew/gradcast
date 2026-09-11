@@ -41,7 +41,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
     public async Task<IReadOnlyList<SchoolSearchResult>> SearchSchoolsAsync(
         string query, string? state, CancellationToken ct = default)
     {
-        var q = _db.Schools.AsQueryable();
+        var q = _db.Schools.AsNoTracking().AsQueryable();
 
         q = q.Where(s => EF.Functions.Like(s.Name, $"%{query}%"));
 
@@ -62,11 +62,11 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
     public async Task<SchoolDetail?> GetSchoolDetailAsync(
         int schoolId, int? year = null, CancellationToken ct = default)
     {
-        var school = await _db.Schools.FirstOrDefaultAsync(s => s.Id == schoolId, ct);
+        var school = await _db.Schools.AsNoTracking().FirstOrDefaultAsync(s => s.Id == schoolId, ct);
         if (school == null) return null;
 
         // Get year data — use specified year or fall back to most recent available
-        var yearDataQuery = _db.SchoolYearData.Where(yd => yd.SchoolId == schoolId);
+        var yearDataQuery = _db.SchoolYearData.AsNoTracking().Where(yd => yd.SchoolId == schoolId);
         Data.Entities.SchoolYearData? yearData;
 
         if (year.HasValue)
@@ -81,6 +81,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
         // Get programs for the matching year (or most recent)
         var programYear = year ?? yearData?.Year ?? 2024;
         var programs = await _db.Programs
+            .AsNoTracking()
             .Where(p => p.SchoolId == schoolId && p.Year == programYear)
             .ToListAsync(ct);
 
@@ -117,6 +118,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
         var startYear = currentYear - 5;
 
         var yearData = await _db.SchoolYearData
+            .AsNoTracking()
             .Where(yd => yd.SchoolId == schoolId && yd.Year >= startYear && yd.Year < currentYear)
             .OrderBy(yd => yd.Year)
             .ToListAsync(ct);
