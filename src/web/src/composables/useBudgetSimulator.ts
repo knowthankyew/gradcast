@@ -73,6 +73,7 @@ export function useBudgetSimulator() {
       store.selectedLocation?.cbsaCode,
       store.housingType,
       store.selectedProgram?.cipCode,
+      store.useSchoolAverage,
     ],
     () => {
       if (store.canSimulate) {

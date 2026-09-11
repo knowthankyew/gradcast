@@ -44,13 +44,16 @@
           <!-- Step 3: Program selection (after school loads) -->
           <ProgramList :programs="store.selectedSchool!.programs" />
 
-          <!-- Step 4: Target destination (after school loads — program optional) -->
+          <!-- Step 4: Target destination (after school loads) -->
           <LocationSelector />
 
           <!-- Step 5: Job market pulse (when program AND location are selected) -->
           <JobPulseWidget v-if="store.hasProgram && store.hasLocation" />
 
-          <!-- Step 6: Budget simulation (after location selected) -->
+          <!-- Prompt when location is selected but program is not yet selected -->
+          <ProgramRequiredPrompt v-if="store.hasLocation && !store.hasProgramSelection" />
+
+          <!-- Step 6: Budget simulation (after program + location selected) -->
           <BudgetSimulator v-if="store.canSimulate" />
         </template>
 
@@ -90,6 +93,7 @@ import ProgramList from './components/ProgramList.vue'
 import YearSelector from './components/YearSelector.vue'
 import LocationSelector from './components/LocationSelector.vue'
 import JobPulseWidget from './components/JobPulseWidget.vue'
+import ProgramRequiredPrompt from './components/ProgramRequiredPrompt.vue'
 import BudgetSimulator from './components/BudgetSimulator.vue'
 import SavedBudgets from './components/SavedBudgets.vue'
 import { useSchoolApi } from './composables/useSchoolApi'

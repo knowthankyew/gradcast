@@ -23,6 +23,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Program state (optional — refines salary estimate)
   const selectedProgram = ref<ProgramSelection | null>(null)
+  const useSchoolAverage = ref(false)
   const hideMissingProgramData = ref(false)
 
   // Location state
@@ -36,8 +37,9 @@ export const useAppStore = defineStore('app', () => {
   // Computed — progressive disclosure gates
   const hasSchool = computed(() => selectedSchool.value !== null)
   const hasProgram = computed(() => selectedProgram.value !== null)
+  const hasProgramSelection = computed(() => selectedProgram.value !== null || useSchoolAverage.value)
   const hasLocation = computed(() => selectedLocation.value !== null)
-  const canSimulate = computed(() => hasSchool.value && hasLocation.value && !isRestoring.value)
+  const canSimulate = computed(() => hasSchool.value && hasLocation.value && hasProgramSelection.value && !isRestoring.value)
 
   // Actions
   function setSchool(school: SchoolDetail) {
@@ -46,6 +48,8 @@ export const useAppStore = defineStore('app', () => {
     // Clear downstream selections when school changes
     selectedProgram.value = null
     selectedLocation.value = null
+    // If school has no programs listed, default to school average
+    useSchoolAverage.value = school.programs.length === 0
   }
 
   /** Restore school without clearing downstream state (used by load-back) */
@@ -78,6 +82,16 @@ export const useAppStore = defineStore('app', () => {
 
   function setProgram(program: ProgramSelection | null) {
     selectedProgram.value = program
+    if (program !== null) {
+      useSchoolAverage.value = false
+    }
+  }
+
+  function setUseSchoolAverage(useAverage: boolean) {
+    useSchoolAverage.value = useAverage
+    if (useAverage) {
+      selectedProgram.value = null
+    }
   }
 
   function setHideMissingProgramData(hide: boolean) {
@@ -100,11 +114,13 @@ export const useAppStore = defineStore('app', () => {
     selectedSchoolId.value = null
     selectedSchool.value = null
     selectedProgram.value = null
+    useSchoolAverage.value = false
     selectedLocation.value = null
   }
 
   function clearProgram() {
     selectedProgram.value = null
+    useSchoolAverage.value = false
   }
 
   function clearLocation() {
@@ -116,6 +132,7 @@ export const useAppStore = defineStore('app', () => {
     selectedSchool,
     selectedYear,
     selectedProgram,
+    useSchoolAverage,
     hideMissingProgramData,
     selectedLocation,
     hideMissingLocationData,
@@ -123,6 +140,7 @@ export const useAppStore = defineStore('app', () => {
     isRestoring,
     hasSchool,
     hasProgram,
+    hasProgramSelection,
     hasLocation,
     canSimulate,
     setSchool,
@@ -130,6 +148,7 @@ export const useAppStore = defineStore('app', () => {
     updateSchoolDetail,
     setYear,
     setProgram,
+    setUseSchoolAverage,
     setHideMissingProgramData,
     setLocation,
     setHideMissingLocationData,

@@ -4,11 +4,48 @@
       <v-icon class="mr-2" color="accent">mdi-calculator-variant</v-icon>
       Post-Grad Monthly Budget Simulator
     </v-card-title>
-    <v-card-subtitle>
-      Based on your school, program earnings, and target destination
+    <v-card-subtitle class="d-flex align-center flex-wrap ga-2">
+      <span v-if="store.selectedProgram">
+        <v-icon size="x-small" color="accent" class="mr-1">mdi-school</v-icon>
+        <strong>{{ store.selectedProgram.title }}</strong> ({{ store.selectedProgram.credentialName }}) &middot; {{ sim?.locationName ?? store.selectedLocation?.name }}
+      </span>
+      <span v-else-if="store.useSchoolAverage">
+        <v-icon size="x-small" color="amber-darken-2" class="mr-1">mdi-chart-bell-curve-cumulative</v-icon>
+        <strong>School-Wide Average</strong> (All Majors) &middot; {{ sim?.locationName ?? store.selectedLocation?.name }}
+      </span>
+      <span v-else>
+        Based on your school, program earnings, and target destination
+      </span>
     </v-card-subtitle>
 
     <v-card-text>
+      <!-- School-wide average alert banner -->
+      <v-alert
+        v-if="store.useSchoolAverage && !store.selectedProgram"
+        type="warning"
+        variant="tonal"
+        density="comfortable"
+        class="mb-4"
+      >
+        <div class="d-flex align-center justify-space-between flex-wrap ga-2">
+          <div>
+            <div class="font-weight-medium">Viewing School-Wide Average Earnings</div>
+            <div class="text-caption">
+              Salary is based on the average across all graduates at this school. To see your personalized budget, select your specific major.
+            </div>
+          </div>
+          <v-btn
+            size="small"
+            variant="elevated"
+            color="warning"
+            prepend-icon="mdi-school"
+            @click="scrollToProgramList"
+          >
+            Select a Specific Major
+          </v-btn>
+        </div>
+      </v-alert>
+
       <!-- Loading -->
       <div v-if="loading" class="d-flex justify-center py-8">
         <v-progress-circular indeterminate color="primary" size="48" />
@@ -199,16 +236,32 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useBudgetSimulator } from '../composables/useBudgetSimulator'
+import { useAppStore } from '../stores/appStore'
 
+const store = useAppStore()
 const { simulation: sim, loading, error, runSimulation } = useBudgetSimulator()
 
 const salaryOverrideInput = ref<number | null>(null)
+
+function scrollToProgramList() {
+  const el = document.getElementById('program-list-card')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.classList.add('program-card-highlight')
+    setTimeout(() => {
+      el.classList.remove('program-card-highlight')
+    }, 1800)
+  }
+}
 
 const salarySourceLabel = computed(() => {
   if (!sim.value) return ''
   switch (sim.value.salarySource) {
     case 'user_override': return 'Your custom salary'
-    case 'scorecard_median': return 'College Scorecard median earnings'
+    case 'scorecard_median':
+      return store.selectedProgram
+        ? `${store.selectedProgram.title} median earnings (Scorecard)`
+        : 'School-wide average earnings (Scorecard)'
     case 'national_fallback': return 'National median (no program data available)'
     default: return sim.value.salarySource
   }

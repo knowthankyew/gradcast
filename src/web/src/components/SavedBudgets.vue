@@ -69,6 +69,7 @@
           <v-list-item-subtitle>
             {{ budget.context.schoolName }}
             <span v-if="budget.context.programTitle"> &middot; {{ budget.context.programTitle }}</span>
+            <span v-else> &middot; School-Wide Average</span>
             &middot; {{ budget.context.locationName }}
             &middot; {{ budget.context.housingType === '2bed' ? 'Roommate' : 'Alone' }}
           </v-list-item-subtitle>
@@ -201,6 +202,7 @@ async function onLoad(budget: SavedBudget) {
       })
     } else {
       store.clearProgram()
+      store.setUseSchoolAverage(true)
     }
 
     // Restore location + housing type

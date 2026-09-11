@@ -12,6 +12,8 @@
           density="compact"
           hide-details
           inset
+          role="switch"
+          :input-props="{ role: 'switch' }"
         />
         <v-tooltip location="top" text="Hide metro areas without Fair Market Rent data">
           <template #activator="{ props: tooltipProps }">
@@ -51,10 +53,10 @@
               <v-list-item v-bind="props">
                 <template #subtitle>
                   <div class="d-flex align-center flex-wrap ga-2 mt-1">
-                    <span>{{ (item as any).raw?.state ?? '' }} Metro Area</span>
+                    <span>{{ getLoc(item)?.state ?? '' }} Metro Area</span>
                     <span class="text-medium-emphasis">•</span>
-                    <span v-if="(item as any).raw?.hasHousingData" class="font-weight-medium text-primary">
-                      {{ formatRentPreview((item as any).raw) }}
+                    <span v-if="getLoc(item)?.hasHousingData" class="font-weight-medium text-primary">
+                      {{ formatRentPreview(getLoc(item)) }}
                     </span>
                     <span v-else class="text-medium-emphasis">
                       Rent data unavailable
@@ -217,6 +219,10 @@ onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (abortController) abortController.abort()
 })
+
+function getLoc(item: any): LocationResult {
+  return item?.raw ?? item
+}
 
 function onLocationSelected(item: LocationResult | null) {
   if (item) {

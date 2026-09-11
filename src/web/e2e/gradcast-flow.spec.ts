@@ -97,7 +97,8 @@ test.describe('GradCast Core User Flow', () => {
     await expect(commPanel).toBeVisible()
 
     // 3. Toggle switch ON to hide missing data
-    const filterSwitch = page.getByRole('switch', { name: /Hide missing data/i })
+    const programsCard = page.locator('.v-card', { hasText: 'Programs by Department' })
+    const filterSwitch = programsCard.getByRole('switch', { name: /Hide missing data/i })
     await filterSwitch.click()
 
     // 4. Verify filtered count and that program with missing earnings is hidden
@@ -149,7 +150,47 @@ test.describe('GradCast Core User Flow', () => {
     // 6. Switch housing to roommate (2-Bed) and verify rent preview updates
     const roommateBtn = page.getByRole('button', { name: /Roommate \(2-Bed\)/i })
     await roommateBtn.click()
+    await metroInput.fill('Austin')
     await expect(page.getByText('$975/mo (shared 2-bed)')).toBeVisible()
+  })
+
+  test('prompts user to select program when destination is picked first, and allows school-wide average fallback', async ({ page }) => {
+    // 1. Search and select school
+    const schoolInput = page.getByPlaceholder('Start typing a school name...')
+    await schoolInput.fill('Texas')
+    const schoolOption = page.getByRole('option', { name: /The University of Texas at Austin/i })
+    await schoolOption.click()
+
+    // 2. Select destination BEFORE picking a program
+    const metroInput = page.getByPlaceholder('Start typing a city or metro area...')
+    await metroInput.fill('Austin')
+    const metroOption = page.getByRole('option', { name: /Austin-Round Rock-Georgetown/i })
+    await metroOption.click()
+
+    // 3. Verify ProgramRequiredPrompt card appears and BudgetSimulator is gated
+    await expect(page.getByText('Select a Program to Generate Your Budget')).toBeVisible()
+    await expect(page.getByText('Step 3 Needed')).toBeVisible()
+    await expect(page.getByText('Post-Grad Monthly Budget Simulator')).not.toBeVisible()
+
+    // 4. Click Proceed with School-Wide Average fallback
+    const schoolAvgBtn = page.getByRole('button', { name: /Proceed with School-Wide Average/i })
+    await schoolAvgBtn.click()
+
+    // 5. Verify simulator is unlocked and displays school-wide average banner
+    await expect(page.getByText('Post-Grad Monthly Budget Simulator')).toBeVisible()
+    await expect(page.getByText('Viewing School-Wide Average Earnings')).toBeVisible()
+    await expect(page.getByText('School-Wide Average Active')).toBeVisible()
+
+    // 6. Select a specific program (Computer Science)
+    const compSciPanel = page.getByRole('button', { name: /Computer & Information Sciences/i })
+    await compSciPanel.click()
+    const csRow = page.getByRole('row', { name: /Computer Science/i })
+    await csRow.click()
+
+    // 7. Verify Job Market Pulse is now active and school-wide warning is gone
+    await expect(page.getByText('Job Market Pulse')).toBeVisible()
+    await expect(page.getByText('Viewing School-Wide Average Earnings')).not.toBeVisible()
+    await expect(page.getByText(/Computer Science \(Bachelor's Degree\)/)).toBeVisible()
   })
 })
 

@@ -1,5 +1,10 @@
 <template>
-  <v-card v-if="props.programs.length > 0" elevation="2" class="mb-6">
+  <v-card
+    v-if="props.programs.length > 0"
+    id="program-list-card"
+    elevation="2"
+    class="mb-6 program-list-container"
+  >
     <v-card-title class="d-flex align-center flex-wrap ga-2">
       <v-icon class="mr-2">mdi-book-open-variant</v-icon>
       Programs by Department
@@ -18,25 +23,49 @@
         <v-icon start size="small">mdi-check-circle</v-icon>
         {{ store.selectedProgram.title }}
       </v-chip>
-      <v-chip v-else size="small" variant="tonal" color="grey">
-        <v-icon start size="small">mdi-cursor-default-click</v-icon>
-        Click a program to use its earnings data
+      <v-chip
+        v-else-if="store.useSchoolAverage"
+        color="amber-darken-2"
+        variant="elevated"
+        size="small"
+        closable
+        @click:close="store.setUseSchoolAverage(false)"
+      >
+        <v-icon start size="small">mdi-chart-bell-curve-cumulative</v-icon>
+        School-Wide Average Active
       </v-chip>
+      <div v-else class="d-flex align-center ga-2">
+        <v-chip size="small" variant="tonal" color="grey">
+          <v-icon start size="small">mdi-cursor-default-click</v-icon>
+          Click a program to use its earnings data
+        </v-chip>
+        <v-btn
+          size="x-small"
+          variant="tonal"
+          color="secondary"
+          @click="store.setUseSchoolAverage(true)"
+        >
+          Use School Average
+        </v-btn>
+      </div>
     </v-card-title>
 
     <v-card-text>
-      <!-- Filter controls -->
-      <div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-4">
-        <div class="text-caption text-medium-emphasis">
-          <span v-if="store.hideMissingProgramData">
-            Showing {{ totalFilteredPrograms }} of {{ props.programs.length }} programs (missing earnings hidden)
-          </span>
-          <span v-else>
-            Showing all {{ props.programs.length }} programs
-          </span>
-        </div>
-
-        <div class="d-flex align-center">
+      <!-- Search and Filter controls -->
+      <v-row class="mb-2" align="center">
+        <v-col cols="12" sm="7">
+          <v-text-field
+            v-model="searchQuery"
+            label="Search programs by name"
+            placeholder="e.g., Computer Science, Nursing, Finance..."
+            density="compact"
+            variant="outlined"
+            prepend-inner-icon="mdi-magnify"
+            clearable
+            hide-details
+          />
+        </v-col>
+        <v-col cols="12" sm="5" class="d-flex align-center justify-sm-end">
           <v-switch
             v-model="store.hideMissingProgramData"
             label="Hide missing data"
@@ -44,6 +73,8 @@
             density="compact"
             hide-details
             inset
+            role="switch"
+            :input-props="{ role: 'switch' }"
           />
           <v-tooltip location="top" text="Hide programs without reported median earnings">
             <template #activator="{ props: tooltipProps }">
@@ -52,14 +83,32 @@
               </v-icon>
             </template>
           </v-tooltip>
-        </div>
+        </v-col>
+      </v-row>
+
+      <div class="text-caption text-medium-emphasis mb-3">
+        <span v-if="store.hideMissingProgramData">
+          Showing {{ totalFilteredPrograms }} of {{ props.programs.length }} programs (missing earnings hidden)
+        </span>
+        <span v-else-if="searchQuery.trim()">
+          Showing {{ totalFilteredPrograms }} of {{ props.programs.length }} programs matching "{{ searchQuery.trim() }}"
+        </span>
+        <span v-else>
+          Showing all {{ props.programs.length }} programs
+        </span>
       </div>
 
       <!-- Department panels -->
-      <v-expansion-panels v-if="categories.length > 0" variant="accordion">
+      <v-expansion-panels
+        v-if="categories.length > 0"
+        v-model="openedPanels"
+        multiple
+        variant="accordion"
+      >
         <v-expansion-panel
           v-for="category in categories"
           :key="category.code"
+          :value="category.code"
         >
           <v-expansion-panel-title>
             <div class="d-flex align-center flex-grow-1">
@@ -126,27 +175,65 @@
       <div v-else class="text-center py-8 text-medium-emphasis">
         <v-icon size="48" class="mb-2" color="grey">mdi-filter-off-outline</v-icon>
         <div class="text-subtitle-1 font-weight-medium mb-1">
-          No programs with reported earnings data
+          No matching programs found
         </div>
         <div class="text-body-2 mb-4">
-          All {{ props.programs.length }} programs at this school have privacy-suppressed or unreported earnings.
+          <span v-if="searchQuery.trim()">
+            No programs match "{{ searchQuery.trim() }}".
+          </span>
+          <span v-else>
+            All {{ props.programs.length }} programs at this school have privacy-suppressed or unreported earnings.
+          </span>
         </div>
-        <v-btn
-          size="small"
-          variant="tonal"
-          color="primary"
-          prepend-icon="mdi-filter-remove"
-          @click="store.setHideMissingProgramData(false)"
-        >
-          Show All Programs
-        </v-btn>
+        <div class="d-flex justify-center ga-2">
+          <v-btn
+            v-if="searchQuery.trim()"
+            size="small"
+            variant="tonal"
+            prepend-icon="mdi-close"
+            @click="searchQuery = ''"
+          >
+            Clear Search
+          </v-btn>
+          <v-btn
+            v-if="store.hideMissingProgramData"
+            size="small"
+            variant="tonal"
+            color="primary"
+            prepend-icon="mdi-filter-remove"
+            @click="store.setHideMissingProgramData(false)"
+          >
+            Show All Programs
+          </v-btn>
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="secondary"
+            prepend-icon="mdi-chart-bell-curve-cumulative"
+            @click="store.setUseSchoolAverage(true)"
+          >
+            Use School Average
+          </v-btn>
+        </div>
       </div>
     </v-card-text>
+  </v-card>
+
+  <v-card v-else elevation="1" class="mb-6 pa-4" variant="tonal" color="info">
+    <div class="d-flex align-center">
+      <v-icon class="mr-3" size="32">mdi-information-outline</v-icon>
+      <div>
+        <div class="font-weight-medium">No program-level data available for this institution.</div>
+        <div class="text-caption text-medium-emphasis">
+          The budget simulator will automatically use the school-wide average.
+        </div>
+      </div>
+    </div>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { ProgramData, ProgramCategory } from '../types'
 import { cipCategories } from '../data/cipCategories'
 import { useAppStore } from '../stores/appStore'
@@ -157,11 +244,22 @@ const props = defineProps<{
 
 const store = useAppStore()
 
+const searchQuery = ref('')
+const openedPanels = ref<string[]>([])
+
 const filteredPrograms = computed(() => {
-  if (!store.hideMissingProgramData) {
-    return props.programs
+  let list = props.programs
+  if (store.hideMissingProgramData) {
+    list = list.filter((p) => p.medianEarnings != null)
   }
-  return props.programs.filter((p) => p.medianEarnings != null)
+  const q = searchQuery.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter((p) => {
+      const categoryName = cipCategories[p.code.substring(0, 2)]?.toLowerCase() || ''
+      return p.title.toLowerCase().includes(q) || categoryName.includes(q)
+    })
+  }
+  return list
 })
 
 const totalFilteredPrograms = computed(() => filteredPrograms.value.length)
@@ -192,6 +290,13 @@ const categories = computed<ProgramCategory[]>(() => {
   }
 
   return result.sort((a, b) => a.name.localeCompare(b.name))
+})
+
+// Auto-expand all categories when searching so matching programs are visible
+watch(searchQuery, (newQuery) => {
+  if (newQuery.trim().length > 0) {
+    openedPanels.value = categories.value.map((c) => c.code)
+  }
 })
 
 function isSelected(program: ProgramData): boolean {
@@ -244,5 +349,27 @@ function formatCurrency(value: number): string {
 }
 .program-selected {
   background-color: rgba(var(--v-theme-accent), 0.08) !important;
+}
+
+.program-list-container {
+  transition: box-shadow 0.4s ease, border-color 0.4s ease;
+}
+
+.program-card-highlight {
+  animation: pulse-border 1.8s ease-in-out;
+}
+
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0.8);
+    border-color: rgb(var(--v-theme-primary));
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(var(--v-theme-primary), 0.25);
+    border-color: rgb(var(--v-theme-primary));
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--v-theme-primary), 0);
+  }
 }
 </style>
