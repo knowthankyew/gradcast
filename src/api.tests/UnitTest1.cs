@@ -137,7 +137,7 @@ public class LoanAmortizationServiceTests
 public class HousingCostServiceTests
 {
     [Fact]
-    public void HousingCostServiceMapsTheRequestedHousingTypeToTheRentBranch()
+    public async Task HousingCostServiceMapsTheRequestedHousingTypeToTheRentBranch()
     {
         var repo = new StubGradCastRepository(
             rent: new FairMarketRent
@@ -152,7 +152,7 @@ public class HousingCostServiceTests
             });
 
         IHousingCostService service = new HousingCostService(repo);
-        var result = service.GetHousingCostAsync("12345", "2bed").GetAwaiter().GetResult();
+        var result = await service.GetHousingCostAsync("12345", "2bed");
 
         Assert.NotNull(result);
         Assert.Equal("12345", result!.CbsaCode);
@@ -162,12 +162,12 @@ public class HousingCostServiceTests
     }
 
     [Fact]
-    public void HousingCostServiceReturnsNullWhenTheRepositoryCannotFindHousingData()
+    public async Task HousingCostServiceReturnsNullWhenTheRepositoryCannotFindHousingData()
     {
         var repo = new StubGradCastRepository();
         IHousingCostService service = new HousingCostService(repo);
 
-        var result = service.GetHousingCostAsync("missing", "1bed").GetAwaiter().GetResult();
+        var result = await service.GetHousingCostAsync("missing", "1bed");
 
         Assert.Null(result);
     }
@@ -176,7 +176,7 @@ public class HousingCostServiceTests
 public class BudgetSimulatorServiceTests
 {
     [Fact]
-    public void BudgetSimulationStatusClassifiesDisposableIncomeAsTightWhenResultIsPositiveButSmall()
+    public async Task BudgetSimulationStatusClassifiesDisposableIncomeAsTightWhenResultIsPositiveButSmall()
     {
         var repo = new StubGradCastRepository();
         IHousingCostService housing = new HousingCostService(repo);
@@ -200,7 +200,7 @@ public class BudgetSimulatorServiceTests
 
         var request = new BudgetSimulationRequest(1, string.Empty, "12345", "1bed", 1000m);
 
-        var result = service.SimulateAsync(request).GetAwaiter().GetResult();
+        var result = await service.SimulateAsync(request);
         Assert.NotNull(result);
         Assert.Contains(result!.IncomeStatus, new[] { "tight", "deficit", "manageable", "comfortable" });
     }
@@ -211,7 +211,8 @@ public class FinanceEndpointValidationContractTests
     [Fact]
     public void FinanceEndpointValidationFailureKeepsAStableProblemShape()
     {
-        var error = FinanceEndpoints.ValidateLoanRequest(-1m, 0.02m);
+        var request = new LoanPaymentRequest(-1m, 0.02m, null);
+        var error = FinanceEndpoints.ValidateLoanRequest(request);
 
         Assert.NotNull(error);
         var result = error as IResult;

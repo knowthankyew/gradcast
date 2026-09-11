@@ -23,16 +23,16 @@ public static class FinanceEndpoints
              .WithDescription("Run full budget simulation for school + location + program");
     }
 
-    public static IResult? ValidateNetPayRequest(decimal grossSalary, string? state)
+    public static IResult? ValidateNetPayRequest(NetPayRequest request)
     {
-        if (grossSalary <= 0 || grossSalary > 10_000_000)
+        if (request.GrossSalary <= 0 || request.GrossSalary > 10_000_000)
         {
             return ValidationFailure(
                 title: "Invalid salary",
                 detail: "Gross salary must be between $1 and $10,000,000.");
         }
 
-        if (string.IsNullOrWhiteSpace(state) || state.Length < 2)
+        if (string.IsNullOrWhiteSpace(request.State) || request.State.Length < 2)
         {
             return ValidationFailure(
                 title: "Invalid state",
@@ -42,16 +42,16 @@ public static class FinanceEndpoints
         return null;
     }
 
-    public static IResult? ValidateLoanRequest(decimal principal, decimal? rate)
+    public static IResult? ValidateLoanRequest(LoanPaymentRequest request)
     {
-        if (principal < 0 || principal > 1_000_000)
+        if (request.Principal < 0 || request.Principal > 1_000_000)
         {
             return ValidationFailure(
                 title: "Invalid principal",
                 detail: "Loan principal must be between $0 and $1,000,000.");
         }
 
-        if (rate.HasValue && (rate.Value <= 0 || rate.Value > 0.30m))
+        if (request.Rate.HasValue && (request.Rate.Value <= 0 || request.Rate.Value > 0.30m))
         {
             return ValidationFailure(
                 title: "Invalid rate",
@@ -85,13 +85,14 @@ public static class FinanceEndpoints
         [FromQuery] string state,
         ITaxCalculationService taxService)
     {
-        var invalid = ValidateNetPayRequest(grossSalary, state);
+        var request = new NetPayRequest(grossSalary, state);
+        var invalid = ValidateNetPayRequest(request);
         if (invalid != null)
         {
             return invalid;
         }
 
-        var result = taxService.Calculate(grossSalary, state);
+        var result = taxService.Calculate(request.GrossSalary, request.State);
         return Results.Ok(result);
     }
 
@@ -101,13 +102,14 @@ public static class FinanceEndpoints
         [FromQuery] int? termYears,
         ILoanAmortizationService loanService)
     {
-        var invalid = ValidateLoanRequest(principal, rate);
+        var request = new LoanPaymentRequest(principal, rate, termYears);
+        var invalid = ValidateLoanRequest(request);
         if (invalid != null)
         {
             return invalid;
         }
 
-        var result = loanService.Calculate(principal, rate, termYears);
+        var result = loanService.Calculate(request.Principal, request.Rate, request.TermYears);
         return Results.Ok(result);
     }
 
