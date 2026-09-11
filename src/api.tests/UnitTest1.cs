@@ -184,7 +184,14 @@ public class BudgetSimulatorServiceTests
     [Fact]
     public async Task BudgetSimulationStatusClassifiesDisposableIncomeAsTightWhenResultIsPositiveButSmall()
     {
-        var repo = new StubGradCastRepository();
+        var repo = new StubGradCastRepository(new FairMarketRent
+        {
+            CbsaCode = "12345",
+            Year = 2026,
+            OneBedroom = 900,
+            TwoBedroom = 1200,
+            Efficiency = 700
+        });
         IHousingCostService housing = new HousingCostService(repo);
         var provider = new StubTaxConfigProvider(new TaxConfig
         {
@@ -207,8 +214,23 @@ public class BudgetSimulatorServiceTests
         var request = new BudgetSimulationRequest(1, string.Empty, "12345", "1bed", 1000m);
 
         var result = await service.SimulateAsync(request);
-        Assert.NotNull(result);
-        Assert.Contains(result!.IncomeStatus, new[] { "tight", "deficit", "manageable", "comfortable" });
+        var success = Assert.IsType<BudgetSimulationSuccess>(result);
+        Assert.Contains(success.Simulation.IncomeStatus, new[] { "tight", "deficit", "manageable", "comfortable" });
+    }
+
+    [Fact]
+    public async Task BudgetSimulationReturnsHousingDataUnavailableWhenAValidLocationHasNoFmrRecord()
+    {
+        var repo = new StubGradCastRepository();
+        IHousingCostService housing = new HousingCostService(repo);
+        var taxService = new StubTaxCalculationService();
+        var service = new BudgetSimulatorService(repo, housing, taxService, new LoanAmortizationService());
+
+        var outcome = await service.SimulateAsync(new BudgetSimulationRequest(1, null, "12345", "1bed", 50000m));
+
+        var unavailable = Assert.IsType<BudgetSimulationUnavailable>(outcome);
+        Assert.Equal(BudgetSimulationUnavailableReason.HousingDataUnavailable, unavailable.Reason);
+        Assert.Contains("12345", unavailable.Detail);
     }
 }
 
@@ -366,17 +388,70 @@ public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFa
         await AssertProblemResponse(response, "Invalid salary override");
     }
 
-    private static async Task AssertProblemResponse(HttpResponseMessage response, string expectedTitle)
+    [Fact]
+    public async Task SimulatorKeepsTheSuccessfulBudgetResponseShape()
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode = "12345",
+            housingType = "1bed"
+        });
+
+        response.EnsureSuccessStatusCode();
+        var simulation = await response.Content.ReadFromJsonAsync<BudgetSimulationResult>();
+        Assert.NotNull(simulation);
+        Assert.Equal(1200m, simulation!.RentMonthly);
+    }
+
+    private static async Task AssertProblemResponse(
+        HttpResponseMessage response,
+        string expectedTitle,
+        System.Net.HttpStatusCode expectedStatus = System.Net.HttpStatusCode.BadRequest)
     {
         var responseBody = await response.Content.ReadAsStringAsync();
         Assert.True(
-            response.StatusCode == System.Net.HttpStatusCode.BadRequest,
-            $"Expected 400 but received {(int)response.StatusCode}: {responseBody}");
+            response.StatusCode == expectedStatus,
+            $"Expected {(int)expectedStatus} but received {(int)response.StatusCode}: {responseBody}");
         Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
         Assert.NotNull(problem);
         Assert.Equal(expectedTitle, problem!.Title);
+    }
+}
+
+public class FinanceEndpointUnavailableDataTests : IClassFixture<WebApplicationFactory<Program>>
+{
+    private readonly HttpClient _client;
+
+    public FinanceEndpointUnavailableDataTests(WebApplicationFactory<Program> factory)
+    {
+        _client = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll<IBudgetSimulatorService>();
+                services.AddSingleton<IBudgetSimulatorService>(new UnavailableBudgetSimulatorService());
+            });
+        }).CreateClient();
+    }
+
+    [Fact]
+    public async Task SimulatorReportsMissingHousingAsAnUnavailableDataProblem()
+    {
+        var response = await _client.PostAsJsonAsync("/api/finance/simulator", new
+        {
+            schoolId = 1,
+            cbsaCode = "12345",
+            housingType = "1bed"
+        });
+
+        Assert.Equal(System.Net.HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDetails>();
+        Assert.NotNull(problem);
+        Assert.Equal("Housing data unavailable", problem!.Title);
     }
 }
 
@@ -401,8 +476,8 @@ public sealed class StubTaxCalculationService : ITaxCalculationService
 
 public sealed class StubBudgetSimulatorService : IBudgetSimulatorService
 {
-    public Task<BudgetSimulationResult?> SimulateAsync(BudgetSimulationRequest request, CancellationToken ct = default)
-        => Task.FromResult<BudgetSimulationResult?>(new BudgetSimulationResult(
+    public Task<BudgetSimulationOutcome> SimulateAsync(BudgetSimulationRequest request, CancellationToken ct = default)
+        => Task.FromResult<BudgetSimulationOutcome>(new BudgetSimulationSuccess(new BudgetSimulationResult(
             GrossAnnualSalary: 100000m,
             GrossMonthly: 8333.33m,
             NetMonthly: 6200.00m,
@@ -416,7 +491,15 @@ public sealed class StubBudgetSimulatorService : IBudgetSimulatorService
             DisposableMonthly: 4700m,
             IncomeStatus: "comfortable",
             LocationName: "Stub City",
-            State: "CA"));
+            State: "CA")));
+}
+
+public sealed class UnavailableBudgetSimulatorService : IBudgetSimulatorService
+{
+    public Task<BudgetSimulationOutcome> SimulateAsync(BudgetSimulationRequest request, CancellationToken ct = default)
+        => Task.FromResult<BudgetSimulationOutcome>(new BudgetSimulationUnavailable(
+            BudgetSimulationUnavailableReason.HousingDataUnavailable,
+            "No Fair Market Rent data is available for CBSA code '12345'."));
 }
 
 public sealed class StubTaxConfigProvider : ITaxConfigProvider

@@ -30,7 +30,7 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         _loanService = loanService;
     }
 
-    public async Task<BudgetSimulationResult?> SimulateAsync(
+    public async Task<BudgetSimulationOutcome> SimulateAsync(
         BudgetSimulationRequest request, CancellationToken ct = default)
     {
         // 1. Determine salary (user override > program median earnings > school-wide median)
@@ -46,7 +46,12 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         // 2. Get location info for state tax lookup
         var location = await _repo.GetLocationByCbsaCodeAsync(request.CbsaCode, ct);
 
-        if (location == null) return null;
+        if (location == null)
+        {
+            return new BudgetSimulationUnavailable(
+                BudgetSimulationUnavailableReason.LocationNotFound,
+                $"Could not find location data for CBSA code '{request.CbsaCode}'.");
+        }
 
         // 3. Calculate net pay
         var netPay = _taxService.Calculate(salary, location.State);
@@ -55,7 +60,14 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         var housing = await _housingService.GetHousingCostAsync(
             request.CbsaCode, request.HousingType, ct);
 
-        var rentMonthly = housing?.MonthlyRent ?? 0;
+        if (housing == null)
+        {
+            return new BudgetSimulationUnavailable(
+                BudgetSimulationUnavailableReason.HousingDataUnavailable,
+                $"No Fair Market Rent data is available for CBSA code '{request.CbsaCode}'.");
+        }
+
+        var rentMonthly = housing.MonthlyRent;
 
         // 5. Calculate loan payment from school's median debt
         var medianDebt = await _repo.GetMedianDebtAsync(request.SchoolId, ct);
@@ -73,7 +85,7 @@ public class BudgetSimulatorService : IBudgetSimulatorService
             _ => "deficit"
         };
 
-        return new BudgetSimulationResult(
+        return new BudgetSimulationSuccess(new BudgetSimulationResult(
             GrossAnnualSalary: salary,
             GrossMonthly: netPay.GrossMonthly,
             NetMonthly: netPay.NetMonthly,
@@ -88,7 +100,7 @@ public class BudgetSimulatorService : IBudgetSimulatorService
             IncomeStatus: status,
             LocationName: location.Name,
             State: location.State
-        );
+        ));
     }
 
     private async Task<decimal> ResolveSalaryAsync(BudgetSimulationRequest request, CancellationToken ct)

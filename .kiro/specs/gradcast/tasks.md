@@ -85,11 +85,11 @@
 - [x] Return consistent RFC 7807 problem responses for invalid finance input; do not allow invalid input to produce a 500.
 - [x] Add endpoint-level tests for zero/negative loan terms, unsupported housing types, and invalid salary overrides.
 
-### Task 36: Treat Missing Housing Data as Unavailable, Not Free
-- [ ] Make budget simulation return an explicit unavailable result when no FMR record exists for the selected CBSA.
-- [ ] Map that result to a clear client error/status rather than returning a successful simulation with `$0` rent.
-- [ ] Preserve the existing successful response shape for simulations with valid housing data.
-- [ ] Add regression coverage for a valid location with missing FMR data.
+### Task 36: Treat Missing Housing Data as Unavailable, Not Free ✅ Complete
+- [x] Make budget simulation return an explicit unavailable result when no FMR record exists for the selected CBSA.
+- [x] Map that result to a clear client error/status rather than returning a successful simulation with `$0` rent.
+- [x] Preserve the existing successful response shape for simulations with valid housing data.
+- [x] Add regression coverage for a valid location with missing FMR data.
 
 ### Task 37: Refresh Import Dependencies and Remove Vulnerable SQLite Native Package
 - [ ] Replace the preview EF Core SQLite package in `src/import` with the same supported stable version used by API/data projects.

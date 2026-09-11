@@ -160,16 +160,20 @@ public static class FinanceEndpoints
             return invalid;
         }
 
-        var result = await simulatorService.SimulateAsync(normalizedRequest, ct);
-        if (result == null)
-        {
-            return ValidationFailure(
-                title: "Simulation failed",
-                detail: "Could not find location data for the given CBSA code.",
-                statusCode: 404);
-        }
+        var outcome = await simulatorService.SimulateAsync(normalizedRequest, ct);
 
-        return Results.Ok(result);
+        return outcome switch
+        {
+            BudgetSimulationSuccess success => Results.Ok(success.Simulation),
+            BudgetSimulationUnavailable { Reason: BudgetSimulationUnavailableReason.LocationNotFound } unavailable
+                => ValidationFailure("Location not found", unavailable.Detail, statusCode: 404),
+            BudgetSimulationUnavailable { Reason: BudgetSimulationUnavailableReason.HousingDataUnavailable } unavailable
+                => ValidationFailure("Housing data unavailable", unavailable.Detail, statusCode: 422),
+            _ => Results.Problem(
+                title: "Simulation failed",
+                detail: "The budget simulation returned an unrecognized result.",
+                statusCode: 500)
+        };
     }
 
     private static IResult ValidationFailure(
