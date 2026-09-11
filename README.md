@@ -23,6 +23,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 - **Progressive disclosure UX**: each step reveals the next, guiding the user through choices
 - **Program selection**: click any program row to use its earnings data in the simulation
 - **Target destination picker**: search 156 US metro areas with housing type toggle (live alone / roommate)
+- **Job Market Pulse**: live job openings, local median salary, and Scorecard earnings comparison via Adzuna API (matched by CIP program category and target metro area)
 - **Post-Grad Monthly Budget Simulator**:
   - Net take-home pay (federal + state taxes + FICA)
   - Rent from HUD Fair Market Rents (by metro + housing type)
@@ -46,6 +47,9 @@ An AI-generated proof-of-concept web application that helps students simulate th
 4. Pick target destination      → Metro area + housing preference
 5. Budget simulator appears     → Real numbers, real consequences
 6. Save scenarios               → Compare different school/city/program combinations
+5. Job market pulse appears     → Active job openings & local salary vs. Scorecard earnings
+6. Budget simulator appears     → Real numbers, real consequences
+7. Save scenarios               → Compare different school/city/program combinations
 ```
 
 ## Getting Started
@@ -55,6 +59,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
 - [Node.js 20+](https://nodejs.org/)
 - A free API key from [api.data.gov](https://api.data.gov/signup/) (required for `api` and `hybrid` modes)
+- (Optional) Free API credentials from [developer.adzuna.com](https://developer.adzuna.com/) (for live Job Market Pulse data)
 
 ### Quick Start (Hybrid Mode — Recommended)
 
@@ -139,6 +144,8 @@ gradcast/
 │   │   │   ├── SchoolEndpoints.cs      # /api/schools/*
 │   │   │   ├── LocationEndpoints.cs    # /api/locations/*
 │   │   │   └── FinanceEndpoints.cs     # /api/finance/*
+│   │   │   ├── FinanceEndpoints.cs     # /api/finance/*
+│   │   │   └── JobEndpoints.cs         # /api/jobs/*
 │   │   ├── Models/                 # DTOs
 │   │   └── Services/               # Business logic
 │   │       ├── CollegeScorecardService.cs      # Remote Scorecard API
@@ -148,6 +155,7 @@ gradcast/
 │   │       ├── HousingCostService.cs           # HUD FMR lookup
 │   │       ├── TaxCalculationService.cs        # Federal + state tax math
 │   │       ├── LoanAmortizationService.cs      # Student loan payments
+│   │       ├── AdzunaJobPulseService.cs        # Live job openings via Adzuna
 │   │       └── BudgetSimulatorService.cs       # Orchestrates the full sim
 │   ├── data/                       # EF Core class library
 │   │   ├── Entities/               # School, Program, CbsaLocation, FairMarketRent, etc.
@@ -161,6 +169,7 @@ gradcast/
 │           │   ├── SchoolDetail.vue
 │           │   ├── ProgramList.vue         # Selectable program rows
 │           │   ├── LocationSelector.vue    # Metro + housing type
+│           │   ├── JobPulseWidget.vue      # Active openings & salary comparison
 │           │   ├── BudgetSimulator.vue     # The "consequences engine"
 │           │   └── SavedBudgets.vue        # localStorage scenarios
 │           ├── composables/        # API + logic composables
@@ -183,6 +192,7 @@ gradcast/
 | GET | `/api/finance/net-pay?grossSalary=&state=` | Net pay calculator |
 | GET | `/api/finance/loan-payment?principal=&rate=&termYears=` | Loan amortization |
 | POST | `/api/finance/simulator` | Full budget simulation |
+| GET | `/api/jobs/pulse?cipCode={cip}&cbsa={cbsa}` | Live job openings & salary data |
 
 ## Phase 3 Vision
 
@@ -200,6 +210,7 @@ gradcast/
 | [HUD Fair Market Rents](https://www.huduser.gov/portal/datasets/fmr.html) | Rent by metro area | Annual |
 | Census Bureau | CBSA metro area delineations | Decennial+ |
 | Federal tax brackets | Income tax calculations | Annual (hardcoded) |
+| [Adzuna](https://developer.adzuna.com/) | Job openings & local salaries by CIP/metro | Real-time API |
 
 ## License
 
