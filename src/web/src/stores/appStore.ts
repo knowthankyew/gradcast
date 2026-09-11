@@ -27,6 +27,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Location state
   const selectedLocation = ref<LocationSelection | null>(null)
+  const hideMissingLocationData = ref(false)
   const housingType = ref<'1bed' | '2bed'>('1bed')
 
   // Restoration mutex — prevents watchers from firing during scenario load-back
@@ -87,6 +88,10 @@ export const useAppStore = defineStore('app', () => {
     selectedLocation.value = location
   }
 
+  function setHideMissingLocationData(hide: boolean) {
+    hideMissingLocationData.value = hide
+  }
+
   function setHousingType(type: '1bed' | '2bed') {
     housingType.value = type
   }
@@ -113,6 +118,7 @@ export const useAppStore = defineStore('app', () => {
     selectedProgram,
     hideMissingProgramData,
     selectedLocation,
+    hideMissingLocationData,
     housingType,
     isRestoring,
     hasSchool,
@@ -126,6 +132,7 @@ export const useAppStore = defineStore('app', () => {
     setProgram,
     setHideMissingProgramData,
     setLocation,
+    setHideMissingLocationData,
     setHousingType,
     clearSchool,
     clearProgram,

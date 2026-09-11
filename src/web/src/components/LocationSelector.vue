@@ -1,8 +1,26 @@
 <template>
   <v-card class="mb-6" elevation="2">
-    <v-card-title class="text-h6">
+    <v-card-title class="d-flex align-center flex-wrap ga-2">
       <v-icon class="mr-2">mdi-map-marker-radius</v-icon>
       Target Destination
+      <v-spacer />
+      <div class="d-flex align-center">
+        <v-switch
+          v-model="store.hideMissingLocationData"
+          label="Hide missing data"
+          color="primary"
+          density="compact"
+          hide-details
+          inset
+        />
+        <v-tooltip location="top" text="Hide metro areas without Fair Market Rent data">
+          <template #activator="{ props: tooltipProps }">
+            <v-icon v-bind="tooltipProps" size="small" color="medium-emphasis" class="ml-1">
+              mdi-information-outline
+            </v-icon>
+          </template>
+        </v-tooltip>
+      </div>
     </v-card-title>
     <v-card-subtitle class="mb-2">
       Where do you plan to live and work after graduation?
@@ -24,7 +42,6 @@
             variant="outlined"
             clearable
             no-filter
-            hide-no-data
             @update:model-value="onLocationSelected"
           >
             <template #selection="{ item }">
@@ -33,9 +50,38 @@
             <template #item="{ props, item }">
               <v-list-item v-bind="props">
                 <template #subtitle>
-                  {{ (item as any).raw?.state ?? '' }} Metro Area
+                  <div class="d-flex align-center flex-wrap ga-2 mt-1">
+                    <span>{{ (item as any).raw?.state ?? '' }} Metro Area</span>
+                    <span class="text-medium-emphasis">•</span>
+                    <span v-if="(item as any).raw?.hasHousingData" class="font-weight-medium text-primary">
+                      {{ formatRentPreview((item as any).raw) }}
+                    </span>
+                    <span v-else class="text-medium-emphasis">
+                      Rent data unavailable
+                    </span>
+                  </div>
                 </template>
               </v-list-item>
+            </template>
+            <template #no-data>
+              <div class="pa-4 text-caption text-medium-emphasis text-center">
+                <div v-if="store.hideMissingLocationData">
+                  No metro areas with available rent data found.
+                  <div class="mt-1">
+                    <v-btn
+                      size="x-small"
+                      variant="text"
+                      color="primary"
+                      @click="store.setHideMissingLocationData(false)"
+                    >
+                      Turn off "Hide missing data"
+                    </v-btn>
+                  </div>
+                </div>
+                <div v-else>
+                  No matching metro areas found.
+                </div>
+              </div>
             </template>
           </v-autocomplete>
         </v-col>
@@ -73,6 +119,9 @@ interface LocationResult {
   name: string
   state: string
   type: string
+  oneBedRent?: number | null
+  twoBedRent?: number | null
+  hasHousingData?: boolean
 }
 
 const store = useAppStore()
@@ -93,7 +142,7 @@ const items = computed(() => {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 let abortController: AbortController | null = null
 
-watch(searchQuery, (val) => {
+function fetchLocations(val: string) {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (abortController) abortController.abort()
 
@@ -106,7 +155,8 @@ watch(searchQuery, (val) => {
     loading.value = true
     abortController = new AbortController()
     try {
-      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(val)}`, {
+      const requireHousingParam = store.hideMissingLocationData ? '&requireHousing=true' : ''
+      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(val)}${requireHousingParam}`, {
         signal: abortController.signal,
       })
       if (response.ok) {
@@ -120,7 +170,20 @@ watch(searchQuery, (val) => {
       loading.value = false
     }
   }, 300)
+}
+
+watch(searchQuery, (val) => {
+  fetchLocations(val)
 })
+
+watch(
+  () => store.hideMissingLocationData,
+  () => {
+    if (searchQuery.value && searchQuery.value.length >= 2) {
+      fetchLocations(searchQuery.value)
+    }
+  }
+)
 
 watch(
   () => store.selectedLocation,
@@ -170,5 +233,24 @@ function onLocationSelected(item: LocationResult | null) {
 
 function onHousingChanged(value: '1bed' | '2bed') {
   store.setHousingType(value)
+}
+
+function formatRentPreview(loc: LocationResult): string {
+  if (housingChoice.value === '2bed' && loc.twoBedRent != null) {
+    const shared = Math.round(loc.twoBedRent / 2)
+    return `${formatCurrency(shared)}/mo (shared 2-bed)`
+  }
+  if (loc.oneBedRent != null) {
+    return `${formatCurrency(loc.oneBedRent)}/mo (1-bed)`
+  }
+  return 'Rent data unavailable'
+}
+
+function formatCurrency(val: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(val)
 }
 </script>

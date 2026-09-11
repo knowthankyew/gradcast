@@ -62,6 +62,18 @@ export const mockLocationSearch = [
     name: 'Austin-Round Rock-Georgetown',
     state: 'TX',
     type: 'Metro',
+    oneBedRent: 1550,
+    twoBedRent: 1950,
+    hasHousingData: true,
+  },
+  {
+    cbsaCode: '99999',
+    name: 'Rural Outpost Without Housing Data',
+    state: 'TX',
+    type: 'Micro',
+    oneBedRent: null,
+    twoBedRent: null,
+    hasHousingData: false,
   },
 ]
 
@@ -122,10 +134,14 @@ export async function setupMockApi(page: Page) {
     }
 
     if (url.pathname === '/api/locations/search') {
+      const requireHousing = url.searchParams.get('requireHousing') === 'true'
+      const locations = requireHousing
+        ? mockLocationSearch.filter((l) => l.hasHousingData)
+        : mockLocationSearch
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockLocationSearch),
+        body: JSON.stringify(locations),
       })
     }
 

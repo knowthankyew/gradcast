@@ -113,5 +113,43 @@ test.describe('GradCast Core User Flow', () => {
     await expect(page.getByText('Showing all 3 programs')).toBeVisible()
     await expect(commPanel).toBeVisible()
   })
+
+  test('toggles "Hide missing data" filter on target destination selector', async ({ page }) => {
+    // 1. Search and select school to display destination card
+    const schoolInput = page.getByPlaceholder('Start typing a school name...')
+    await schoolInput.fill('Texas')
+    const schoolOption = page.getByRole('option', { name: /The University of Texas at Austin/i })
+    await schoolOption.click()
+
+    await expect(page.getByText('Target Destination')).toBeVisible()
+
+    // 2. Search metro area with filter off (default)
+    const metroInput = page.getByPlaceholder('Start typing a city or metro area...')
+    await metroInput.fill('Rural')
+
+    // Rural location without rent data should appear
+    const ruralOption = page.getByRole('option', { name: /Rural Outpost Without Housing Data/i })
+    await expect(ruralOption).toBeVisible()
+    await expect(page.getByText('Rent data unavailable')).toBeVisible()
+
+    // 3. Toggle "Hide missing data" ON in Destination card
+    const destinationCard = page.locator('.v-card', { hasText: 'Target Destination' })
+    const filterSwitch = destinationCard.getByRole('switch', { name: /Hide missing data/i })
+    await filterSwitch.click()
+
+    // 4. Verify that location without housing data is now hidden
+    await expect(ruralOption).not.toBeVisible()
+
+    // 5. Search for Austin (which has housing data)
+    await metroInput.fill('Austin')
+    const austinOption = page.getByRole('option', { name: /Austin-Round Rock-Georgetown/i })
+    await expect(austinOption).toBeVisible()
+    await expect(page.getByText('$1,550/mo (1-bed)')).toBeVisible()
+
+    // 6. Switch housing to roommate (2-Bed) and verify rent preview updates
+    const roommateBtn = page.getByRole('button', { name: /Roommate \(2-Bed\)/i })
+    await roommateBtn.click()
+    await expect(page.getByText('$975/mo (shared 2-bed)')).toBeVisible()
+  })
 })
 

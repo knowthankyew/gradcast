@@ -20,6 +20,7 @@ public static class LocationEndpoints
 
     private static async Task<IResult> SearchLocations(
         [FromQuery(Name = "q")] string? query,
+        [FromQuery(Name = "requireHousing")] bool? requireHousing,
         LocationService service,
         CancellationToken ct)
     {
@@ -31,7 +32,7 @@ public static class LocationEndpoints
                 statusCode: 400);
         }
 
-        var results = await service.SearchLocationsAsync(query, ct);
+        var results = await service.SearchLocationsAsync(query, requireHousing ?? false, ct);
         return Results.Ok(results);
     }
 
