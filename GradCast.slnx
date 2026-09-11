@@ -3,6 +3,9 @@
   <Folder Name="/src/api/">
     <Project Path="src/api/GradCast.Api.csproj" />
   </Folder>
+  <Folder Name="/src/api.tests/">
+    <Project Path="src/api.tests/GradCast.Api.Tests.csproj" />
+  </Folder>
   <Folder Name="/src/data/">
     <Project Path="src/data/GradCast.Data.csproj" />
   </Folder>

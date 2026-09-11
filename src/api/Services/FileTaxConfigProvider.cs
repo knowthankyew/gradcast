@@ -28,7 +28,7 @@ public class FileTaxConfigProvider : ITaxConfigProvider
         if (configFiles.Count == 0)
         {
             throw new InvalidOperationException(
-                "No tax configuration files found. Add a tax_config_YYYY.json file.");
+                $"No tax configuration files found in {taxDataDir}. Add a tax_config_YYYY.json file.");
         }
 
         var latestFile = configFiles[0];

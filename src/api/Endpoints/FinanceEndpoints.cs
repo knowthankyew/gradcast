@@ -52,7 +52,7 @@ public static class FinanceEndpoints
         [FromQuery] decimal principal,
         [FromQuery] decimal? rate,
         [FromQuery] int? termYears,
-        LoanAmortizationService loanService)
+        ILoanAmortizationService loanService)
     {
         if (principal < 0 || principal > 1_000_000)
         {
@@ -76,7 +76,7 @@ public static class FinanceEndpoints
 
     private static async Task<IResult> RunSimulation(
         BudgetSimulationRequest request,
-        BudgetSimulatorService simulatorService,
+        IBudgetSimulatorService simulatorService,
         CancellationToken ct)
     {
         if (request.SchoolId <= 0)
