@@ -39,6 +39,14 @@ export const mockSchoolDetail = {
       completions: 120,
       medianEarnings: 82000,
     },
+    {
+      code: '09.0101',
+      title: 'Communication, General',
+      credentialLevel: 3,
+      credentialName: "Bachelor's Degree",
+      completions: 45,
+      medianEarnings: null,
+    },
   ],
 }
 

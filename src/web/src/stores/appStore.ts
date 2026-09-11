@@ -23,6 +23,7 @@ export const useAppStore = defineStore('app', () => {
 
   // Program state (optional — refines salary estimate)
   const selectedProgram = ref<ProgramSelection | null>(null)
+  const hideMissingProgramData = ref(false)
 
   // Location state
   const selectedLocation = ref<LocationSelection | null>(null)
@@ -78,6 +79,10 @@ export const useAppStore = defineStore('app', () => {
     selectedProgram.value = program
   }
 
+  function setHideMissingProgramData(hide: boolean) {
+    hideMissingProgramData.value = hide
+  }
+
   function setLocation(location: LocationSelection) {
     selectedLocation.value = location
   }
@@ -106,6 +111,7 @@ export const useAppStore = defineStore('app', () => {
     selectedSchool,
     selectedYear,
     selectedProgram,
+    hideMissingProgramData,
     selectedLocation,
     housingType,
     isRestoring,
@@ -118,6 +124,7 @@ export const useAppStore = defineStore('app', () => {
     updateSchoolDetail,
     setYear,
     setProgram,
+    setHideMissingProgramData,
     setLocation,
     setHousingType,
     clearSchool,

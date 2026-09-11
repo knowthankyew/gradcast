@@ -1,10 +1,10 @@
 <template>
-  <v-card v-if="categories.length > 0" elevation="2" class="mb-6">
-    <v-card-title class="d-flex align-center">
+  <v-card v-if="props.programs.length > 0" elevation="2" class="mb-6">
+    <v-card-title class="d-flex align-center flex-wrap ga-2">
       <v-icon class="mr-2">mdi-book-open-variant</v-icon>
       Programs by Department
-      <v-chip class="ml-3" size="small" color="primary" variant="tonal">
-        {{ categories.length }} categories
+      <v-chip class="ml-1" size="small" color="primary" variant="tonal">
+        {{ categories.length }} {{ categories.length === 1 ? 'category' : 'categories' }}
       </v-chip>
       <v-spacer />
       <v-chip
@@ -25,7 +25,38 @@
     </v-card-title>
 
     <v-card-text>
-      <v-expansion-panels variant="accordion">
+      <!-- Filter controls -->
+      <div class="d-flex align-center justify-space-between flex-wrap ga-2 mb-4">
+        <div class="text-caption text-medium-emphasis">
+          <span v-if="store.hideMissingProgramData">
+            Showing {{ totalFilteredPrograms }} of {{ props.programs.length }} programs (missing earnings hidden)
+          </span>
+          <span v-else>
+            Showing all {{ props.programs.length }} programs
+          </span>
+        </div>
+
+        <div class="d-flex align-center">
+          <v-switch
+            v-model="store.hideMissingProgramData"
+            label="Hide missing data"
+            color="primary"
+            density="compact"
+            hide-details
+            inset
+          />
+          <v-tooltip location="top" text="Hide programs without reported median earnings">
+            <template #activator="{ props: tooltipProps }">
+              <v-icon v-bind="tooltipProps" size="small" color="medium-emphasis" class="ml-1">
+                mdi-information-outline
+              </v-icon>
+            </template>
+          </v-tooltip>
+        </div>
+      </div>
+
+      <!-- Department panels -->
+      <v-expansion-panels v-if="categories.length > 0" variant="accordion">
         <v-expansion-panel
           v-for="category in categories"
           :key="category.code"
@@ -90,6 +121,26 @@
           </v-expansion-panel-text>
         </v-expansion-panel>
       </v-expansion-panels>
+
+      <!-- Empty state when all programs are filtered out -->
+      <div v-else class="text-center py-8 text-medium-emphasis">
+        <v-icon size="48" class="mb-2" color="grey">mdi-filter-off-outline</v-icon>
+        <div class="text-subtitle-1 font-weight-medium mb-1">
+          No programs with reported earnings data
+        </div>
+        <div class="text-body-2 mb-4">
+          All {{ props.programs.length }} programs at this school have privacy-suppressed or unreported earnings.
+        </div>
+        <v-btn
+          size="small"
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-filter-remove"
+          @click="store.setHideMissingProgramData(false)"
+        >
+          Show All Programs
+        </v-btn>
+      </div>
     </v-card-text>
   </v-card>
 </template>
@@ -106,10 +157,19 @@ const props = defineProps<{
 
 const store = useAppStore()
 
+const filteredPrograms = computed(() => {
+  if (!store.hideMissingProgramData) {
+    return props.programs
+  }
+  return props.programs.filter((p) => p.medianEarnings != null)
+})
+
+const totalFilteredPrograms = computed(() => filteredPrograms.value.length)
+
 const categories = computed<ProgramCategory[]>(() => {
   const grouped = new Map<string, ProgramData[]>()
 
-  for (const program of props.programs) {
+  for (const program of filteredPrograms.value) {
     const prefix = program.code.substring(0, 2)
     if (!grouped.has(prefix)) {
       grouped.set(prefix, [])
@@ -119,6 +179,7 @@ const categories = computed<ProgramCategory[]>(() => {
 
   const result: ProgramCategory[] = []
   for (const [code, programs] of grouped) {
+    if (programs.length === 0) continue
     const sorted = [...programs].sort(
       (a, b) => (b.completions ?? 0) - (a.completions ?? 0)
     )

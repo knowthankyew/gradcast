@@ -81,5 +81,37 @@ test.describe('GradCast Core User Flow', () => {
     await roommateBtn.click()
     await expect(roommateBtn).toHaveClass(/v-btn--active/)
   })
+
+  test('toggles "Hide missing data" filter on programs list', async ({ page }) => {
+    // 1. Search and select school
+    const schoolInput = page.getByPlaceholder('Start typing a school name...')
+    await schoolInput.fill('Texas')
+    const option = page.getByRole('option', { name: /The University of Texas at Austin/i })
+    await option.click()
+
+    await expect(page.getByText('Programs by Department')).toBeVisible()
+
+    // 2. Verify filter is off by default
+    await expect(page.getByText('Showing all 3 programs')).toBeVisible()
+    const commPanel = page.getByRole('button', { name: /Communication & Journalism/i })
+    await expect(commPanel).toBeVisible()
+
+    // 3. Toggle switch ON to hide missing data
+    const filterSwitch = page.getByRole('switch', { name: /Hide missing data/i })
+    await filterSwitch.click()
+
+    // 4. Verify filtered count and that program with missing earnings is hidden
+    await expect(page.getByText('Showing 2 of 3 programs (missing earnings hidden)')).toBeVisible()
+    await expect(commPanel).not.toBeVisible()
+
+    // 5. Verify programs with earnings remain visible
+    const csPanel = page.getByRole('button', { name: /Computer & Information Sciences/i })
+    await expect(csPanel).toBeVisible()
+
+    // 6. Toggle filter OFF and verify full list is restored
+    await filterSwitch.click()
+    await expect(page.getByText('Showing all 3 programs')).toBeVisible()
+    await expect(commPanel).toBeVisible()
+  })
 })
 
