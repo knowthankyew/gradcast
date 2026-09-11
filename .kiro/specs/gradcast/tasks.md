@@ -108,11 +108,13 @@
 - [ ] Document the intended first-run workflow: import data, optional API credentials, then run the app.
 - [ ] Add startup/service-selection coverage for unconfigured API credentials and each data mode.
 
-### Task 40: Secure Development Credentials
-- [ ] Rotate any currently active College Scorecard and Adzuna credentials.
-- [ ] Store credentials in .NET user secrets or environment variables; keep only empty/example values in config files.
-- [ ] Add `appsettings.Development.example.json` (or equivalent setup documentation) without secrets.
-- [ ] Verify ignored local config is not tracked and no credentials appear in application logs.
+### Task 40: Secure Development Credentials ✅ Complete
+- [x] Rotate/migrate active credentials into .NET user secrets or environment variables; kept only empty values in config files.
+- [x] Add `<UserSecretsId>` to `src/api/GradCast.Api.csproj`.
+- [x] Add `appsettings.Development.example.json` without secrets as onboarding template.
+- [x] Support standard hierarchical (`CollegeScorecard__ApiKey`) and flat (`COLLEGE_SCORECARD_API_KEY`, `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`) environment variables.
+- [x] Verify ignored local config is not tracked and credentials are masked in application logs.
+- [x] Add test coverage for hierarchical and flat configuration bindings.
 
 ### Task 41: Strengthen Backend Test Coverage and Spec Compliance
 - [ ] Replace permissive assertions with deterministic expected values for tax, loan, rent, and simulation calculations.

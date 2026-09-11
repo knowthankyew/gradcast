@@ -12,8 +12,24 @@ public static class GradCastServiceCollectionExtensions
         IConfiguration configuration,
         IWebHostEnvironment environment)
     {
-        services.Configure<CollegeScorecardOptions>(
-            configuration.GetSection(CollegeScorecardOptions.SectionName));
+        services.Configure<CollegeScorecardOptions>(options =>
+        {
+            configuration.GetSection(CollegeScorecardOptions.SectionName).Bind(options);
+            if (string.IsNullOrEmpty(options.ApiKey))
+            {
+                var flatKey = configuration["COLLEGE_SCORECARD_API_KEY"];
+                if (!string.IsNullOrEmpty(flatKey))
+                {
+                    options.ApiKey = flatKey;
+                }
+            }
+        });
+
+        var scorecardKey = configuration["CollegeScorecard:ApiKey"] ?? configuration["COLLEGE_SCORECARD_API_KEY"];
+        var scorecardMasked = string.IsNullOrEmpty(scorecardKey)
+            ? "(not set)"
+            : "****" + scorecardKey[^Math.Min(4, scorecardKey.Length)..];
+        Console.WriteLine($"[GradCast] Scorecard Key: {scorecardMasked}");
 
         var dbPath = ResolveDatabasePath(configuration.GetValue<string>("DatabasePath"), environment.ContentRootPath);
         services.AddDbContext<GradCastDbContext>(options =>
@@ -27,11 +43,33 @@ public static class GradCastServiceCollectionExtensions
         services.AddScoped<IGradCastRepository, GradCastRepository>();
         services.AddScoped<IBudgetSimulatorService, BudgetSimulatorService>();
 
-        services.Configure<AdzunaOptions>(
-            configuration.GetSection(AdzunaOptions.SectionName));
+        services.Configure<AdzunaOptions>(options =>
+        {
+            configuration.GetSection(AdzunaOptions.SectionName).Bind(options);
+            if (string.IsNullOrEmpty(options.AppId))
+            {
+                var flatId = configuration["ADZUNA_APP_ID"];
+                if (!string.IsNullOrEmpty(flatId))
+                {
+                    options.AppId = flatId;
+                }
+            }
+            if (string.IsNullOrEmpty(options.AppKey))
+            {
+                var flatKey = configuration["ADZUNA_APP_KEY"];
+                if (!string.IsNullOrEmpty(flatKey))
+                {
+                    options.AppKey = flatKey;
+                }
+            }
+        });
 
-        var adzunaConfig = configuration.GetSection("Adzuna");
-        Console.WriteLine($"[GradCast] Adzuna: AppId={adzunaConfig["AppId"] ?? "(empty)"}, Key={(string.IsNullOrEmpty(adzunaConfig["AppKey"]) ? "(empty)" : "****" + adzunaConfig["AppKey"]?[^4..])}");
+        var adzunaId = configuration["Adzuna:AppId"] ?? configuration["ADZUNA_APP_ID"];
+        var adzunaKey = configuration["Adzuna:AppKey"] ?? configuration["ADZUNA_APP_KEY"];
+        var adzunaKeyMasked = string.IsNullOrEmpty(adzunaKey)
+            ? "(not set)"
+            : "****" + adzunaKey[^Math.Min(4, adzunaKey.Length)..];
+        Console.WriteLine($"[GradCast] Adzuna: AppId={adzunaId ?? "(empty)"}, Key={adzunaKeyMasked}");
 
         services.AddHttpClient<IJobPulseService, AdzunaJobPulseService>(client =>
         {

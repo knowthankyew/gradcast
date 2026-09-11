@@ -75,11 +75,32 @@ An AI-generated proof-of-concept web application that helps students simulate th
    ```
    This creates `gradcast.db` with schools, programs, metro areas, and housing costs.
 
-4. Configure your API key:
+4. Configure API keys (optional — Scorecard API for remote/hybrid fallback, Adzuna for live job pulse):
+   
+   **Option A: .NET User Secrets (Recommended for local dev)**
    ```bash
-   cd src/api
-   dotnet user-secrets init
-   dotnet user-secrets set "CollegeScorecard:ApiKey" "YOUR_API_KEY"
+   dotnet user-secrets set "CollegeScorecard:ApiKey" "YOUR_SCORECARD_KEY" --project src/api
+   dotnet user-secrets set "Adzuna:AppId" "YOUR_ADZUNA_APP_ID" --project src/api
+   dotnet user-secrets set "Adzuna:AppKey" "YOUR_ADZUNA_APP_KEY" --project src/api
+   ```
+
+   **Option B: Environment Variables**
+   ```bash
+   # Standard ASP.NET Core hierarchical naming
+   export CollegeScorecard__ApiKey="YOUR_SCORECARD_KEY"
+   export Adzuna__AppId="YOUR_ADZUNA_APP_ID"
+   export Adzuna__AppKey="YOUR_ADZUNA_APP_KEY"
+
+   # Or flat naming
+   export COLLEGE_SCORECARD_API_KEY="YOUR_SCORECARD_KEY"
+   export ADZUNA_APP_ID="YOUR_ADZUNA_APP_ID"
+   export ADZUNA_APP_KEY="YOUR_ADZUNA_APP_KEY"
+   ```
+
+   **Option C: Local Configuration File**
+   ```bash
+   cp src/api/appsettings.Development.example.json src/api/appsettings.Development.json
+   # Edit src/api/appsettings.Development.json with your keys (gitignored)
    ```
 
 5. Run the API in hybrid mode:
@@ -103,7 +124,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 If you just want to try it without downloading the bulk data:
 
 ```bash
-# Set your API key in src/api/appsettings.Development.json, then:
+# Configure your API key (see step 4 above), then:
 dotnet run --project src/import -- --seed-only  # Creates empty DB with metro/FMR seed data
 dotnet run --project src/api
 cd src/web && npm install && npm run dev
