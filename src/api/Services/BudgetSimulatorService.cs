@@ -1,6 +1,4 @@
 using GradCast.Api.Models;
-using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Services;
 
@@ -13,20 +11,20 @@ namespace GradCast.Api.Services;
 ///
 /// Does NOT call external APIs (Adzuna, etc.) — those are async on the frontend.
 /// </summary>
-public class BudgetSimulatorService
+public class BudgetSimulatorService : IBudgetSimulatorService
 {
-    private readonly GradCastDbContext _db;
+    private readonly IGradCastRepository _repo;
     private readonly HousingCostService _housingService;
-    private readonly TaxCalculationService _taxService;
-    private readonly LoanAmortizationService _loanService;
+    private readonly ITaxCalculationService _taxService;
+    private readonly ILoanAmortizationService _loanService;
 
     public BudgetSimulatorService(
-        GradCastDbContext db,
+        IGradCastRepository repo,
         HousingCostService housingService,
-        TaxCalculationService taxService,
-        LoanAmortizationService loanService)
+        ITaxCalculationService taxService,
+        ILoanAmortizationService loanService)
     {
-        _db = db;
+        _repo = repo;
         _housingService = housingService;
         _taxService = taxService;
         _loanService = loanService;
@@ -46,8 +44,7 @@ public class BudgetSimulatorService
         }
 
         // 2. Get location info for state tax lookup
-        var location = await _db.CbsaLocations
-            .FirstOrDefaultAsync(c => c.CbsaCode == request.CbsaCode, ct);
+        var location = await _repo.GetLocationByCbsaCodeAsync(request.CbsaCode, ct);
 
         if (location == null) return null;
 
@@ -61,7 +58,7 @@ public class BudgetSimulatorService
         var rentMonthly = housing?.MonthlyRent ?? 0;
 
         // 5. Calculate loan payment from school's median debt
-        var medianDebt = await GetMedianDebtAsync(request.SchoolId, ct);
+        var medianDebt = await _repo.GetMedianDebtAsync(request.SchoolId, ct);
         var loan = _loanService.Calculate(medianDebt);
 
         // 6. Assemble the budget
@@ -104,47 +101,17 @@ public class BudgetSimulatorService
         // Try program-specific median earnings
         if (!string.IsNullOrEmpty(request.CipCode))
         {
-            var programEarnings = await _db.Programs
-                .Where(p => p.SchoolId == request.SchoolId &&
-                            p.CipCode.StartsWith(request.CipCode) &&
-                            p.MedianEarnings.HasValue)
-                .OrderByDescending(p => p.MedianEarnings)
-                .Select(p => p.MedianEarnings)
-                .FirstOrDefaultAsync(ct);
-
+            var programEarnings = await _repo.GetProgramMedianEarningsAsync(request.SchoolId, request.CipCode, ct);
             if (programEarnings.HasValue && programEarnings.Value > 0)
             {
                 return programEarnings.Value;
             }
         }
 
-        // Fall back to school-wide median across all programs
-        var earningsList = await _db.Programs
-            .Where(p => p.SchoolId == request.SchoolId && p.MedianEarnings.HasValue)
-            .Select(p => p.MedianEarnings!.Value)
-            .ToListAsync(ct);
-
+        var earningsList = await _repo.GetSchoolMedianEarningsAsync(request.SchoolId, ct);
         if (earningsList.Count == 0) return 0;
 
         var schoolMedian = earningsList.Average();
         return schoolMedian > 0 ? Math.Round(schoolMedian, 0) : 0;
-    }
-
-    private async Task<decimal> GetMedianDebtAsync(int schoolId, CancellationToken ct)
-    {
-        // For the PoC, estimate debt from tuition data
-        // In a full implementation, we'd use the Scorecard's median_debt_suppressed field
-        var yearData = await _db.SchoolYearData
-            .Where(yd => yd.SchoolId == schoolId)
-            .OrderByDescending(yd => yd.Year)
-            .FirstOrDefaultAsync(ct);
-
-        if (yearData?.TuitionInState == null) return 28000m; // National average fallback
-
-        // Estimate: ~60% of 4-year tuition as borrowed (accounts for aid/scholarships)
-        var estimatedDebt = yearData.TuitionInState.Value * 4 * 0.6m;
-
-        // Cap at a reasonable maximum
-        return Math.Min(estimatedDebt, 150_000m);
     }
 }

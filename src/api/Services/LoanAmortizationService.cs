@@ -6,7 +6,7 @@ namespace GradCast.Api.Services;
 /// Calculates standard federal student loan monthly payments.
 /// Uses standard amortization formula with configurable rate and term.
 /// </summary>
-public class LoanAmortizationService
+public class LoanAmortizationService : ILoanAmortizationService
 {
     private const decimal DefaultAnnualRate = 0.055m;  // 5.5% federal direct loan rate
     private const int DefaultTermYears = 10;            // Standard repayment plan

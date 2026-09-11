@@ -34,9 +34,11 @@ builder.Services.AddDbContext<GradCastDbContext>(options =>
 // Phase 2 services (always local DB)
 builder.Services.AddScoped<LocationService>();
 builder.Services.AddScoped<HousingCostService>();
-builder.Services.AddSingleton<TaxCalculationService>();
-builder.Services.AddSingleton<LoanAmortizationService>();
-builder.Services.AddScoped<BudgetSimulatorService>();
+builder.Services.AddSingleton<ITaxConfigProvider, FileTaxConfigProvider>();
+builder.Services.AddSingleton<ITaxCalculationService, TaxCalculationService>();
+builder.Services.AddSingleton<ILoanAmortizationService, LoanAmortizationService>();
+builder.Services.AddScoped<IGradCastRepository, GradCastRepository>();
+builder.Services.AddScoped<IBudgetSimulatorService, BudgetSimulatorService>();
 
 // Job Pulse (Adzuna API — graceful fallback if unconfigured)
 builder.Services.Configure<AdzunaOptions>(

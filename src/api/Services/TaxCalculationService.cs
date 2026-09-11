@@ -1,4 +1,3 @@
-using System.Text.Json;
 using GradCast.Api.Models;
 
 namespace GradCast.Api.Services;
@@ -6,17 +5,16 @@ namespace GradCast.Api.Services;
 /// <summary>
 /// Calculates estimated federal and state income taxes for a single filer.
 /// Tax brackets and rates are loaded from versioned JSON configuration files
-/// (src/api/Configuration/TaxData/tax_config_{year}.json), allowing annual
-/// updates without recompilation.
+/// via the injected tax config provider, allowing annual updates without recompilation.
 /// This is an approximation for PoC/planning purposes, not tax advice.
 /// </summary>
-public class TaxCalculationService
+public class TaxCalculationService : ITaxCalculationService
 {
     private readonly TaxConfig _config;
 
-    public TaxCalculationService(IWebHostEnvironment env)
+    public TaxCalculationService(ITaxConfigProvider configProvider)
     {
-        _config = LoadConfig(env.ContentRootPath);
+        _config = configProvider.GetConfig();
     }
 
     public int TaxYear => _config.TaxYear;
@@ -73,69 +71,5 @@ public class TaxCalculationService
         }
 
         return tax;
-    }
-
-    private static TaxConfig LoadConfig(string contentRootPath)
-    {
-        // Find the most recent tax config file
-        var taxDataDir = Path.Combine(contentRootPath, "Configuration", "TaxData");
-
-        if (!Directory.Exists(taxDataDir))
-        {
-            throw new InvalidOperationException(
-                $"Tax configuration directory not found: {taxDataDir}. " +
-                "Ensure Configuration/TaxData/tax_config_YYYY.json exists.");
-        }
-
-        var configFiles = Directory.GetFiles(taxDataDir, "tax_config_*.json")
-            .OrderByDescending(f => f)
-            .ToList();
-
-        if (configFiles.Count == 0)
-        {
-            throw new InvalidOperationException(
-                "No tax configuration files found. Add a tax_config_YYYY.json file.");
-        }
-
-        var latestFile = configFiles[0];
-        var json = File.ReadAllText(latestFile);
-        var raw = JsonDocument.Parse(json).RootElement;
-
-        var config = new TaxConfig
-        {
-            TaxYear = raw.GetProperty("taxYear").GetInt32(),
-            StandardDeduction = raw.GetProperty("standardDeduction").GetDecimal(),
-            SocialSecurityRate = raw.GetProperty("socialSecurityRate").GetDecimal(),
-            SocialSecurityWageCap = raw.GetProperty("socialSecurityWageCap").GetDecimal(),
-            MedicareRate = raw.GetProperty("medicareRate").GetDecimal(),
-        };
-
-        foreach (var bracket in raw.GetProperty("federalBrackets").EnumerateArray())
-        {
-            config.FederalBrackets.Add(new TaxBracket(
-                bracket.GetProperty("upperBound").GetDecimal(),
-                bracket.GetProperty("rate").GetDecimal()
-            ));
-        }
-
-        foreach (var prop in raw.GetProperty("stateTaxRates").EnumerateObject())
-        {
-            config.StateTaxRates[prop.Name.ToUpperInvariant()] = prop.Value.GetDecimal();
-        }
-
-        return config;
-    }
-
-    private record TaxBracket(decimal UpperBound, decimal Rate);
-
-    private class TaxConfig
-    {
-        public int TaxYear { get; set; }
-        public decimal StandardDeduction { get; set; }
-        public decimal SocialSecurityRate { get; set; }
-        public decimal SocialSecurityWageCap { get; set; }
-        public decimal MedicareRate { get; set; }
-        public List<TaxBracket> FederalBrackets { get; set; } = new();
-        public Dictionary<string, decimal> StateTaxRates { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -1,0 +1,9 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "dotnet build": true,
+        "mkdir": true,
+        "dotnet new": true,
+        "dotnet list": true,
+        "dotnet restore": true
+    }
+}

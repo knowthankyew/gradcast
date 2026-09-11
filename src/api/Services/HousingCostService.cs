@@ -1,16 +1,14 @@
 using GradCast.Api.Models;
-using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Services;
 
 public class HousingCostService
 {
-    private readonly GradCastDbContext _db;
+    private readonly IGradCastRepository _repo;
 
-    public HousingCostService(GradCastDbContext db)
+    public HousingCostService(IGradCastRepository repo)
     {
-        _db = db;
+        _repo = repo;
     }
 
     /// <summary>
@@ -19,17 +17,14 @@ public class HousingCostService
     public async Task<HousingCostResult?> GetHousingCostAsync(
         string cbsaCode, string housingType, CancellationToken ct = default)
     {
-        var fmr = await _db.FairMarketRents
-            .Where(f => f.CbsaCode == cbsaCode)
-            .OrderByDescending(f => f.Year)
-            .FirstOrDefaultAsync(ct);
+        var fmr = await _repo.GetLatestFairMarketRentAsync(cbsaCode, ct);
 
         if (fmr == null) return null;
 
         var monthlyRent = housingType switch
         {
             "1bed" => fmr.OneBedroom,
-            "2bed" => fmr.TwoBedroom / 2, // Split with roommate
+            "2bed" => fmr.TwoBedroom / 2,
             "studio" => fmr.Efficiency,
             _ => fmr.OneBedroom
         };
