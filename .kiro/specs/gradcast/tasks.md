@@ -92,9 +92,9 @@
 - [x] Add regression coverage for a valid location with missing FMR data.
 
 ### Task 37: Refresh Import Dependencies and Remove Vulnerable SQLite Native Package
-- [ ] Replace the preview EF Core SQLite package in `src/import` with the same supported stable version used by API/data projects.
-- [ ] Restore packages and verify `dotnet list GradCast.slnx package --include-transitive --vulnerable` reports no known vulnerabilities.
-- [ ] Run the import tool against a representative Scorecard extract to confirm compatibility.
+- [x] Replace the preview EF Core SQLite package in `src/import` with the same supported stable version used by API/data projects.
+- [x] Restore packages and verify `dotnet list GradCast.slnx package --include-transitive --vulnerable` reports no known vulnerabilities.
+- [x] Run the import tool against a representative Scorecard extract to confirm compatibility.
 
 ### Task 38: Make Reference-Data Seeding Updatable
 - [ ] Change CBSA and FMR seeding from "skip when table has rows" to idempotent upsert behavior.
