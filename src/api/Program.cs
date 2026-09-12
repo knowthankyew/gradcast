@@ -13,6 +13,7 @@ builder.Services.AddGradCastOpenApi();
 var app = builder.Build();
 
 await app.EnsureGradCastDatabaseAsync();
+app.LogGradCastStartupDiagnostics();
 
 if (app.Environment.IsDevelopment())
 {

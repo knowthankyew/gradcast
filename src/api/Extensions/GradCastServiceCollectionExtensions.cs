@@ -25,11 +25,6 @@ public static class GradCastServiceCollectionExtensions
             }
         });
 
-        var scorecardKey = configuration["CollegeScorecard:ApiKey"] ?? configuration["COLLEGE_SCORECARD_API_KEY"];
-        var scorecardMasked = string.IsNullOrEmpty(scorecardKey)
-            ? "(not set)"
-            : "****" + scorecardKey[^Math.Min(4, scorecardKey.Length)..];
-        Console.WriteLine($"[GradCast] Scorecard Key: {scorecardMasked}");
 
         var dbPath = ResolveDatabasePath(configuration.GetValue<string>("DatabasePath"), environment.ContentRootPath);
         services.AddDbContext<GradCastDbContext>(options =>
@@ -64,12 +59,7 @@ public static class GradCastServiceCollectionExtensions
             }
         });
 
-        var adzunaId = configuration["Adzuna:AppId"] ?? configuration["ADZUNA_APP_ID"];
-        var adzunaKey = configuration["Adzuna:AppKey"] ?? configuration["ADZUNA_APP_KEY"];
-        var adzunaKeyMasked = string.IsNullOrEmpty(adzunaKey)
-            ? "(not set)"
-            : "****" + adzunaKey[^Math.Min(4, adzunaKey.Length)..];
-        Console.WriteLine($"[GradCast] Adzuna: AppId={adzunaId ?? "(empty)"}, Key={adzunaKeyMasked}");
+
 
         services.AddHttpClient<IJobPulseService, AdzunaJobPulseService>(client =>
         {
@@ -86,7 +76,6 @@ public static class GradCastServiceCollectionExtensions
         if (dataSource.Equals("local", StringComparison.OrdinalIgnoreCase))
         {
             services.AddScoped<ICollegeScorecardService, LocalCollegeScorecardService>();
-            Console.WriteLine($"[GradCast] Scorecard: LOCAL | DB: {dbPath}");
         }
         else if (dataSource.Equals("hybrid", StringComparison.OrdinalIgnoreCase))
         {
@@ -98,7 +87,6 @@ public static class GradCastServiceCollectionExtensions
 
             services.AddScoped<LocalCollegeScorecardService>();
             services.AddScoped<ICollegeScorecardService, HybridCollegeScorecardService>();
-            Console.WriteLine($"[GradCast] Scorecard: HYBRID (local + API) | DB: {dbPath}");
         }
         else
         {
@@ -108,7 +96,7 @@ public static class GradCastServiceCollectionExtensions
                 client.Timeout = TimeSpan.FromSeconds(30);
             });
 
-            Console.WriteLine($"[GradCast] Scorecard: REMOTE API | DB: {dbPath}");
+
         }
 
         services.AddMemoryCache();
@@ -134,6 +122,48 @@ public static class GradCastServiceCollectionExtensions
     {
         services.AddOpenApi();
         return services;
+    }
+
+    /// <summary>
+    /// Logs startup diagnostic information using structured logging.
+    /// Call after <c>builder.Build()</c> so that <see cref="ILogger"/> is available.
+    /// </summary>
+    public static void LogGradCastStartupDiagnostics(this WebApplication app)
+    {
+        var logger = app.Logger;
+        var configuration = app.Configuration;
+
+        // Scorecard API key
+        var scorecardKey = configuration["CollegeScorecard:ApiKey"] ?? configuration["COLLEGE_SCORECARD_API_KEY"];
+        var scorecardMasked = string.IsNullOrEmpty(scorecardKey)
+            ? "(not set)"
+            : "****" + scorecardKey[^Math.Min(4, scorecardKey.Length)..];
+        logger.LogInformation("[GradCast] Scorecard Key: {ScorecardKey}", scorecardMasked);
+
+        // Adzuna API credentials
+        var adzunaId = configuration["Adzuna:AppId"] ?? configuration["ADZUNA_APP_ID"];
+        var adzunaKey = configuration["Adzuna:AppKey"] ?? configuration["ADZUNA_APP_KEY"];
+        var adzunaKeyMasked = string.IsNullOrEmpty(adzunaKey)
+            ? "(not set)"
+            : "****" + adzunaKey[^Math.Min(4, adzunaKey.Length)..];
+        logger.LogInformation("[GradCast] Adzuna: AppId={AdzunaAppId}, Key={AdzunaKey}",
+            adzunaId ?? "(empty)", adzunaKeyMasked);
+
+        // Data source mode and database path
+        var dataSource = configuration.GetValue<string>("DataSource");
+        if (string.IsNullOrWhiteSpace(dataSource)) dataSource = "hybrid";
+        var dbPath = ResolveDatabasePath(
+            configuration.GetValue<string>("DatabasePath"),
+            app.Environment.ContentRootPath);
+
+        var modeLabel = dataSource.ToLowerInvariant() switch
+        {
+            "local" => "LOCAL",
+            "hybrid" => "HYBRID (local + API)",
+            _ => "REMOTE API"
+        };
+
+        logger.LogInformation("[GradCast] Scorecard: {DataMode} | DB: {DatabasePath}", modeLabel, dbPath);
     }
 
     private static string ResolveDatabasePath(string? configuredPath, string contentRootPath)
