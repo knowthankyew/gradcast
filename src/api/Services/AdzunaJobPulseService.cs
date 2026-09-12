@@ -100,6 +100,10 @@ public class AdzunaJobPulseService : IJobPulseService
                 meanSalary = meanEl.GetDecimal();
             }
 
+            _logger.LogInformation(
+                "Fetched Adzuna pulse for CIP {CipCode} in {LocationName}: Openings={ActiveOpenings}, Salary={LocalMedianSalary}",
+                cipCode, location.Name, count, meanSalary);
+
             return new JobPulseResult(
                 CipCode: cipCode,
                 CbsaCode: cbsaCode,

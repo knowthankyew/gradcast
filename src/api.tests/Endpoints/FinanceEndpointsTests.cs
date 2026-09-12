@@ -235,6 +235,25 @@ public class FinanceEndpointHttpValidationTests : IClassFixture<WebApplicationFa
         Assert.Equal(1200m, simulation!.RentMonthly);
     }
 
+    [Fact]
+    public async Task HttpPipelineAttachesCorrelationIdHeaderToResponse()
+    {
+        var response = await _client.GetAsync("/api/finance/net-pay?grossSalary=60000&state=TX");
+        Assert.True(response.Headers.Contains("X-Correlation-ID"));
+    }
+
+    [Fact]
+    public async Task HttpPipelinePreservesIncomingCorrelationIdHeader()
+    {
+        var request = new HttpRequestMessage(HttpMethod.Get, "/api/finance/net-pay?grossSalary=60000&state=TX");
+        const string customCorrelationId = "custom-client-trace-id-999";
+        request.Headers.Add("X-Correlation-ID", customCorrelationId);
+
+        var response = await _client.SendAsync(request);
+        Assert.True(response.Headers.Contains("X-Correlation-ID"));
+        Assert.Equal(customCorrelationId, response.Headers.GetValues("X-Correlation-ID").First());
+    }
+
     internal static async Task AssertProblemResponse(
         HttpResponseMessage response,
         string expectedTitle,

@@ -1,4 +1,5 @@
 using GradCast.Api.Models;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GradCast.Api.Services;
 
@@ -17,17 +18,20 @@ public class BudgetSimulatorService : IBudgetSimulatorService
     private readonly IHousingCostService _housingService;
     private readonly ITaxCalculationService _taxService;
     private readonly ILoanAmortizationService _loanService;
+    private readonly ILogger<BudgetSimulatorService> _logger;
 
     public BudgetSimulatorService(
         IGradCastRepository repo,
         IHousingCostService housingService,
         ITaxCalculationService taxService,
-        ILoanAmortizationService loanService)
+        ILoanAmortizationService loanService,
+        ILogger<BudgetSimulatorService>? logger = null)
     {
         _repo = repo;
         _housingService = housingService;
         _taxService = taxService;
         _loanService = loanService;
+        _logger = logger ?? NullLogger<BudgetSimulatorService>.Instance;
     }
 
     public async Task<BudgetSimulationOutcome> SimulateAsync(
@@ -80,6 +84,10 @@ public class BudgetSimulatorService : IBudgetSimulatorService
             > 0m => "tight",
             _ => "deficit"
         };
+
+        _logger.LogInformation(
+            "Calculated budget simulation: School={SchoolId}, Metro={CbsaCode}, Gross={GrossAnnual}, NetMonthly={NetMonthly}, Disposable={DisposableMonthly}, Status={IncomeStatus}",
+            request.SchoolId, request.CbsaCode, salary, netPay.NetMonthly, Math.Round(disposable, 2), status);
 
         return new BudgetSimulationSuccess(new BudgetSimulationResult(
             GrossAnnualSalary: salary,

@@ -1,5 +1,6 @@
 using GradCast.Api.Endpoints;
 using GradCast.Api.Extensions;
+using GradCast.Api.Middleware;
 using GradCast.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
@@ -21,6 +22,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseCors();
+app.UseMiddleware<RequestCorrelationMiddleware>();
+app.UseHttpLogging();
 
 // Preferred static asset locations in order
 var possibleWwwRoots = new[]

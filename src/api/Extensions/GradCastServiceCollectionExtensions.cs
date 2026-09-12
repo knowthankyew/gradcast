@@ -1,6 +1,8 @@
 using GradCast.Api.Configuration;
+using GradCast.Api.Middleware;
 using GradCast.Api.Services;
 using GradCast.Data;
+using Microsoft.AspNetCore.HttpLogging;
 using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Extensions;
@@ -37,6 +39,16 @@ public static class GradCastServiceCollectionExtensions
         services.AddSingleton<ILoanAmortizationService, LoanAmortizationService>();
         services.AddScoped<IGradCastRepository, GradCastRepository>();
         services.AddScoped<IBudgetSimulatorService, BudgetSimulatorService>();
+
+        services.AddHttpLogging(logging =>
+        {
+            logging.LoggingFields = HttpLoggingFields.RequestMethod
+                | HttpLoggingFields.RequestPath
+                | HttpLoggingFields.ResponseStatusCode
+                | HttpLoggingFields.Duration;
+            logging.CombineLogs = true;
+        });
+        services.AddSingleton<IHttpLoggingInterceptor, GradCastHttpLoggingInterceptor>();
 
         services.Configure<AdzunaOptions>(options =>
         {
