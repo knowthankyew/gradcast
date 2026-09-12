@@ -18,7 +18,8 @@ primary_region = 'dfw'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_count = 0
+  # Kept warm (min 1 machine) for launch; reduce to 0 later to sleep when idle
+  min_machines_count = 1
 
 [[http_service.checks]]
   interval = '30s'
