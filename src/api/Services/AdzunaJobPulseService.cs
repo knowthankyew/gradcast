@@ -1,8 +1,8 @@
 using System.Text.Json;
+using Dapper;
 using GradCast.Api.Configuration;
 using GradCast.Api.Models;
 using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace GradCast.Api.Services;
@@ -15,29 +15,30 @@ public class AdzunaJobPulseService : IJobPulseService
 {
     private readonly HttpClient _httpClient;
     private readonly AdzunaOptions _options;
-    private readonly GradCastDbContext _db;
+    private readonly ISqliteConnectionFactory _dbFactory;
     private readonly ILogger<AdzunaJobPulseService> _logger;
 
     public AdzunaJobPulseService(
         HttpClient httpClient,
         IOptions<AdzunaOptions> options,
-        GradCastDbContext db,
+        ISqliteConnectionFactory dbFactory,
         ILogger<AdzunaJobPulseService> logger)
     {
         _httpClient = httpClient;
         _options = options.Value;
-        _db = db;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
     public async Task<JobPulseResult?> GetPulseAsync(string cipCode, string cbsaCode, CancellationToken ct = default)
     {
         // Get location name for the search
-        var location = await _db.CbsaLocations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CbsaCode == cbsaCode, ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string locationSql = "SELECT name FROM cbsa_locations WHERE cbsa_code = @CbsaCode LIMIT 1;";
+        var locationName = await conn.QueryFirstOrDefaultAsync<string>(
+            new CommandDefinition(locationSql, new { CbsaCode = cbsaCode }, cancellationToken: ct));
 
-        if (location == null) return null;
+        if (locationName == null) return null;
 
         // Get Scorecard median earnings for this CIP at any school (as baseline)
         var scorecardEarnings = await GetScorecardEarningsAsync(cipCode, ct);
@@ -58,14 +59,14 @@ public class AdzunaJobPulseService : IJobPulseService
                 LocalMedianSalary: null,
                 ScorecardMedianEarnings: scorecardEarnings,
                 DataSource: "scorecard_only",
-                LocationName: location.Name
+                LocationName: locationName
             );
         }
 
         // Query Adzuna
         try
         {
-            var locationQuery = ExtractCityForSearch(location.Name);
+            var locationQuery = ExtractCityForSearch(locationName);
             // Use + encoding for spaces (Adzuna requires this, not %20)
             var encodedKeyword = searchKeyword.Replace(" ", "+");
             var encodedLocation = locationQuery.Replace(" ", "+");
@@ -83,7 +84,7 @@ public class AdzunaJobPulseService : IJobPulseService
                 _logger.LogWarning("Adzuna returned {Status} for CIP {Cip} in {Location}",
                     response.StatusCode, cipCode, locationQuery);
 
-                return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, location.Name);
+                return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, locationName);
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(ct);
@@ -102,7 +103,7 @@ public class AdzunaJobPulseService : IJobPulseService
 
             _logger.LogInformation(
                 "Fetched Adzuna pulse for CIP {CipCode} in {LocationName}: Openings={ActiveOpenings}, Salary={LocalMedianSalary}",
-                cipCode, location.Name, count, meanSalary);
+                cipCode, locationName, count, meanSalary);
 
             return new JobPulseResult(
                 CipCode: cipCode,
@@ -112,13 +113,13 @@ public class AdzunaJobPulseService : IJobPulseService
                 LocalMedianSalary: meanSalary,
                 ScorecardMedianEarnings: scorecardEarnings,
                 DataSource: "adzuna",
-                LocationName: location.Name
+                LocationName: locationName
             );
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Adzuna API call failed for CIP {Cip} in {Cbsa}. Message: {Message}", cipCode, cbsaCode, ex.Message);
-            return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, location.Name);
+            return FallbackResult(cipCode, cbsaCode, displayKeywords, scorecardEarnings, locationName);
         }
     }
 
@@ -140,17 +141,21 @@ public class AdzunaJobPulseService : IJobPulseService
     {
         var prefix = cipCode.Length >= 2 ? cipCode[..2] : cipCode;
 
-        var earnings = await _db.Programs
-            .AsNoTracking()
-            .Where(p => p.CipCode.StartsWith(prefix) && p.MedianEarnings.HasValue)
-            .Select(p => p.MedianEarnings!.Value)
-            .ToListAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT CAST(median_earnings AS REAL)
+            FROM programs
+            WHERE cip_code LIKE @PrefixPattern AND median_earnings IS NOT NULL
+            ORDER BY CAST(median_earnings AS REAL) ASC;
+        """;
+
+        var earnings = (await conn.QueryAsync<decimal>(
+            new CommandDefinition(sql, new { PrefixPattern = prefix + "%" }, cancellationToken: ct))).ToList();
 
         if (earnings.Count == 0) return null;
 
         // Return the median (middle value when sorted)
-        var sorted = earnings.OrderBy(e => e).ToList();
-        return sorted[sorted.Count / 2];
+        return earnings[earnings.Count / 2];
     }
 
     /// <summary>

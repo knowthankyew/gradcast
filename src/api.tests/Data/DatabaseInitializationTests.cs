@@ -1,8 +1,7 @@
+using Dapper;
 using GradCast.Api.Extensions;
 using GradCast.Data;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xunit;
@@ -41,8 +40,7 @@ public class DatabaseInitializationTests : IDisposable
 
         var builder = WebApplication.CreateBuilder();
         builder.Services.AddLogging(l => l.AddConsole());
-        builder.Services.AddDbContext<GradCastDbContext>(options =>
-            options.UseSqlite($"Data Source={_tempDbPath}"));
+        builder.Services.AddSingleton<ISqliteConnectionFactory>(_ => new SqliteConnectionFactory(_tempDbPath));
 
         var app = builder.Build();
 
@@ -53,9 +51,10 @@ public class DatabaseInitializationTests : IDisposable
 
         using (var scope = app.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<GradCastDbContext>();
-            var cbsaCount = await db.CbsaLocations.CountAsync();
-            var fmrCount = await db.FairMarketRents.CountAsync();
+            var factory = scope.ServiceProvider.GetRequiredService<ISqliteConnectionFactory>();
+            await using var conn = await factory.CreateOpenConnectionAsync();
+            var cbsaCount = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM cbsa_locations;");
+            var fmrCount = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fair_market_rents;");
 
             Assert.Equal(156, cbsaCount);
             Assert.Equal(156, fmrCount);
@@ -66,9 +65,10 @@ public class DatabaseInitializationTests : IDisposable
 
         using (var scope = app.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<GradCastDbContext>();
-            var cbsaCount = await db.CbsaLocations.CountAsync();
-            var fmrCount = await db.FairMarketRents.CountAsync();
+            var factory = scope.ServiceProvider.GetRequiredService<ISqliteConnectionFactory>();
+            await using var conn = await factory.CreateOpenConnectionAsync();
+            var cbsaCount = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM cbsa_locations;");
+            var fmrCount = await conn.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fair_market_rents;");
 
             Assert.Equal(156, cbsaCount);
             Assert.Equal(156, fmrCount);

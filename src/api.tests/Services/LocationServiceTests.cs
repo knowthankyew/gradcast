@@ -1,7 +1,7 @@
+using Dapper;
 using GradCast.Api.Services;
 using GradCast.Data;
-using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace GradCast.Api.Tests;
 
@@ -14,23 +14,24 @@ public class LocationServiceTests
 
         try
         {
-            var options = new DbContextOptionsBuilder<GradCastDbContext>()
-                .UseSqlite($"Data Source={databasePath}")
-                .Options;
+            var factory = new SqliteConnectionFactory(databasePath);
+            await using (var conn = await factory.CreateOpenConnectionAsync())
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
 
-            await using var db = new GradCastDbContext(options);
-            await db.Database.EnsureCreatedAsync();
+                await conn.ExecuteAsync("""
+                    INSERT INTO cbsa_locations (cbsa_code, name, state, type) VALUES
+                    ('1001', 'Metro With Rent', 'TX', 'Metropolitan'),
+                    ('1002', 'Metro Without Rent', 'TX', 'Metropolitan');
+                """);
 
-            db.CbsaLocations.AddRange(
-                new CbsaLocation { CbsaCode = "1001", Name = "Metro With Rent", State = "TX", Type = "Metropolitan" },
-                new CbsaLocation { CbsaCode = "1002", Name = "Metro Without Rent", State = "TX", Type = "Metropolitan" }
-            );
-            db.FairMarketRents.Add(
-                new FairMarketRent { CbsaCode = "1001", Year = 2025, Efficiency = 900, OneBedroom = 1100, TwoBedroom = 1400, ThreeBedroom = 1800, FourBedroom = 2100 }
-            );
-            await db.SaveChangesAsync();
+                await conn.ExecuteAsync("""
+                    INSERT INTO fair_market_rents (cbsa_code, year, efficiency, one_bedroom, two_bedroom, three_bedroom, four_bedroom) VALUES
+                    ('1001', 2025, 900, 1100, 1400, 1800, 2100);
+                """);
+            }
 
-            var service = new LocationService(db);
+            var service = new LocationService(factory);
 
             // 1. Without requireHousing filter: returns both
             var allResults = await service.SearchLocationsAsync("Metro", requireHousing: false);
@@ -54,7 +55,10 @@ public class LocationServiceTests
         }
         finally
         {
-            File.Delete(databasePath);
+            if (File.Exists(databasePath))
+            {
+                File.Delete(databasePath);
+            }
         }
     }
 }

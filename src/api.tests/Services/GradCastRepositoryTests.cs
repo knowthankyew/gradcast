@@ -1,7 +1,7 @@
+using Dapper;
 using GradCast.Api.Services;
 using GradCast.Data;
-using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace GradCast.Api.Tests;
 
@@ -14,21 +14,25 @@ public class GradCastRepositoryTests
 
         try
         {
-            var options = new DbContextOptionsBuilder<GradCastDbContext>()
-                .UseSqlite($"Data Source={databasePath}")
-                .Options;
+            var factory = new SqliteConnectionFactory(databasePath);
+            await using (var conn = await factory.CreateOpenConnectionAsync())
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
 
-            await using var db = new GradCastDbContext(options);
-            await db.Database.EnsureCreatedAsync();
-            db.Schools.Add(new School { Id = 1, Name = "Test School", City = "Test City", State = "CA" });
-            await db.SaveChangesAsync();
-            db.Programs.AddRange(
-                new GradCast.Data.Entities.Program { SchoolId = 1, Year = 2024, CipCode = "11.07", CredentialLevel = 2, Title = "Legacy format", MedianEarnings = 45000m },
-                new GradCast.Data.Entities.Program { SchoolId = 1, Year = 2024, CipCode = "1107", CredentialLevel = 3, Title = "Canonical format", MedianEarnings = 75000m },
-                new GradCast.Data.Entities.Program { SchoolId = 1, Year = 2024, CipCode = "1107", CredentialLevel = 5, Title = "Canonical format", MedianEarnings = 95000m });
-            await db.SaveChangesAsync();
+                await conn.ExecuteAsync("""
+                    INSERT INTO schools (id, name, city, state, school_url, ownership) VALUES
+                    (1, 'Test School', 'Test City', 'CA', NULL, 1);
+                """);
 
-            var repository = new GradCastRepository(db);
+                await conn.ExecuteAsync("""
+                    INSERT INTO programs (school_id, year, cip_code, credential_level, title, median_earnings) VALUES
+                    (1, 2024, '11.07', 2, 'Legacy format', 45000),
+                    (1, 2024, '1107', 3, 'Canonical format', 75000),
+                    (1, 2024, '1107', 5, 'Canonical format', 95000);
+                """);
+            }
+
+            var repository = new GradCastRepository(factory);
 
             var selectedEarnings = await repository.GetProgramMedianEarningsAsync(1, "11.0701", 3);
             var legacyEarnings = await repository.GetProgramMedianEarningsAsync(1, "1107", 2);
@@ -40,7 +44,10 @@ public class GradCastRepositoryTests
         }
         finally
         {
-            File.Delete(databasePath);
+            if (File.Exists(databasePath))
+            {
+                File.Delete(databasePath);
+            }
         }
     }
 }

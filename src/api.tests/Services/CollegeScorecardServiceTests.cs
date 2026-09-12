@@ -1,11 +1,11 @@
+using Dapper;
 using GradCast.Api.Configuration;
 using GradCast.Api.Services;
 using GradCast.Data;
-using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Xunit;
 
 namespace GradCast.Api.Tests;
 
@@ -36,25 +36,22 @@ public class CollegeScorecardServiceTests
     [Fact]
     public async Task HybridCollegeScorecardService_ServesLocalData_WithoutApiKey()
     {
-        var dbName = $"hybrid_no_key_test_{Guid.NewGuid():N}.db";
-        var optionsBuilder = new DbContextOptionsBuilder<GradCastDbContext>();
-        optionsBuilder.UseSqlite($"Data Source={dbName}");
-
-        await using var db = new GradCastDbContext(optionsBuilder.Options);
-        await db.Database.EnsureCreatedAsync();
+        var dbPath = Path.Combine(Path.GetTempPath(), $"hybrid_no_key_test_{Guid.NewGuid():N}.db");
+        var factory = new SqliteConnectionFactory(dbPath);
 
         try
         {
-            db.Schools.Add(new School
+            await using (var conn = await factory.CreateOpenConnectionAsync())
             {
-                Id = 99999,
-                Name = "Local University",
-                City = "Austin",
-                State = "TX"
-            });
-            await db.SaveChangesAsync();
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
 
-            var localService = new LocalCollegeScorecardService(db, new LoggerFactory().CreateLogger<LocalCollegeScorecardService>());
+                await conn.ExecuteAsync("""
+                    INSERT INTO schools (id, name, city, state, school_url, ownership) VALUES
+                    (99999, 'Local University', 'Austin', 'TX', NULL, 1);
+                """);
+            }
+
+            var localService = new LocalCollegeScorecardService(factory, new LoggerFactory().CreateLogger<LocalCollegeScorecardService>());
 
             var emptyScorecardOptions = Options.Create(new CollegeScorecardOptions
             {
@@ -70,7 +67,6 @@ public class CollegeScorecardServiceTests
             var hybridService = new HybridCollegeScorecardService(
                 localService,
                 remoteService,
-                db,
                 new LoggerFactory().CreateLogger<HybridCollegeScorecardService>());
 
             var results = await hybridService.SearchSchoolsAsync("Local", null);
@@ -79,7 +75,10 @@ public class CollegeScorecardServiceTests
         }
         finally
         {
-            await db.Database.EnsureDeletedAsync();
+            if (File.Exists(dbPath))
+            {
+                File.Delete(dbPath);
+            }
         }
     }
 }

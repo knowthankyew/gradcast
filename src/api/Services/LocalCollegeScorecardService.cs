@@ -1,6 +1,8 @@
+using System.Data.Common;
+using Dapper;
 using GradCast.Api.Models;
 using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
+using GradCast.Data.Entities;
 
 namespace GradCast.Api.Services;
 
@@ -10,62 +12,103 @@ namespace GradCast.Api.Services;
 /// </summary>
 public class LocalCollegeScorecardService : ICollegeScorecardService
 {
-    private readonly GradCastDbContext _db;
+    private readonly ISqliteConnectionFactory _dbFactory;
     private readonly ILogger<LocalCollegeScorecardService> _logger;
 
-
-    public LocalCollegeScorecardService(GradCastDbContext db, ILogger<LocalCollegeScorecardService> logger)
+    public LocalCollegeScorecardService(ISqliteConnectionFactory dbFactory, ILogger<LocalCollegeScorecardService> logger)
     {
-        _db = db;
+        _dbFactory = dbFactory;
         _logger = logger;
     }
 
     public async Task<IReadOnlyList<SchoolSearchResult>> SearchSchoolsAsync(
         string query, string? state, CancellationToken ct = default)
     {
-        var q = _db.Schools.AsNoTracking().AsQueryable();
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT id, name, city, state
+            FROM schools
+            WHERE name LIKE @Query
+              AND (@State IS NULL OR state = @State)
+            ORDER BY name ASC
+            LIMIT 10;
+        """;
 
-        q = q.Where(s => EF.Functions.Like(s.Name, $"%{query}%"));
+        await using var reader = await conn.ExecuteReaderAsync(
+            new CommandDefinition(sql, new
+            {
+                Query = $"%{query}%",
+                State = string.IsNullOrWhiteSpace(state) ? null : state
+            }, cancellationToken: ct));
 
-        if (!string.IsNullOrWhiteSpace(state))
+        var results = new List<SchoolSearchResult>();
+        while (await reader.ReadAsync(ct))
         {
-            q = q.Where(s => s.State == state);
+            results.Add(new SchoolSearchResult(
+                reader.GetInt32(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3)
+            ));
         }
 
-        var results = await q
-            .OrderBy(s => s.Name)
-            .Take(10)
-            .Select(s => new SchoolSearchResult(s.Id, s.Name, s.City, s.State))
-            .ToListAsync(ct);
-
         return results;
+    }
+
+    public async Task<bool> HasYearDataAsync(int schoolId, int year, CancellationToken ct = default)
+    {
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = "SELECT 1 FROM school_year_data WHERE school_id = @SchoolId AND year = @Year LIMIT 1;";
+        var exists = await conn.ExecuteScalarAsync<int?>(
+            new CommandDefinition(sql, new { SchoolId = schoolId, Year = year }, cancellationToken: ct));
+        return exists.HasValue;
     }
 
     public async Task<SchoolDetail?> GetSchoolDetailAsync(
         int schoolId, int? year = null, CancellationToken ct = default)
     {
-        var school = await _db.Schools.AsNoTracking().FirstOrDefaultAsync(s => s.Id == schoolId, ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string schoolSql = "SELECT id, name, city, state, school_url, ownership FROM schools WHERE id = @SchoolId LIMIT 1;";
+        var school = await conn.QueryFirstOrDefaultAsync<School>(
+            new CommandDefinition(schoolSql, new { SchoolId = schoolId }, cancellationToken: ct));
+
         if (school == null) return null;
 
         // Get year data — use specified year or fall back to most recent available
-        var yearDataQuery = _db.SchoolYearData.AsNoTracking().Where(yd => yd.SchoolId == schoolId);
-        Data.Entities.SchoolYearData? yearData;
-
+        SchoolYearData? yearData;
         if (year.HasValue)
         {
-            yearData = await yearDataQuery.FirstOrDefaultAsync(yd => yd.Year == year.Value, ct);
+            const string yearSql = """
+                SELECT id, school_id, year, CAST(admission_rate AS REAL) as admission_rate, student_size, tuition_in_state, tuition_out_of_state, CAST(completion_rate AS REAL) as completion_rate
+                FROM school_year_data
+                WHERE school_id = @SchoolId AND year = @Year
+                LIMIT 1;
+            """;
+            yearData = await conn.QueryFirstOrDefaultAsync<SchoolYearData>(
+                new CommandDefinition(yearSql, new { SchoolId = schoolId, Year = year.Value }, cancellationToken: ct));
         }
         else
         {
-            yearData = await yearDataQuery.OrderByDescending(yd => yd.Year).FirstOrDefaultAsync(ct);
+            const string yearSql = """
+                SELECT id, school_id, year, CAST(admission_rate AS REAL) as admission_rate, student_size, tuition_in_state, tuition_out_of_state, CAST(completion_rate AS REAL) as completion_rate
+                FROM school_year_data
+                WHERE school_id = @SchoolId
+                ORDER BY year DESC
+                LIMIT 1;
+            """;
+            yearData = await conn.QueryFirstOrDefaultAsync<SchoolYearData>(
+                new CommandDefinition(yearSql, new { SchoolId = schoolId }, cancellationToken: ct));
         }
 
         // Get programs for the matching year (or most recent)
         var programYear = year ?? yearData?.Year ?? 2024;
-        var programs = await _db.Programs
-            .AsNoTracking()
-            .Where(p => p.SchoolId == schoolId && p.Year == programYear)
-            .ToListAsync(ct);
+        const string programsSql = """
+            SELECT id, school_id, year, cip_code, title, credential_level, completions, CAST(median_earnings AS REAL) as median_earnings
+            FROM programs
+            WHERE school_id = @SchoolId AND year = @ProgramYear;
+        """;
+        var programs = await conn.QueryAsync<GradCast.Data.Entities.Program>(
+            new CommandDefinition(programsSql, new { SchoolId = schoolId, ProgramYear = programYear }, cancellationToken: ct));
 
         var programDtos = programs.Select(p => new ProgramData(
             Code: p.CipCode.Replace(".", ""), // Normalize to 4-digit without dot
@@ -99,15 +142,30 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
         var currentYear = DateTime.UtcNow.Year;
         var startYear = currentYear - 5;
 
-        var yearData = await _db.SchoolYearData
-            .AsNoTracking()
-            .Where(yd => yd.SchoolId == schoolId && yd.Year >= startYear && yd.Year < currentYear)
-            .OrderBy(yd => yd.Year)
-            .ToListAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT year, tuition_in_state, tuition_out_of_state
+            FROM school_year_data
+            WHERE school_id = @SchoolId
+              AND year >= @StartYear
+              AND year < @CurrentYear
+              AND (tuition_in_state IS NOT NULL OR tuition_out_of_state IS NOT NULL)
+            ORDER BY year ASC;
+        """;
 
-        return yearData
-            .Where(yd => yd.TuitionInState.HasValue || yd.TuitionOutOfState.HasValue)
-            .Select(yd => new TuitionTrendPoint(yd.Year, yd.TuitionInState, yd.TuitionOutOfState))
-            .ToList();
+        await using var reader = await conn.ExecuteReaderAsync(
+            new CommandDefinition(sql, new { SchoolId = schoolId, StartYear = startYear, CurrentYear = currentYear }, cancellationToken: ct));
+
+        var points = new List<TuitionTrendPoint>();
+        while (await reader.ReadAsync(ct))
+        {
+            points.Add(new TuitionTrendPoint(
+                reader.GetInt32(0),
+                reader.IsDBNull(1) ? null : reader.GetInt32(1),
+                reader.IsDBNull(2) ? null : reader.GetInt32(2)
+            ));
+        }
+
+        return points;
     }
 }

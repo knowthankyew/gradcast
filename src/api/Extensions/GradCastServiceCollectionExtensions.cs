@@ -3,7 +3,6 @@ using GradCast.Api.Middleware;
 using GradCast.Api.Services;
 using GradCast.Data;
 using Microsoft.AspNetCore.HttpLogging;
-using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Extensions;
 
@@ -29,8 +28,8 @@ public static class GradCastServiceCollectionExtensions
 
 
         var dbPath = ResolveDatabasePath(configuration.GetValue<string>("DatabasePath"), environment.ContentRootPath);
-        services.AddDbContext<GradCastDbContext>(options =>
-            options.UseSqlite($"Data Source={dbPath}"));
+        Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
+        services.AddSingleton<ISqliteConnectionFactory>(_ => new SqliteConnectionFactory(dbPath));
 
         services.AddScoped<ILocationService, LocationService>();
         services.AddScoped<IHousingCostService, HousingCostService>();

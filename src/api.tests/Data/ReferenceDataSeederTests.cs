@@ -1,6 +1,7 @@
+using Dapper;
 using GradCast.Data;
 using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
+using Xunit;
 
 namespace GradCast.Api.Tests;
 
@@ -13,20 +14,17 @@ public class ReferenceDataSeederIntegrationTests
 
         try
         {
-            var options = new DbContextOptionsBuilder<GradCastDbContext>()
-                .UseSqlite($"Data Source={databasePath}")
-                .Options;
-
-            await using var db = new GradCastDbContext(options);
-            await db.Database.EnsureCreatedAsync();
+            var factory = new SqliteConnectionFactory(databasePath);
+            await using var connection = await factory.CreateOpenConnectionAsync();
+            await SqliteDatabaseInitializer.InitializeAsync(connection);
 
             var initialResult = await ReferenceDataSeeder.SeedAsync(
-                db,
+                connection,
                 [new GradCast.Data.SeedData.CbsaSeed.CbsaEntry("12345", "Original Metro", "CA", "Metropolitan")],
                 [new GradCast.Data.SeedData.FmrSeed.FmrEntry("12345", 2025, 700, 900, 1100, 1400, 1600)]);
 
             var updateResult = await ReferenceDataSeeder.SeedAsync(
-                db,
+                connection,
                 [new GradCast.Data.SeedData.CbsaSeed.CbsaEntry("12345", "Corrected Metro", "CA", "Micropolitan")],
                 [
                     new GradCast.Data.SeedData.FmrSeed.FmrEntry("12345", 2025, 710, 925, 1125, 1425, 1625),
@@ -36,11 +34,11 @@ public class ReferenceDataSeederIntegrationTests
             Assert.Equal(new ReferenceDataSeedResult(1, 0, 1, 0), initialResult);
             Assert.Equal(new ReferenceDataSeedResult(0, 1, 1, 1), updateResult);
 
-            var location = await db.CbsaLocations.SingleAsync(location => location.CbsaCode == "12345");
-            var rents = await db.FairMarketRents
-                .Where(rent => rent.CbsaCode == "12345")
-                .OrderBy(rent => rent.Year)
-                .ToListAsync();
+            var location = await connection.QuerySingleAsync<CbsaLocation>(
+                "SELECT cbsa_code, name, state, type FROM cbsa_locations WHERE cbsa_code = '12345';");
+
+            var rents = (await connection.QueryAsync<FairMarketRent>(
+                "SELECT id, cbsa_code, year, efficiency, one_bedroom, two_bedroom, three_bedroom, four_bedroom FROM fair_market_rents WHERE cbsa_code = '12345' ORDER BY year ASC;")).ToList();
 
             Assert.Equal("Corrected Metro", location.Name);
             Assert.Equal("Micropolitan", location.Type);
@@ -59,7 +57,10 @@ public class ReferenceDataSeederIntegrationTests
         }
         finally
         {
-            File.Delete(databasePath);
+            if (File.Exists(databasePath))
+            {
+                File.Delete(databasePath);
+            }
         }
     }
 }

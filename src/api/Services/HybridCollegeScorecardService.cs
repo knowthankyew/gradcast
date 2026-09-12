@@ -1,6 +1,4 @@
 using GradCast.Api.Models;
-using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Services;
 
@@ -12,18 +10,15 @@ public class HybridCollegeScorecardService : ICollegeScorecardService
 {
     private readonly LocalCollegeScorecardService _local;
     private readonly CollegeScorecardService _remote;
-    private readonly GradCastDbContext _db;
     private readonly ILogger<HybridCollegeScorecardService> _logger;
 
     public HybridCollegeScorecardService(
         LocalCollegeScorecardService local,
         CollegeScorecardService remote,
-        GradCastDbContext db,
         ILogger<HybridCollegeScorecardService> logger)
     {
         _local = local;
         _remote = remote;
-        _db = db;
         _logger = logger;
     }
 
@@ -60,9 +55,7 @@ public class HybridCollegeScorecardService : ICollegeScorecardService
         else
         {
             // Specific year requested — check if we have year data locally
-            var hasLocalYear = await _db.SchoolYearData
-                .AsNoTracking()
-                .AnyAsync(yd => yd.SchoolId == schoolId && yd.Year == year.Value, ct);
+            var hasLocalYear = await _local.HasYearDataAsync(schoolId, year.Value, ct);
 
             if (hasLocalYear)
             {

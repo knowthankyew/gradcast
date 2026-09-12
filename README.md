@@ -17,7 +17,7 @@ An AI-generated proof-of-concept web application that helps students simulate th
 - **Backend**: C# / ASP.NET Core 10 Minimal API
 - **Frontend**: Vue 3 (Composition API) + TypeScript + Vuetify 4 + Pinia
 - **Testing**: Playwright (Frontend E2E) + xUnit (.NET Backend)
-- **Data Layer**: SQLite via EF Core (local/hybrid mode) or live API calls (remote mode)
+- **Data Layer**: SQLite via Dapper / Microsoft.Data.Sqlite (local/hybrid mode) or live API calls (remote mode)
 - **Build**: .NET CLI + Vite
 
 ## Features
@@ -240,10 +240,12 @@ gradcast/
 │   │   ├── Endpoints/                    # Route contracts & API validation tests
 │   │   ├── Services/                     # Service unit tests (Budget, Tax, Loan, etc.)
 │   │   └── TestDoubles/                  # Shared test doubles & stubs
-│   ├── data/                             # EF Core class library
+│   ├── data/                             # SQLite data layer (Dapper & connection factory)
 │   │   ├── Entities/                     # School, Program, CbsaLocation, FairMarketRent, etc.
 │   │   ├── SeedData/                     # Static seed (metros + FMR values)
-│   │   └── GradCastDbContext.cs
+│   │   ├── ISqliteConnectionFactory.cs   # Connection factory interface
+│   │   ├── SqliteConnectionFactory.cs    # Connection factory with WAL pragmas
+│   │   └── SqliteDatabaseInitializer.cs  # Schema DDL & covering index creation
 │   ├── import/                           # CLI import tool
 │   │   └── Program.cs                    # Bulk Scorecard import & reference data seeder
 │   └── web/                              # Vue 3 + Vuetify 4 frontend

@@ -1,32 +1,38 @@
+using Dapper;
 using GradCast.Data;
 using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Services;
 
 public class GradCastRepository : IGradCastRepository
 {
-    private readonly GradCastDbContext _db;
+    private readonly ISqliteConnectionFactory _dbFactory;
 
-    public GradCastRepository(GradCastDbContext db)
+    public GradCastRepository(ISqliteConnectionFactory dbFactory)
     {
-        _db = db;
+        _dbFactory = dbFactory;
     }
 
     public async Task<CbsaLocation?> GetLocationByCbsaCodeAsync(string cbsaCode, CancellationToken ct = default)
     {
-        return await _db.CbsaLocations
-            .AsNoTracking()
-            .FirstOrDefaultAsync(c => c.CbsaCode == cbsaCode, ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = "SELECT cbsa_code, name, state, type FROM cbsa_locations WHERE cbsa_code = @CbsaCode LIMIT 1;";
+        return await conn.QueryFirstOrDefaultAsync<CbsaLocation>(
+            new CommandDefinition(sql, new { CbsaCode = cbsaCode }, cancellationToken: ct));
     }
 
     public async Task<FairMarketRent?> GetLatestFairMarketRentAsync(string cbsaCode, CancellationToken ct = default)
     {
-        return await _db.FairMarketRents
-            .AsNoTracking()
-            .Where(f => f.CbsaCode == cbsaCode)
-            .OrderByDescending(f => f.Year)
-            .FirstOrDefaultAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT id, cbsa_code, year, efficiency, one_bedroom, two_bedroom, three_bedroom, four_bedroom
+            FROM fair_market_rents
+            WHERE cbsa_code = @CbsaCode
+            ORDER BY year DESC
+            LIMIT 1;
+        """;
+        return await conn.QueryFirstOrDefaultAsync<FairMarketRent>(
+            new CommandDefinition(sql, new { CbsaCode = cbsaCode }, cancellationToken: ct));
     }
 
     public async Task<decimal?> GetProgramMedianEarningsAsync(
@@ -38,15 +44,24 @@ public class GradCastRepository : IGradCastRepository
         var normalizedCipCode = CipCode.NormalizeToFourDigit(cipCode);
         if (normalizedCipCode is null) return null;
 
-        var earnings = await _db.Programs
-            .AsNoTracking()
-            .Where(p => p.SchoolId == schoolId &&
-                        p.CipCode.Replace(".", "") == normalizedCipCode &&
-                        p.MedianEarnings.HasValue &&
-                        (!credentialLevel.HasValue || p.CredentialLevel == credentialLevel.Value))
-            .Select(p => p.MedianEarnings!.Value)
-            .OrderBy(value => value)
-            .ToListAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT CAST(median_earnings AS REAL)
+            FROM programs
+            WHERE school_id = @SchoolId
+              AND REPLACE(cip_code, '.', '') = @NormalizedCipCode
+              AND median_earnings IS NOT NULL
+              AND (@CredentialLevel IS NULL OR credential_level = @CredentialLevel)
+            ORDER BY CAST(median_earnings AS REAL) ASC;
+        """;
+
+        var earnings = (await conn.QueryAsync<decimal>(
+            new CommandDefinition(sql, new
+            {
+                SchoolId = schoolId,
+                NormalizedCipCode = normalizedCipCode,
+                CredentialLevel = credentialLevel
+            }, cancellationToken: ct))).ToList();
 
         if (earnings.Count == 0) return null;
 
@@ -61,24 +76,35 @@ public class GradCastRepository : IGradCastRepository
 
     public async Task<List<decimal>> GetSchoolMedianEarningsAsync(int schoolId, CancellationToken ct = default)
     {
-        return await _db.Programs
-            .AsNoTracking()
-            .Where(p => p.SchoolId == schoolId && p.MedianEarnings.HasValue)
-            .Select(p => p.MedianEarnings!.Value)
-            .ToListAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT CAST(median_earnings AS REAL)
+            FROM programs
+            WHERE school_id = @SchoolId AND median_earnings IS NOT NULL;
+        """;
+
+        var earnings = await conn.QueryAsync<decimal>(
+            new CommandDefinition(sql, new { SchoolId = schoolId }, cancellationToken: ct));
+        return earnings.ToList();
     }
 
     public async Task<decimal> GetMedianDebtAsync(int schoolId, CancellationToken ct = default)
     {
-        var yearData = await _db.SchoolYearData
-            .AsNoTracking()
-            .Where(yd => yd.SchoolId == schoolId)
-            .OrderByDescending(yd => yd.Year)
-            .FirstOrDefaultAsync(ct);
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        const string sql = """
+            SELECT tuition_in_state
+            FROM school_year_data
+            WHERE school_id = @SchoolId
+            ORDER BY year DESC
+            LIMIT 1;
+        """;
 
-        if (yearData?.TuitionInState == null) return 28000m;
+        var tuitionInState = await conn.QueryFirstOrDefaultAsync<int?>(
+            new CommandDefinition(sql, new { SchoolId = schoolId }, cancellationToken: ct));
 
-        var estimatedDebt = yearData.TuitionInState.Value * 4 * 0.6m;
+        if (tuitionInState == null) return 28000m;
+
+        var estimatedDebt = tuitionInState.Value * 4 * 0.6m;
         return Math.Min(estimatedDebt, 150_000m);
     }
 }

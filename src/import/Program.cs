@@ -2,9 +2,10 @@ using System.Globalization;
 using System.IO.Compression;
 using CsvHelper;
 using CsvHelper.Configuration;
+using Dapper;
 using GradCast.Data;
 using GradCast.Data.Entities;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Data.Sqlite;
 
 // ─── Usage ─────────────────────────────────────────────────────────────────────
 // dotnet run --project src/import -- <path-to-scorecard-zip-or-directory> [db-path]
@@ -93,12 +94,9 @@ else
 Console.WriteLine($"  Database: {dbPath}");
 Console.WriteLine();
 
-// Set up EF Core with SQLite
-var optionsBuilder = new DbContextOptionsBuilder<GradCastDbContext>();
-optionsBuilder.UseSqlite($"Data Source={dbPath}");
-
-await using var db = new GradCastDbContext(optionsBuilder.Options);
-await db.Database.EnsureCreatedAsync();
+var connectionFactory = new SqliteConnectionFactory(dbPath);
+await using var connection = await connectionFactory.CreateOpenConnectionAsync();
+await SqliteDatabaseInitializer.InitializeAsync(connection);
 Console.WriteLine("Database schema created/verified.");
 
 if (!isSeedOnly)
@@ -133,7 +131,7 @@ if (!isSeedOnly)
 
     if (institutionCsv != null)
     {
-        await ImportInstitutionDataAsync(db, institutionCsv);
+        await ImportInstitutionDataAsync(connection, institutionCsv);
     }
     else
     {
@@ -142,18 +140,22 @@ if (!isSeedOnly)
 
     if (fieldOfStudyCsv != null)
     {
-        await ImportFieldOfStudyDataAsync(db, fieldOfStudyCsv);
+        await ImportFieldOfStudyDataAsync(connection, fieldOfStudyCsv);
     }
     else
     {
         Console.WriteLine("Warning: No field-of-study CSV found. Skipping.");
     }
 
+    var schoolCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM schools;");
+    var yearCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM school_year_data;");
+    var programCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM programs;");
+
     Console.WriteLine();
     Console.WriteLine("Import complete!");
-    Console.WriteLine($"  Schools: {await db.Schools.CountAsync()}");
-    Console.WriteLine($"  Year records: {await db.SchoolYearData.CountAsync()}");
-    Console.WriteLine($"  Programs: {await db.Programs.CountAsync()}");
+    Console.WriteLine($"  Schools: {schoolCount}");
+    Console.WriteLine($"  Year records: {yearCount}");
+    Console.WriteLine($"  Programs: {programCount}");
 
     if (cleanupWorkDir)
     {
@@ -162,14 +164,16 @@ if (!isSeedOnly)
 }
 
 // Upsert curated reference data on every import so corrected values and new FMR years apply.
-var referenceDataResult = await ReferenceDataSeeder.SeedAsync(db);
+var referenceDataResult = await ReferenceDataSeeder.SeedAsync(connection);
 Console.WriteLine(
     $"  Reference data: {referenceDataResult.CbsaInserted} CBSA inserted, " +
     $"{referenceDataResult.CbsaUpdated} CBSA updated, " +
     $"{referenceDataResult.FmrInserted} FMR inserted, {referenceDataResult.FmrUpdated} FMR updated.");
 
-Console.WriteLine($"  CBSA Locations: {await db.CbsaLocations.CountAsync()}");
-Console.WriteLine($"  Fair Market Rents: {await db.FairMarketRents.CountAsync()}");
+var cbsaTotal = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM cbsa_locations;");
+var fmrTotal = await connection.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fair_market_rents;");
+Console.WriteLine($"  CBSA Locations: {cbsaTotal}");
+Console.WriteLine($"  Fair Market Rents: {fmrTotal}");
 
 if (isSeedOnly)
 {
@@ -196,7 +200,7 @@ static string? FindCsvFile(string dir, string[] namePatterns)
     return null;
 }
 
-static async Task ImportInstitutionDataAsync(GradCastDbContext db, string csvPath)
+static async Task ImportInstitutionDataAsync(SqliteConnection connection, string csvPath)
 {
     Console.WriteLine($"Importing institution data from: {Path.GetFileName(csvPath)}");
 
@@ -248,7 +252,7 @@ static async Task ImportInstitutionDataAsync(GradCastDbContext db, string csvPat
 
         if (schoolBatch.Count >= batchSize)
         {
-            await FlushSchoolBatchAsync(db, schoolBatch, yearBatch);
+            await FlushSchoolBatchAsync(connection, schoolBatch, yearBatch);
             schoolBatch.Clear();
             yearBatch.Clear();
 
@@ -258,57 +262,50 @@ static async Task ImportInstitutionDataAsync(GradCastDbContext db, string csvPat
     }
 
     if (schoolBatch.Count > 0)
-        await FlushSchoolBatchAsync(db, schoolBatch, yearBatch);
+        await FlushSchoolBatchAsync(connection, schoolBatch, yearBatch);
 
     Console.WriteLine($"\r  Processed {totalRows:N0} institutions. Done.");
 }
 
-static async Task FlushSchoolBatchAsync(GradCastDbContext db, List<School> schools, List<SchoolYearData> yearData)
+static async Task FlushSchoolBatchAsync(SqliteConnection connection, List<School> schools, List<SchoolYearData> yearData)
 {
-    foreach (var school in schools)
-    {
-        var existing = await db.Schools.FindAsync(school.Id);
-        if (existing != null)
-        {
-            existing.Name = school.Name;
-            existing.City = school.City;
-            existing.State = school.State;
-            existing.SchoolUrl = school.SchoolUrl;
-            existing.Ownership = school.Ownership;
-        }
-        else
-        {
-            db.Schools.Add(school);
-        }
-    }
+    await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync();
 
-    foreach (var yd in yearData)
-    {
-        var existing = await db.SchoolYearData
-            .FirstOrDefaultAsync(x => x.SchoolId == yd.SchoolId && x.Year == yd.Year);
-        if (existing != null)
-        {
-            existing.AdmissionRate = yd.AdmissionRate;
-            existing.StudentSize = yd.StudentSize;
-            existing.TuitionInState = yd.TuitionInState;
-            existing.TuitionOutOfState = yd.TuitionOutOfState;
-            existing.CompletionRate = yd.CompletionRate;
-        }
-        else
-        {
-            db.SchoolYearData.Add(yd);
-        }
-    }
+    const string schoolSql = """
+        INSERT INTO schools (id, name, city, state, school_url, ownership)
+        VALUES (@Id, @Name, @City, @State, @SchoolUrl, @Ownership)
+        ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            city = excluded.city,
+            state = excluded.state,
+            school_url = excluded.school_url,
+            ownership = excluded.ownership;
+    """;
 
-    await db.SaveChangesAsync();
+    await connection.ExecuteAsync(schoolSql, schools, transaction: tx);
+
+    const string yearSql = """
+        INSERT INTO school_year_data (school_id, year, admission_rate, student_size, tuition_in_state, tuition_out_of_state, completion_rate)
+        VALUES (@SchoolId, @Year, @AdmissionRate, @StudentSize, @TuitionInState, @TuitionOutOfState, @CompletionRate)
+        ON CONFLICT(school_id, year) DO UPDATE SET
+            admission_rate = excluded.admission_rate,
+            student_size = excluded.student_size,
+            tuition_in_state = excluded.tuition_in_state,
+            tuition_out_of_state = excluded.tuition_out_of_state,
+            completion_rate = excluded.completion_rate;
+    """;
+
+    await connection.ExecuteAsync(yearSql, yearData, transaction: tx);
+
+    await tx.CommitAsync();
 }
 
-static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPath)
+static async Task ImportFieldOfStudyDataAsync(SqliteConnection connection, string csvPath)
 {
     Console.WriteLine($"Importing field of study data from: {Path.GetFileName(csvPath)}");
 
     // Pre-load all known school IDs to skip programs referencing schools not in our DB
-    var knownSchoolIds = new HashSet<int>(await db.Schools.Select(s => s.Id).ToListAsync());
+    var knownSchoolIds = new HashSet<int>(await connection.QueryAsync<int>("SELECT id FROM schools;"));
     Console.WriteLine($"  {knownSchoolIds.Count:N0} known schools in database.");
 
     using var reader = new StreamReader(csvPath);
@@ -363,7 +360,7 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
 
         if (batch.Count >= batchSize)
         {
-            await FlushProgramBatchAsync(db, batch);
+            await FlushProgramBatchAsync(connection, batch);
             batch.Clear();
 
             if (totalRows % 10000 == 0)
@@ -372,34 +369,27 @@ static async Task ImportFieldOfStudyDataAsync(GradCastDbContext db, string csvPa
     }
 
     if (batch.Count > 0)
-        await FlushProgramBatchAsync(db, batch);
+        await FlushProgramBatchAsync(connection, batch);
 
     Console.WriteLine($"\r  Processed {totalRows:N0} programs ({skippedRows:N0} skipped — no matching school). Done.");
 }
 
-static async Task FlushProgramBatchAsync(GradCastDbContext db, List<GradCast.Data.Entities.Program> programs)
+static async Task FlushProgramBatchAsync(SqliteConnection connection, List<GradCast.Data.Entities.Program> programs)
 {
-    foreach (var prog in programs)
-    {
-        var existing = await db.Programs.FirstOrDefaultAsync(x =>
-            x.SchoolId == prog.SchoolId &&
-            x.Year == prog.Year &&
-            x.CipCode == prog.CipCode &&
-            x.CredentialLevel == prog.CredentialLevel);
+    await using var tx = (SqliteTransaction)await connection.BeginTransactionAsync();
 
-        if (existing != null)
-        {
-            existing.Title = prog.Title;
-            existing.Completions = prog.Completions;
-            existing.MedianEarnings = prog.MedianEarnings;
-        }
-        else
-        {
-            db.Programs.Add(prog);
-        }
-    }
+    const string programSql = """
+        INSERT INTO programs (school_id, year, cip_code, title, credential_level, completions, median_earnings)
+        VALUES (@SchoolId, @Year, @CipCode, @Title, @CredentialLevel, @Completions, @MedianEarnings)
+        ON CONFLICT(school_id, year, cip_code, credential_level) DO UPDATE SET
+            title = excluded.title,
+            completions = excluded.completions,
+            median_earnings = excluded.median_earnings;
+    """;
 
-    await db.SaveChangesAsync();
+    await connection.ExecuteAsync(programSql, programs, transaction: tx);
+
+    await tx.CommitAsync();
 }
 
 static int? ParseInt(string? value)

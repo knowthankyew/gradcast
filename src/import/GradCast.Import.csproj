@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\data\GradCast.Data.csproj" />
@@ -6,7 +6,6 @@
 
   <ItemGroup>
     <PackageReference Include="CsvHelper" Version="33.0.1" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.12" />
   </ItemGroup>
 
   <PropertyGroup>

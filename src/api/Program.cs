@@ -2,7 +2,6 @@ using GradCast.Api.Endpoints;
 using GradCast.Api.Extensions;
 using GradCast.Api.Middleware;
 using GradCast.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -79,17 +78,15 @@ if (staticRoot != null)
 
 app.Run();
 
-static async Task<IResult> CheckHealthAsync(GradCastDbContext db, CancellationToken ct)
+static async Task<IResult> CheckHealthAsync(ISqliteConnectionFactory dbFactory, CancellationToken ct)
 {
     try
     {
-        var canConnect = await db.Database.CanConnectAsync(ct);
-        if (!canConnect)
-        {
-            return Results.Json(new { status = "Unhealthy", database = "Cannot connect" }, statusCode: StatusCodes.Status503ServiceUnavailable);
-        }
+        await using var conn = await dbFactory.CreateOpenConnectionAsync(ct);
+        var cbsaCount = await Dapper.SqlMapper.ExecuteScalarAsync<int>(
+            conn,
+            new Dapper.CommandDefinition("SELECT COUNT(*) FROM cbsa_locations;", cancellationToken: ct));
 
-        var cbsaCount = await db.CbsaLocations.CountAsync(ct);
         return Results.Ok(new
         {
             status = "Healthy",
