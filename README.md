@@ -1,5 +1,7 @@
 # GradCast
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-gradcast.fly.dev-00D1B2?style=for-the-badge&logo=fly.io&logoColor=white)](https://gradcast.fly.dev)
+
 An AI-generated proof-of-concept web application that helps students simulate their financial future after graduation — based on real college costs, program-level earnings data, local housing markets, and tax calculations. Built on the U.S. Department of Education's [College Scorecard API](https://collegescorecard.ed.gov/data/api/) and HUD Fair Market Rent data.
 
 <p align="center">
@@ -321,6 +323,8 @@ GradCast is configured for single-machine containerized deployment to [Fly.io](h
    ```bash
    fly deploy
    ```
+
+Live instance is accessible at **https://gradcast.fly.dev**.
 
 ## API Endpoints
 
