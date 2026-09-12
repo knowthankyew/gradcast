@@ -16,24 +16,6 @@ public class CollegeScorecardService : ICollegeScorecardService
 
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
 
-    private static readonly Dictionary<int, string> CredentialLevels = new()
-    {
-        [1] = "Undergraduate Certificate",
-        [2] = "Associate's Degree",
-        [3] = "Bachelor's Degree",
-        [4] = "Post-baccalaureate Certificate",
-        [5] = "Master's Degree",
-        [6] = "Doctoral Degree",
-        [7] = "First Professional Degree",
-        [8] = "Graduate Certificate"
-    };
-
-    private static readonly Dictionary<int, string> OwnershipTypes = new()
-    {
-        [1] = "Public",
-        [2] = "Private Nonprofit",
-        [3] = "Private For-Profit"
-    };
 
     public CollegeScorecardService(
         HttpClient httpClient,
@@ -200,7 +182,7 @@ public class CollegeScorecardService : ICollegeScorecardService
             State: GetStringOrDefault(item, "school.state"),
             SchoolUrl: GetStringOrNull(item, "school.school_url"),
             Ownership: ownership,
-            OwnershipName: OwnershipTypes.GetValueOrDefault(ownership, "Unknown"),
+            OwnershipName: ScorecardLookups.OwnershipTypes.GetValueOrDefault(ownership, "Unknown"),
             AdmissionRate: GetDecimalOrNull(item, $"{dataPrefix}.admissions.admission_rate.overall"),
             StudentSize: GetNullableInt(item, $"{dataPrefix}.student.size"),
             TuitionInState: GetNullableInt(item, $"{dataPrefix}.cost.tuition.in_state"),
@@ -246,7 +228,7 @@ public class CollegeScorecardService : ICollegeScorecardService
                 Code: code,
                 Title: title,
                 CredentialLevel: credLevel,
-                CredentialName: CredentialLevels.GetValueOrDefault(credLevel, "Unknown"),
+                CredentialName: ScorecardLookups.CredentialLevels.GetValueOrDefault(credLevel, "Unknown"),
                 Completions: completions,
                 MedianEarnings: earnings
             ));

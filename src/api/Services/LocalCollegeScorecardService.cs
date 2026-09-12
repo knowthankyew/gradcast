@@ -13,24 +13,6 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
     private readonly GradCastDbContext _db;
     private readonly ILogger<LocalCollegeScorecardService> _logger;
 
-    private static readonly Dictionary<int, string> CredentialLevels = new()
-    {
-        [1] = "Undergraduate Certificate",
-        [2] = "Associate's Degree",
-        [3] = "Bachelor's Degree",
-        [4] = "Post-baccalaureate Certificate",
-        [5] = "Master's Degree",
-        [6] = "Doctoral Degree",
-        [7] = "First Professional Degree",
-        [8] = "Graduate Certificate"
-    };
-
-    private static readonly Dictionary<int, string> OwnershipTypes = new()
-    {
-        [1] = "Public",
-        [2] = "Private Nonprofit",
-        [3] = "Private For-Profit"
-    };
 
     public LocalCollegeScorecardService(GradCastDbContext db, ILogger<LocalCollegeScorecardService> logger)
     {
@@ -89,7 +71,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
             Code: p.CipCode.Replace(".", ""), // Normalize to 4-digit without dot
             Title: p.Title,
             CredentialLevel: p.CredentialLevel,
-            CredentialName: CredentialLevels.GetValueOrDefault(p.CredentialLevel, "Unknown"),
+            CredentialName: ScorecardLookups.CredentialLevels.GetValueOrDefault(p.CredentialLevel, "Unknown"),
             Completions: p.Completions,
             MedianEarnings: p.MedianEarnings
         )).ToList();
@@ -101,7 +83,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
             State: school.State,
             SchoolUrl: school.SchoolUrl,
             Ownership: school.Ownership,
-            OwnershipName: OwnershipTypes.GetValueOrDefault(school.Ownership, "Unknown"),
+            OwnershipName: ScorecardLookups.OwnershipTypes.GetValueOrDefault(school.Ownership, "Unknown"),
             AdmissionRate: yearData?.AdmissionRate,
             StudentSize: yearData?.StudentSize,
             TuitionInState: yearData?.TuitionInState,
