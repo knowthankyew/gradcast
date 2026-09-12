@@ -301,6 +301,27 @@ Test coverage:
 dotnet test
 ```
 
+## Deployment (Fly.io)
+
+GradCast is configured for single-machine containerized deployment to [Fly.io](https://fly.io/) backed by a persistent Fly Volume for SQLite:
+
+1. **Launch App**:
+   ```bash
+   fly launch --no-deploy
+   ```
+2. **Provision Persistent Volume**:
+   ```bash
+   fly volumes create gradcast_data --region dfw --size 1
+   ```
+3. **Set Optional API Secrets**:
+   ```bash
+   fly secrets set COLLEGE_SCORECARD_API_KEY=your_key ADZUNA_APP_ID=your_id ADZUNA_APP_KEY=your_key
+   ```
+4. **Deploy**:
+   ```bash
+   fly deploy
+   ```
+
 ## API Endpoints
 
 | Method | Path | Description |
