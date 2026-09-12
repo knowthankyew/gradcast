@@ -1,23 +1,8 @@
 import { ref, watch } from 'vue'
 import { useAppStore } from '../stores/appStore'
+import type { BudgetSimulation } from '../types'
 
-export interface BudgetSimulation {
-  grossAnnualSalary: number
-  grossMonthly: number
-  netMonthly: number
-  effectiveTaxRate: number
-  salarySource: string
-  hasReportedEarnings: boolean
-  rentMonthly: number
-  housingType: string
-  loanPaymentMonthly: number
-  loanPrincipal: number
-  fixedCostsMonthly: number
-  disposableMonthly: number
-  incomeStatus: string
-  locationName: string
-  state: string
-}
+export type { BudgetSimulation }
 
 const simulation = ref<BudgetSimulation | null>(null)
 const loading = ref(false)

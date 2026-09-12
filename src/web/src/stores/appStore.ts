@@ -29,6 +29,7 @@ export const useAppStore = defineStore('app', () => {
   // Location state
   const selectedLocation = ref<LocationSelection | null>(null)
   const hideMissingLocationData = ref(false)
+  // Intentionally '1bed' | '2bed' (no 'studio') because the UI only exposes two housing modes (1-bed and shared 2-bed), even though the backend supports 'studio'.
   const housingType = ref<'1bed' | '2bed'>('1bed')
 
   // Restoration mutex — prevents watchers from firing during scenario load-back

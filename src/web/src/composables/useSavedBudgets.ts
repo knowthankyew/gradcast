@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { BudgetSimulation } from './useBudgetSimulator'
+import type { BudgetSimulation } from '../types'
 
 export interface SavedBudgetContext {
   schoolId: number

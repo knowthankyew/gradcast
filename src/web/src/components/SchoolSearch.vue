@@ -61,8 +61,12 @@ const emit = defineEmits<{
 const store = useAppStore()
 const { searchSchools, searchLoading } = useSchoolApi()
 
+interface SchoolSearchItem extends SchoolSearchResult {
+  displayName: string
+}
+
 const searchQuery = ref('')
-const selectedSchool = ref<any>(null)
+const selectedSchool = ref<SchoolSearchItem | null>(null)
 const selectedState = ref<string | null>(null)
 const results = ref<SchoolSearchResult[]>([])
 const loading = computed(() => searchLoading.value)
@@ -150,7 +154,7 @@ onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
 })
 
-function onSchoolSelected(school: any) {
+function onSchoolSelected(school: SchoolSearchItem | null) {
   if (school) {
     emit('schoolSelected', school.id)
   } else {
