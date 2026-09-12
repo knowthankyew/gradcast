@@ -16,7 +16,7 @@ primary_region = 'dfw'
 [http_service]
   internal_port = 5062
   force_https = true
-  auto_stop_machines = 'stop'
+  auto_stop_machines = 'off'
   auto_start_machines = true
   # Kept warm (min 1 machine) for launch; reduce to 0 later to sleep when idle
   min_machines_count = 1
