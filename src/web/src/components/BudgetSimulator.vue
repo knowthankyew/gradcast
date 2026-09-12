@@ -231,18 +231,18 @@
             <template v-else>
               <div
                 class="text-h4 font-weight-bold"
-                :class="statusColor"
+                :class="computedStatusTextColor"
               >
                 {{ formatCurrency(sim.disposableMonthly) }}
               </div>
               <v-chip
                 size="small"
-                :color="statusChipColor"
+                :color="computedStatusChipColor"
                 variant="tonal"
                 class="mt-2"
               >
-                <v-icon start size="small">{{ statusIcon }}</v-icon>
-                {{ statusLabel }}
+                <v-icon start size="small">{{ computedStatusIcon }}</v-icon>
+                {{ computedStatusLabel }}
               </v-chip>
             </template>
           </v-col>
@@ -368,6 +368,8 @@
 import { ref, computed } from 'vue'
 import { useBudgetSimulator } from '../composables/useBudgetSimulator'
 import { useAppStore } from '../stores/appStore'
+import { formatCurrency } from '../utils/format'
+import { statusColor, statusIcon, statusLabel, statusTextColor } from '../utils/budgetStatus'
 
 const store = useAppStore()
 const { simulation: sim, loading, error, runSimulation } = useBudgetSimulator()
@@ -429,49 +431,10 @@ const salarySourceLabel = computed(() => {
   }
 })
 
-const statusColor = computed(() => {
-  if (!sim.value) return ''
-  switch (sim.value.incomeStatus) {
-    case 'comfortable': return 'text-green-darken-2'
-    case 'manageable': return 'text-green-darken-1'
-    case 'tight': return 'text-orange-darken-2'
-    case 'deficit': return 'text-red-darken-2'
-    default: return ''
-  }
-})
-
-const statusChipColor = computed(() => {
-  if (!sim.value) return 'grey'
-  switch (sim.value.incomeStatus) {
-    case 'comfortable': return 'green'
-    case 'manageable': return 'light-green'
-    case 'tight': return 'orange'
-    case 'deficit': return 'red'
-    default: return 'grey'
-  }
-})
-
-const statusIcon = computed(() => {
-  if (!sim.value) return 'mdi-help'
-  switch (sim.value.incomeStatus) {
-    case 'comfortable': return 'mdi-check-circle'
-    case 'manageable': return 'mdi-check'
-    case 'tight': return 'mdi-alert'
-    case 'deficit': return 'mdi-alert-circle'
-    default: return 'mdi-help'
-  }
-})
-
-const statusLabel = computed(() => {
-  if (!sim.value) return ''
-  switch (sim.value.incomeStatus) {
-    case 'comfortable': return 'Comfortable — solid financial cushion'
-    case 'manageable': return 'Manageable — budget works but limited flexibility'
-    case 'tight': return 'Tight — very little room for extras'
-    case 'deficit': return 'Deficit — expenses exceed income'
-    default: return ''
-  }
-})
+const computedStatusTextColor = computed(() => sim.value ? statusTextColor(sim.value.incomeStatus) : '')
+const computedStatusChipColor = computed(() => sim.value ? statusColor(sim.value.incomeStatus) : 'grey')
+const computedStatusIcon = computed(() => sim.value ? statusIcon(sim.value.incomeStatus) : 'mdi-help')
+const computedStatusLabel = computed(() => sim.value ? statusLabel(sim.value.incomeStatus) : '')
 
 const rentPct = computed(() => {
   if (!sim.value || sim.value.netMonthly <= 0) return 0
@@ -497,14 +460,6 @@ function runWithOverride() {
 function resetOverride() {
   salaryOverrideInput.value = null
   runSimulation()
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 </script>
 

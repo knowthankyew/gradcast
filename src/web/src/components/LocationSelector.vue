@@ -115,6 +115,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onUnmounted } from 'vue'
 import { useAppStore, type LocationSelection } from '../stores/appStore'
+import { formatCurrency } from '../utils/format'
 
 interface LocationResult {
   cbsaCode: string
@@ -250,13 +251,5 @@ function formatRentPreview(loc: LocationResult): string {
     return `${formatCurrency(loc.oneBedRent)}/mo (1-bed)`
   }
   return 'Rent data unavailable'
-}
-
-function formatCurrency(val: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(val)
 }
 </script>

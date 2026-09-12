@@ -91,6 +91,7 @@
 import { computed } from 'vue'
 import { useJobPulse } from '../composables/useJobPulse'
 import { useAppStore } from '../stores/appStore'
+import { formatCurrency } from '../utils/format'
 
 const store = useAppStore()
 const { pulse, loading, error } = useJobPulse()
@@ -121,12 +122,4 @@ const salaryDiffLabel = computed(() => {
   if (pct > 0) return `+${pct.toFixed(0)}%`
   return `${pct.toFixed(0)}%`
 })
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
 </script>

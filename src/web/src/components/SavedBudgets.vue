@@ -137,6 +137,8 @@ import { useBudgetSimulator } from '../composables/useBudgetSimulator'
 import { useSavedBudgets, type SavedBudget } from '../composables/useSavedBudgets'
 import { useAppStore } from '../stores/appStore'
 import { useSchoolApi } from '../composables/useSchoolApi'
+import { formatCurrency, formatDate } from '../utils/format'
+import { statusColor, statusIcon } from '../utils/budgetStatus'
 
 const { simulation } = useBudgetSimulator()
 const store = useAppStore()
@@ -235,40 +237,4 @@ function onClearAll() {
   showClearConfirm.value = false
 }
 
-function statusColor(status: string): string {
-  switch (status) {
-    case 'comfortable': return 'green'
-    case 'manageable': return 'light-green'
-    case 'tight': return 'orange'
-    case 'deficit': return 'red'
-    default: return 'grey'
-  }
-}
-
-function statusIcon(status: string): string {
-  switch (status) {
-    case 'comfortable': return 'mdi-check-circle'
-    case 'manageable': return 'mdi-check'
-    case 'tight': return 'mdi-alert'
-    case 'deficit': return 'mdi-alert-circle'
-    default: return 'mdi-help'
-  }
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
 </script>

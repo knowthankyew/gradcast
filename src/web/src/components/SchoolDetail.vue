@@ -102,6 +102,7 @@
 import { computed, ref, watch } from 'vue'
 import type { SchoolDetail } from '../types'
 import TuitionTrend from './TuitionTrend.vue'
+import { formatCurrency, formatPercent } from '../utils/format'
 
 const props = defineProps<{
   school: SchoolDetail
@@ -127,16 +128,4 @@ const formattedUrl = computed(() => {
   if (!url) return ''
   return url.startsWith('http') ? url : `https://${url}`
 })
-
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
-}
 </script>

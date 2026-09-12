@@ -239,6 +239,7 @@ import { ref, computed, watch } from 'vue'
 import type { ProgramData, ProgramCategory } from '../types'
 import { cipCategories } from '../data/cipCategories'
 import { useAppStore } from '../stores/appStore'
+import { formatCurrency } from '../utils/format'
 
 const props = defineProps<{
   programs: ProgramData[]
@@ -332,14 +333,6 @@ function credentialColor(level: number): string {
     case 8: return 'brown'
     default: return 'grey'
   }
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value)
 }
 </script>
 
