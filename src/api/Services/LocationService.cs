@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace GradCast.Api.Services;
 
-public class LocationService
+public class LocationService : ILocationService
 {
     private readonly GradCastDbContext _db;
 

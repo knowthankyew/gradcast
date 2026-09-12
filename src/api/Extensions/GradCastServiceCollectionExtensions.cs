@@ -30,7 +30,7 @@ public static class GradCastServiceCollectionExtensions
         services.AddDbContext<GradCastDbContext>(options =>
             options.UseSqlite($"Data Source={dbPath}"));
 
-        services.AddScoped<LocationService>();
+        services.AddScoped<ILocationService, LocationService>();
         services.AddScoped<IHousingCostService, HousingCostService>();
         services.AddSingleton<ITaxConfigProvider, FileTaxConfigProvider>();
         services.AddSingleton<ITaxCalculationService, TaxCalculationService>();

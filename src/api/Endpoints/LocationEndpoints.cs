@@ -21,7 +21,7 @@ public static class LocationEndpoints
     private static async Task<IResult> SearchLocations(
         [FromQuery(Name = "q")] string? query,
         [FromQuery(Name = "requireHousing")] bool? requireHousing,
-        LocationService service,
+        ILocationService service,
         CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
