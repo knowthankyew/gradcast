@@ -192,5 +192,42 @@ test.describe('GradCast Core User Flow', () => {
     await expect(page.getByText('Viewing School-Wide Average Earnings')).not.toBeVisible()
     await expect(page.getByText(/Computer Science \(Bachelor's Degree\)/)).toBeVisible()
   })
+
+  test('gracefully handles programs with missing median earnings and allows national baseline application', async ({ page }) => {
+    // 1. Search and select school
+    const schoolInput = page.getByPlaceholder('Start typing a school name...')
+    await schoolInput.fill('Texas')
+    const schoolOption = page.getByRole('option', { name: /The University of Texas at Austin/i })
+    await schoolOption.click()
+
+    // 2. Select a location
+    const metroInput = page.getByPlaceholder('Start typing a city or metro area...')
+    await metroInput.fill('Austin')
+    const metroOption = page.getByRole('option', { name: /Austin-Round Rock-Georgetown/i })
+    await metroOption.click()
+
+    // 3. Select program with missing earnings (Communication, General)
+    const commPanel = page.getByRole('button', { name: /Communication & Journalism/i })
+    await commPanel.click()
+    const commRow = page.getByRole('row', { name: /Communication, General/i })
+    await commRow.click()
+
+    // 4. Verify simulator displays missing earnings notice
+    await expect(page.getByText('Post-Grad Monthly Budget Simulator')).toBeVisible()
+    await expect(page.getByText(/No Median Earnings Reported/i)).toBeVisible()
+    await expect(page.getByText('No Earnings Data Reported')).toBeVisible()
+    await expect(page.getByText('Pending Salary Input')).toBeVisible()
+
+    // 5. Fixed costs (rent + loan) are still calculated and visible
+    await expect(page.getByText('Total Fixed Costs')).toBeVisible()
+
+    // 6. Click Use $45,000 Baseline
+    const baselineBtn = page.getByRole('button', { name: /Use \$45,000 Baseline/i }).first()
+    await baselineBtn.click()
+
+    // 7. Verify simulation recalculates with user override
+    await expect(page.getByText('Pending Salary Input')).not.toBeVisible()
+    await expect(page.getByText('Reset')).toBeVisible()
+  })
 })
 

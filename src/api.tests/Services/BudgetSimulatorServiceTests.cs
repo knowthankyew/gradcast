@@ -79,4 +79,28 @@ public class BudgetSimulatorServiceTests
         Assert.Equal(BudgetSimulationUnavailableReason.HousingDataUnavailable, unavailable.Reason);
         Assert.Contains("12345", unavailable.Detail);
     }
+
+    [Fact]
+    public async Task BudgetSimulationHandlesMissingEarningsGracefully()
+    {
+        var rent = new FairMarketRent { CbsaCode = "12345", Year = 2026, OneBedroom = 1000, TwoBedroom = 1300, Efficiency = 800 };
+        var repo = new StubGradCastRepository(rent, programEarnings: null, schoolEarnings: new List<decimal>());
+        IHousingCostService housing = new HousingCostService(repo);
+        var taxService = new StubTaxCalculationService();
+        var service = new BudgetSimulatorService(repo, housing, taxService, new LoanAmortizationService());
+
+        // Case 1: Program with missing earnings
+        var progOutcome = await service.SimulateAsync(new BudgetSimulationRequest(1, "11.0101", "12345", "1bed", null));
+        var progSuccess = Assert.IsType<BudgetSimulationSuccess>(progOutcome);
+        Assert.False(progSuccess.Simulation.HasReportedEarnings);
+        Assert.Equal("national_fallback", progSuccess.Simulation.SalarySource);
+        Assert.Equal(45000m, progSuccess.Simulation.GrossAnnualSalary);
+
+        // Case 2: School average on school with no reported earnings
+        var schoolOutcome = await service.SimulateAsync(new BudgetSimulationRequest(1, null, "12345", "1bed", null));
+        var schoolSuccess = Assert.IsType<BudgetSimulationSuccess>(schoolOutcome);
+        Assert.False(schoolSuccess.Simulation.HasReportedEarnings);
+        Assert.Equal("national_fallback", schoolSuccess.Simulation.SalarySource);
+        Assert.Equal(45000m, schoolSuccess.Simulation.GrossAnnualSalary);
+    }
 }

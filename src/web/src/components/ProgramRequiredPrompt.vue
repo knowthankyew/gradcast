@@ -29,14 +29,16 @@
             <v-btn
               variant="tonal"
               color="secondary"
-              prepend-icon="mdi-chart-bell-curve-cumulative"
+              :prepend-icon="hasSchoolEarnings ? 'mdi-chart-bell-curve-cumulative' : 'mdi-calculator-variant'"
               @click="proceedWithSchoolAverage"
             >
-              Proceed with School-Wide Average
+              {{ hasSchoolEarnings ? 'Proceed with School-Wide Average' : 'Proceed without Major' }}
             </v-btn>
           </div>
           <div class="text-caption text-medium-emphasis mt-2">
-            Undecided? You can continue with the school-wide average now and pick a major at any time.
+            {{ hasSchoolEarnings
+              ? 'Undecided? You can continue with the school-wide average now and pick a major at any time.'
+              : 'Undecided? You can continue now to view fixed costs and enter a custom salary or use the national baseline.' }}
           </div>
         </div>
       </div>
@@ -45,9 +47,14 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useAppStore } from '../stores/appStore'
 
 const store = useAppStore()
+
+const hasSchoolEarnings = computed(() => {
+  return store.selectedSchool?.programs.some((p) => p.medianEarnings != null) ?? false
+})
 
 function scrollToProgramList() {
   const el = document.getElementById('program-list-card')

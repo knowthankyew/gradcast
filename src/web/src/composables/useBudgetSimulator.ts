@@ -7,6 +7,7 @@ export interface BudgetSimulation {
   netMonthly: number
   effectiveTaxRate: number
   salarySource: string
+  hasReportedEarnings: boolean
   rentMonthly: number
   housingType: string
   loanPaymentMonthly: number

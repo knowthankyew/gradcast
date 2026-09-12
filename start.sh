@@ -15,6 +15,7 @@ cd "$REPO_ROOT"
 
 # Parse CLI arguments
 MODE="dev"
+AUTO_KILL=false
 for arg in "$@"; do
     case "$arg" in
         --single|--prod)
@@ -23,6 +24,9 @@ for arg in "$@"; do
         --api-only)
             MODE="api-only"
             ;;
+        --kill|-k)
+            AUTO_KILL=true
+            ;;
         --help|-h)
             echo "GradCast Quick Start Script"
             echo ""
@@ -30,6 +34,7 @@ for arg in "$@"; do
             echo ""
             echo "Options:"
             echo "  (no args)         Start both API (port 5062) and Vite frontend (port 5173) with hot reload [Default]"
+            echo "  --kill, -k        Automatically terminate stale processes holding ports 5062 or 5173"
             echo "  --single, --prod  Build frontend into dist and run unified single-process ASP.NET server (port 5062)"
             echo "  --api-only        Run backend API only (port 5062)"
             echo "  -h, --help        Show this help message"
@@ -99,9 +104,17 @@ check_port() {
     fi
 
     if [ -n "$pid" ]; then
-        echo -e "${RED}Error: Port $port ($name) is already in use by process PID $pid.${NC}"
-        echo -e "To free it, run: ${BOLD}kill -9 $pid${NC}"
-        exit 1
+        local pid_list
+        pid_list=$(echo "$pid" | tr '\n' ' ' | xargs)
+        if [ "$AUTO_KILL" = true ]; then
+            echo -e "${YELLOW}Port $port ($name) was in use by PID $pid_list. Freeing port...${NC}"
+            kill -9 $pid_list 2>/dev/null || true
+            sleep 0.5
+        else
+            echo -e "${RED}Error: Port $port ($name) is already in use by process PID $pid_list.${NC}"
+            echo -e "To free it automatically, run: ${BOLD}./start.sh --kill${NC} (or: ${BOLD}kill -9 $pid_list${NC})"
+            exit 1
+        fi
     fi
 }
 

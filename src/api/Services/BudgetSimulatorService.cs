@@ -33,15 +33,11 @@ public class BudgetSimulatorService : IBudgetSimulatorService
     public async Task<BudgetSimulationOutcome> SimulateAsync(
         BudgetSimulationRequest request, CancellationToken ct = default)
     {
-        // 1. Determine salary (user override > program median earnings > school-wide median)
-        var salary = await ResolveSalaryAsync(request, ct);
-        var salarySource = request.SalaryOverride.HasValue ? "user_override" : "scorecard_median";
-
-        if (salary <= 0)
-        {
-            salary = 45000m; // National median starting salary fallback
-            salarySource = "national_fallback";
-        }
+        // 1. Determine salary (user override > program median earnings > school-wide median > national fallback)
+        var resolved = await ResolveSalaryAsync(request, ct);
+        var salary = resolved.Amount;
+        var salarySource = resolved.Source;
+        var hasReportedEarnings = resolved.HasReportedEarnings;
 
         // 2. Get location info for state tax lookup
         var location = await _repo.GetLocationByCbsaCodeAsync(request.CbsaCode, ct);
@@ -91,6 +87,7 @@ public class BudgetSimulatorService : IBudgetSimulatorService
             NetMonthly: netPay.NetMonthly,
             EffectiveTaxRate: netPay.EffectiveTaxRate,
             SalarySource: salarySource,
+            HasReportedEarnings: hasReportedEarnings,
             RentMonthly: rentMonthly,
             HousingType: request.HousingType,
             LoanPaymentMonthly: loan.MonthlyPayment,
@@ -103,11 +100,13 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         ));
     }
 
-    private async Task<decimal> ResolveSalaryAsync(BudgetSimulationRequest request, CancellationToken ct)
+    private record ResolvedSalary(decimal Amount, string Source, bool HasReportedEarnings);
+
+    private async Task<ResolvedSalary> ResolveSalaryAsync(BudgetSimulationRequest request, CancellationToken ct)
     {
         if (request.SalaryOverride.HasValue && request.SalaryOverride.Value > 0)
         {
-            return request.SalaryOverride.Value;
+            return new ResolvedSalary(request.SalaryOverride.Value, "user_override", true);
         }
 
         // Try program-specific median earnings
@@ -120,14 +119,25 @@ public class BudgetSimulatorService : IBudgetSimulatorService
                 ct);
             if (programEarnings.HasValue && programEarnings.Value > 0)
             {
-                return programEarnings.Value;
+                return new ResolvedSalary(programEarnings.Value, "program_median", true);
+            }
+
+            // Selected major has no reported earnings in College Scorecard
+            return new ResolvedSalary(45000m, "national_fallback", false);
+        }
+
+        // School-wide average request
+        var earningsList = await _repo.GetSchoolMedianEarningsAsync(request.SchoolId, ct);
+        if (earningsList.Count > 0)
+        {
+            var schoolMedian = earningsList.Average();
+            if (schoolMedian > 0)
+            {
+                return new ResolvedSalary(Math.Round(schoolMedian, 0), "school_median", true);
             }
         }
 
-        var earningsList = await _repo.GetSchoolMedianEarningsAsync(request.SchoolId, ct);
-        if (earningsList.Count == 0) return 0;
-
-        var schoolMedian = earningsList.Average();
-        return schoolMedian > 0 ? Math.Round(schoolMedian, 0) : 0;
+        // School has no reported earnings for any program
+        return new ResolvedSalary(45000m, "national_fallback", false);
     }
 }

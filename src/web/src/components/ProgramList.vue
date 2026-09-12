@@ -31,8 +31,10 @@
         closable
         @click:close="store.setUseSchoolAverage(false)"
       >
-        <v-icon start size="small">mdi-chart-bell-curve-cumulative</v-icon>
-        School-Wide Average Active
+        <v-icon start size="small">
+          {{ hasAnyProgramEarnings ? 'mdi-chart-bell-curve-cumulative' : 'mdi-calculator-variant' }}
+        </v-icon>
+        {{ hasAnyProgramEarnings ? 'School-Wide Average Active' : 'Proceeding without Major' }}
       </v-chip>
       <div v-else class="d-flex align-center ga-2">
         <v-chip size="small" variant="tonal" color="grey">
@@ -45,7 +47,7 @@
           color="secondary"
           @click="store.setUseSchoolAverage(true)"
         >
-          Use School Average
+          {{ hasAnyProgramEarnings ? 'Use School Average' : 'Proceed to Budget' }}
         </v-btn>
       </div>
     </v-card-title>
@@ -209,10 +211,10 @@
             size="small"
             variant="tonal"
             color="secondary"
-            prepend-icon="mdi-chart-bell-curve-cumulative"
+            :prepend-icon="hasAnyProgramEarnings ? 'mdi-chart-bell-curve-cumulative' : 'mdi-calculator-variant'"
             @click="store.setUseSchoolAverage(true)"
           >
-            Use School Average
+            {{ hasAnyProgramEarnings ? 'Use School Average' : 'Proceed to Budget' }}
           </v-btn>
         </div>
       </div>
@@ -225,7 +227,7 @@
       <div>
         <div class="font-weight-medium">No program-level data available for this institution.</div>
         <div class="text-caption text-medium-emphasis">
-          The budget simulator will automatically use the school-wide average.
+          {{ hasAnyProgramEarnings ? 'The budget simulator will automatically use the school-wide average.' : 'The budget simulator will guide you through entering your custom salary or using the national baseline.' }}
         </div>
       </div>
     </div>
@@ -243,6 +245,8 @@ const props = defineProps<{
 }>()
 
 const store = useAppStore()
+
+const hasAnyProgramEarnings = computed(() => props.programs.some((p) => p.medianEarnings != null))
 
 const searchQuery = ref('')
 const openedPanels = ref<string[]>([])

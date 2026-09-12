@@ -21,5 +21,8 @@ public record BudgetSimulationResult(
 
     // Context
     string LocationName,
-    string State
+    string State,
+
+    // Metadata
+    bool HasReportedEarnings = true
 );

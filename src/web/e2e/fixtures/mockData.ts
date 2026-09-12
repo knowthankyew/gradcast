@@ -83,6 +83,7 @@ export const mockFinanceSimulation = {
   netMonthly: 6150,
   effectiveTaxRate: 0.223,
   salarySource: 'scorecard_median',
+  hasReportedEarnings: true,
   rentMonthly: 1550,
   housingType: '1bed',
   loanPaymentMonthly: 450,
@@ -169,6 +170,21 @@ export async function setupMockApi(page: Page) {
             netMonthly: net,
             disposableMonthly: net - mockFinanceSimulation.fixedCostsMonthly,
             salarySource: 'user_override',
+            hasReportedEarnings: true,
+          }),
+        })
+      }
+      if (postData?.cipCode === '09.0101') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            ...mockFinanceSimulation,
+            grossAnnualSalary: 45000,
+            grossMonthly: 3750,
+            netMonthly: 2950,
+            salarySource: 'national_fallback',
+            hasReportedEarnings: false,
           }),
         })
       }

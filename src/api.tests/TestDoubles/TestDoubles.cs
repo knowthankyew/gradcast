@@ -79,10 +79,17 @@ public sealed class StubTaxConfigProvider : ITaxConfigProvider
 public sealed class StubGradCastRepository : IGradCastRepository
 {
     private readonly FairMarketRent? _rent;
+    private readonly decimal? _programEarnings;
+    private readonly List<decimal> _schoolEarnings;
 
-    public StubGradCastRepository(FairMarketRent? rent = null)
+    public StubGradCastRepository(
+        FairMarketRent? rent = null,
+        decimal? programEarnings = 100000m,
+        List<decimal>? schoolEarnings = null)
     {
         _rent = rent;
+        _programEarnings = programEarnings;
+        _schoolEarnings = schoolEarnings ?? new List<decimal> { 100000m };
     }
 
     public Task<CbsaLocation?> GetLocationByCbsaCodeAsync(string cbsaCode, CancellationToken ct = default)
@@ -96,10 +103,10 @@ public sealed class StubGradCastRepository : IGradCastRepository
         string cipCode,
         int? credentialLevel = null,
         CancellationToken ct = default)
-        => Task.FromResult<decimal?>(100000m);
+        => Task.FromResult<decimal?>(_programEarnings);
 
     public Task<List<decimal>> GetSchoolMedianEarningsAsync(int schoolId, CancellationToken ct = default)
-        => Task.FromResult(new List<decimal> { 100000m });
+        => Task.FromResult(_schoolEarnings);
 
     public Task<decimal> GetMedianDebtAsync(int schoolId, CancellationToken ct = default)
         => Task.FromResult(10000m);
