@@ -89,6 +89,7 @@ export const useAppStore = defineStore('app', () => {
     if (program !== null) {
       useSchoolAverage.value = false
     }
+    salaryOverride.value = null
   }
 
   function setUseSchoolAverage(useAverage: boolean) {
@@ -96,6 +97,7 @@ export const useAppStore = defineStore('app', () => {
     if (useAverage) {
       selectedProgram.value = null
     }
+    salaryOverride.value = null
   }
 
   function setHideMissingProgramData(hide: boolean) {
@@ -130,6 +132,7 @@ export const useAppStore = defineStore('app', () => {
   function clearProgram() {
     selectedProgram.value = null
     useSchoolAverage.value = false
+    salaryOverride.value = null
   }
 
   function clearLocation() {
