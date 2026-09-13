@@ -81,4 +81,48 @@ public class CollegeScorecardServiceTests
             }
         }
     }
+
+    [Fact]
+    public async Task LocalCollegeScorecardService_CorrectlyParsesTextMedianEarningsAsDecimal()
+    {
+        var dbPath = Path.Combine(Path.GetTempPath(), $"local_earnings_test_{Guid.NewGuid():N}.db");
+        var factory = new SqliteConnectionFactory(dbPath);
+
+        try
+        {
+            await using (var conn = await factory.CreateOpenConnectionAsync())
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
+
+                await conn.ExecuteAsync("""
+                    INSERT INTO schools (id, name, city, state, school_url, ownership) VALUES
+                    (482477, 'DeVry University-Illinois', 'Lisle', 'IL', NULL, 3);
+                """);
+
+                await conn.ExecuteAsync("""
+                    INSERT INTO programs (school_id, year, cip_code, title, credential_level, completions, median_earnings) VALUES
+                    (482477, 2024, '11.05', 'Computer Systems Analysis', 3, 153, '47609.0');
+                """);
+            }
+
+            var service = new LocalCollegeScorecardService(factory, new LoggerFactory().CreateLogger<LocalCollegeScorecardService>());
+
+            var detail = await service.GetSchoolDetailAsync(482477, 2024);
+            Assert.NotNull(detail);
+            Assert.Equal("DeVry University-Illinois", detail.Name);
+            Assert.Single(detail.Programs);
+
+            var program = detail.Programs[0];
+            Assert.Equal("Computer Systems Analysis", program.Title);
+            Assert.NotNull(program.MedianEarnings);
+            Assert.Equal(47609m, program.MedianEarnings.Value);
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                File.Delete(dbPath);
+            }
+        }
+    }
 }

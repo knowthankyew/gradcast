@@ -146,6 +146,16 @@ export async function setupMockApi(page: Page) {
       })
     }
 
+    if (url.pathname.match(/^\/api\/locations\/([^/]+)$/)) {
+      const cbsa = url.pathname.split('/').pop()
+      const loc = mockLocationSearch.find((l) => l.cbsaCode === cbsa) ?? mockLocationSearch[0]
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(loc),
+      })
+    }
+
     if (url.pathname === '/api/jobs/pulse') {
       return route.fulfill({
         status: 200,
@@ -156,6 +166,10 @@ export async function setupMockApi(page: Page) {
 
     if (url.pathname === '/api/finance/simulator') {
       const postData = route.request().postDataJSON()
+      const requestedHousing = postData?.housingType ?? '1bed'
+      const rentMonthly = requestedHousing === '2bed' ? 1050 : 1550
+      const fixedCosts = rentMonthly + mockFinanceSimulation.loanPaymentMonthly
+
       if (postData?.salaryOverride) {
         const overrideVal = postData.salaryOverride
         const monthly = Math.round(overrideVal / 12)
@@ -168,7 +182,10 @@ export async function setupMockApi(page: Page) {
             grossAnnualSalary: overrideVal,
             grossMonthly: monthly,
             netMonthly: net,
-            disposableMonthly: net - mockFinanceSimulation.fixedCostsMonthly,
+            rentMonthly,
+            housingType: requestedHousing,
+            fixedCostsMonthly: fixedCosts,
+            disposableMonthly: net - fixedCosts,
             salarySource: 'user_override',
             hasReportedEarnings: true,
           }),
@@ -183,6 +200,9 @@ export async function setupMockApi(page: Page) {
             grossAnnualSalary: 45000,
             grossMonthly: 3750,
             netMonthly: 2950,
+            rentMonthly,
+            housingType: requestedHousing,
+            fixedCostsMonthly: fixedCosts,
             salarySource: 'national_fallback',
             hasReportedEarnings: false,
           }),
@@ -191,7 +211,13 @@ export async function setupMockApi(page: Page) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockFinanceSimulation),
+        body: JSON.stringify({
+          ...mockFinanceSimulation,
+          rentMonthly,
+          housingType: requestedHousing,
+          fixedCostsMonthly: fixedCosts,
+          disposableMonthly: mockFinanceSimulation.netMonthly - fixedCosts,
+        }),
       })
     }
 

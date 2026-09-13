@@ -32,6 +32,9 @@ export const useAppStore = defineStore('app', () => {
   // Intentionally '1bed' | '2bed' (no 'studio') because the UI only exposes two housing modes (1-bed and shared 2-bed), even though the backend supports 'studio'.
   const housingType = ref<'1bed' | '2bed'>('1bed')
 
+  // Optional custom salary override
+  const salaryOverride = ref<number | null>(null)
+
   // Restoration mutex — prevents watchers from firing during scenario load-back
   const isRestoring = ref(false)
 
@@ -111,12 +114,17 @@ export const useAppStore = defineStore('app', () => {
     housingType.value = type
   }
 
+  function setSalaryOverride(override: number | null) {
+    salaryOverride.value = override
+  }
+
   function clearSchool() {
     selectedSchoolId.value = null
     selectedSchool.value = null
     selectedProgram.value = null
     useSchoolAverage.value = false
     selectedLocation.value = null
+    salaryOverride.value = null
   }
 
   function clearProgram() {
@@ -138,6 +146,7 @@ export const useAppStore = defineStore('app', () => {
     selectedLocation,
     hideMissingLocationData,
     housingType,
+    salaryOverride,
     isRestoring,
     hasSchool,
     hasProgram,
@@ -154,6 +163,7 @@ export const useAppStore = defineStore('app', () => {
     setLocation,
     setHideMissingLocationData,
     setHousingType,
+    setSalaryOverride,
     clearSchool,
     clearProgram,
     clearLocation,

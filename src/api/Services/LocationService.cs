@@ -74,4 +74,45 @@ public class LocationService : ILocationService
             );
         }).ToList();
     }
+
+    public async Task<LocationSearchResult?> GetLocationByCbsaAsync(string cbsaCode, CancellationToken ct = default)
+    {
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+
+        const string sql = """
+            SELECT cbsa_code, name, state, type
+            FROM cbsa_locations
+            WHERE cbsa_code = @CbsaCode
+            LIMIT 1;
+            """;
+
+        var location = await conn.QuerySingleOrDefaultAsync<CbsaLocation>(
+            new CommandDefinition(sql, new { CbsaCode = cbsaCode }, cancellationToken: ct));
+
+        if (location == null)
+        {
+            return null;
+        }
+
+        const string rentSql = """
+            SELECT cbsa_code, year, one_bedroom, two_bedroom
+            FROM fair_market_rents
+            WHERE cbsa_code = @CbsaCode
+            ORDER BY year DESC
+            LIMIT 1;
+            """;
+
+        var rent = await conn.QuerySingleOrDefaultAsync<FairMarketRent>(
+            new CommandDefinition(rentSql, new { CbsaCode = cbsaCode }, cancellationToken: ct));
+
+        return new LocationSearchResult(
+            location.CbsaCode,
+            location.Name,
+            location.State,
+            location.Type,
+            rent?.OneBedroom,
+            rent?.TwoBedroom,
+            rent != null
+        );
+    }
 }
