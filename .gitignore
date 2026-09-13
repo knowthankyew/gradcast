@@ -42,6 +42,8 @@ src/web/dist/
 # Screenshots
 *.png
 *.jpg
+!src/web/public/*.png
+!src/web/public/*.jpg
 
 # Agent & Testing
 .kiro/
