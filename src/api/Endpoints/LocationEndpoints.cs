@@ -13,9 +13,38 @@ public static class LocationEndpoints
              .WithName("SearchLocations")
              .WithDescription("Search metro areas by name");
 
+        group.MapGet("/{cbsaCode}", GetLocationByCbsa)
+             .WithName("GetLocationByCbsa")
+             .WithDescription("Get metro area details by CBSA code");
+
         group.MapGet("/{cbsaCode}/housing", GetHousingCost)
              .WithName("GetHousingCost")
              .WithDescription("Get Fair Market Rent for a metro area");
+    }
+
+    private static async Task<IResult> GetLocationByCbsa(
+        string cbsaCode,
+        ILocationService service,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(cbsaCode))
+        {
+            return Results.Problem(
+                title: "Invalid CBSA code",
+                detail: "CBSA code is required.",
+                statusCode: 400);
+        }
+
+        var result = await service.GetLocationByCbsaAsync(cbsaCode, ct);
+        if (result == null)
+        {
+            return Results.Problem(
+                title: "Location not found",
+                detail: $"No location found for CBSA code '{cbsaCode}'.",
+                statusCode: 404);
+        }
+
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> SearchLocations(

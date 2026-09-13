@@ -1,9 +1,32 @@
 <template>
   <v-card elevation="3" class="mb-6">
-    <v-card-title class="d-flex align-center">
-      <v-icon class="mr-2" color="accent">mdi-calculator-variant</v-icon>
-      Post-Grad Monthly Budget Simulator
+    <v-card-title class="d-flex align-center justify-space-between flex-wrap ga-2">
+      <div class="d-flex align-center">
+        <v-icon class="mr-2" color="accent">mdi-calculator-variant</v-icon>
+        <span>Post-Grad Monthly Budget Simulator</span>
+      </div>
+      <v-btn
+        color="primary"
+        variant="tonal"
+        size="small"
+        prepend-icon="mdi-share-variant-outline"
+        @click="copyScenarioLink()"
+      >
+        Share Scenario
+      </v-btn>
     </v-card-title>
+
+    <v-snackbar
+      v-model="shareCopied"
+      color="success"
+      location="top"
+      timeout="2500"
+    >
+      <div class="d-flex align-center">
+        <v-icon class="mr-2">mdi-check-circle</v-icon>
+        <span>Scenario link copied to clipboard!</span>
+      </div>
+    </v-snackbar>
     <v-card-subtitle class="d-flex align-center flex-wrap ga-2">
       <span v-if="store.selectedProgram">
         <v-icon size="x-small" color="accent" class="mr-1">mdi-school</v-icon>
@@ -365,16 +388,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useBudgetSimulator } from '../composables/useBudgetSimulator'
 import { useAppStore } from '../stores/appStore'
+import { useScenarioShare } from '../composables/useScenarioShare'
 import { formatCurrency } from '../utils/format'
 import { statusColor, statusIcon, statusLabel, statusTextColor } from '../utils/budgetStatus'
 
 const store = useAppStore()
-const { simulation: sim, loading, error, runSimulation } = useBudgetSimulator()
+const { simulation: sim, loading, error } = useBudgetSimulator()
+const { copyScenarioLink, shareCopied } = useScenarioShare()
 
-const salaryOverrideInput = ref<number | null>(null)
+const salaryOverrideInput = ref<number | null>(store.salaryOverride)
+
+watch(
+  () => store.salaryOverride,
+  (val) => {
+    salaryOverrideInput.value = val
+  },
+  { immediate: true }
+)
 
 const isMissingEarnings = computed(() => {
   return sim.value !== null && !sim.value.hasReportedEarnings && sim.value.salarySource !== 'user_override'
@@ -382,7 +415,7 @@ const isMissingEarnings = computed(() => {
 
 function applyNationalBaseline() {
   salaryOverrideInput.value = 45000
-  runSimulation(45000)
+  store.setSalaryOverride(45000)
 }
 
 function scrollToProgramList() {
@@ -453,13 +486,13 @@ const disposablePct = computed(() => {
 
 function runWithOverride() {
   if (salaryOverrideInput.value && salaryOverrideInput.value > 0) {
-    runSimulation(salaryOverrideInput.value)
+    store.setSalaryOverride(salaryOverrideInput.value)
   }
 }
 
 function resetOverride() {
   salaryOverrideInput.value = null
-  runSimulation()
+  store.setSalaryOverride(null)
 }
 </script>
 

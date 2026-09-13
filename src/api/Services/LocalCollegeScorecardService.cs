@@ -107,7 +107,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
             FROM programs
             WHERE school_id = @SchoolId AND year = @ProgramYear;
         """;
-        var programs = await conn.QueryAsync<GradCast.Data.Entities.Program>(
+        var programs = await conn.QueryAsync<ProgramRow>(
             new CommandDefinition(programsSql, new { SchoolId = schoolId, ProgramYear = programYear }, cancellationToken: ct));
 
         var programDtos = programs.Select(p => new ProgramData(
@@ -116,7 +116,7 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
             CredentialLevel: p.CredentialLevel,
             CredentialName: ScorecardLookups.CredentialLevels.GetValueOrDefault(p.CredentialLevel, "Unknown"),
             Completions: p.Completions,
-            MedianEarnings: p.MedianEarnings
+            MedianEarnings: p.MedianEarnings.HasValue ? Convert.ToDecimal(p.MedianEarnings.Value) : null
         )).ToList();
 
         return new SchoolDetail(
@@ -167,5 +167,17 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
         }
 
         return points;
+    }
+
+    private sealed class ProgramRow
+    {
+        public int Id { get; set; }
+        public int SchoolId { get; set; }
+        public int Year { get; set; }
+        public string CipCode { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public int CredentialLevel { get; set; }
+        public int? Completions { get; set; }
+        public double? MedianEarnings { get; set; }
     }
 }

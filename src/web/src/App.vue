@@ -72,15 +72,29 @@
       </v-container>
     </v-main>
 
-    <v-footer app class="text-center text-caption text-medium-emphasis pa-4">
-      Data provided by the
-      <a href="https://collegescorecard.ed.gov/" target="_blank" rel="noopener" class="ml-1">
-        U.S. Dept. of Education
-      </a>
-      &amp;
-      <a href="https://www.huduser.gov/portal/datasets/fmr.html" target="_blank" rel="noopener" class="ml-1">
-        HUD Fair Market Rents
-      </a>
+    <v-footer app class="d-flex flex-wrap justify-center align-center text-caption text-medium-emphasis pa-4 ga-2">
+      <div>
+        Data provided by the
+        <a href="https://collegescorecard.ed.gov/" target="_blank" rel="noopener" class="ml-1 text-decoration-none text-primary">
+          U.S. Dept. of Education
+        </a>
+        &amp;
+        <a href="https://www.huduser.gov/portal/datasets/fmr.html" target="_blank" rel="noopener" class="ml-1 text-decoration-none text-primary">
+          HUD Fair Market Rents
+        </a>
+      </div>
+      <span class="mx-1">•</span>
+      <div>
+        <a
+          href="https://github.com/knowthankyew/gradcast"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="d-inline-flex align-center text-decoration-none text-medium-emphasis github-footer-link"
+        >
+          <v-icon size="small" class="mr-1">mdi-github</v-icon>
+          <span>GitHub</span>
+        </a>
+      </div>
     </v-footer>
   </v-app>
 </template>
@@ -98,9 +112,14 @@ import BudgetSimulator from './components/BudgetSimulator.vue'
 import SavedBudgets from './components/SavedBudgets.vue'
 import { useSchoolApi } from './composables/useSchoolApi'
 import { useAppStore } from './stores/appStore'
+import { useScenarioShare } from './composables/useScenarioShare'
 
 const store = useAppStore()
 const { detailLoading, error, getSchoolDetail } = useSchoolApi()
+const { initDynamicUrlSync } = useScenarioShare()
+
+// Initialize dynamic URL synchronization and startup hydration from query parameters
+initDynamicUrlSync()
 
 async function onSchoolSelected(id: number) {
   const detail = await getSchoolDetail(id, store.selectedYear)
@@ -119,3 +138,9 @@ async function onYearChanged(year: number | null) {
   }
 }
 </script>
+
+<style scoped>
+.github-footer-link:hover {
+  color: rgb(var(--v-theme-primary)) !important;
+}
+</style>

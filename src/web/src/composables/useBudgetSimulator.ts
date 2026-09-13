@@ -28,7 +28,7 @@ export function useBudgetSimulator() {
         credentialLevel: store.selectedProgram?.credentialLevel ?? null,
         cbsaCode: store.selectedLocation!.cbsaCode,
         housingType: store.housingType,
-        salaryOverride: salaryOverride ?? null,
+        salaryOverride: salaryOverride !== undefined ? salaryOverride : (store.salaryOverride ?? null),
       }
 
       const response = await fetch('/api/finance/simulator', {
@@ -60,6 +60,7 @@ export function useBudgetSimulator() {
       store.housingType,
       store.selectedProgram?.cipCode,
       store.useSchoolAverage,
+      store.salaryOverride,
     ],
     () => {
       if (store.canSimulate) {

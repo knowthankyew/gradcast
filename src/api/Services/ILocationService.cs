@@ -8,4 +8,8 @@ public interface ILocationService
         string query,
         bool requireHousing = false,
         CancellationToken ct = default);
+
+    Task<LocationSearchResult?> GetLocationByCbsaAsync(
+        string cbsaCode,
+        CancellationToken ct = default);
 }

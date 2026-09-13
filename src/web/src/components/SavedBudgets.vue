@@ -83,6 +83,15 @@
 
           <template #append>
             <v-btn
+              icon="mdi-share-variant-outline"
+              variant="text"
+              size="small"
+              color="secondary"
+              :aria-label="`Share scenario: ${budget.name}`"
+              title="Copy shareable link"
+              @click="onShare(budget)"
+            />
+            <v-btn
               icon="mdi-reload"
               variant="text"
               size="small"
@@ -127,6 +136,18 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <v-snackbar
+        v-model="shareCopied"
+        color="success"
+        location="top"
+        timeout="2500"
+      >
+        <div class="d-flex align-center">
+          <v-icon class="mr-2">mdi-check-circle</v-icon>
+          <span>Scenario link copied to clipboard!</span>
+        </div>
+      </v-snackbar>
     </v-card-text>
   </v-card>
 </template>
@@ -137,6 +158,7 @@ import { useBudgetSimulator } from '../composables/useBudgetSimulator'
 import { useSavedBudgets, type SavedBudget } from '../composables/useSavedBudgets'
 import { useAppStore } from '../stores/appStore'
 import { useSchoolApi } from '../composables/useSchoolApi'
+import { useScenarioShare } from '../composables/useScenarioShare'
 import { formatCurrency, formatDate } from '../utils/format'
 import { statusColor, statusIcon } from '../utils/budgetStatus'
 
@@ -144,6 +166,7 @@ const { simulation } = useBudgetSimulator()
 const store = useAppStore()
 const { savedBudgets, saveBudget, deleteBudget, clearAll } = useSavedBudgets()
 const { getSchoolDetail } = useSchoolApi()
+const { copyScenarioLink, shareCopied } = useScenarioShare()
 
 const newName = ref('')
 const justSaved = ref(false)
@@ -151,6 +174,10 @@ const showClearConfirm = ref(false)
 const errorMessage = ref<string | null>(null)
 
 const canSave = computed(() => simulation.value !== null)
+
+function onShare(budget: SavedBudget) {
+  copyScenarioLink(budget.context)
+}
 
 function onSave() {
   if (!newName.value.trim() || !simulation.value) return

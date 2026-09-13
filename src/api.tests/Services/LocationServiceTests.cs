@@ -61,4 +61,50 @@ public class LocationServiceTests
             }
         }
     }
+
+    [Fact]
+    public async Task GetLocationByCbsaAsyncReturnsLocationWithRentWhenFound()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"gradcast-loc-by-cbsa-{Guid.NewGuid():N}.db");
+
+        try
+        {
+            var factory = new SqliteConnectionFactory(databasePath);
+            await using (var conn = await factory.CreateOpenConnectionAsync())
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
+
+                await conn.ExecuteAsync("""
+                    INSERT INTO cbsa_locations (cbsa_code, name, state, type) VALUES
+                    ('14460', 'Boston-Cambridge-Newton', 'MA-NH', 'Metropolitan');
+                """);
+
+                await conn.ExecuteAsync("""
+                    INSERT INTO fair_market_rents (cbsa_code, year, efficiency, one_bedroom, two_bedroom, three_bedroom, four_bedroom) VALUES
+                    ('14460', 2025, 1800, 2100, 2600, 3200, 3500);
+                """);
+            }
+
+            var service = new LocationService(factory);
+
+            var found = await service.GetLocationByCbsaAsync("14460");
+            Assert.NotNull(found);
+            Assert.Equal("14460", found.CbsaCode);
+            Assert.Equal("Boston-Cambridge-Newton", found.Name);
+            Assert.Equal("MA-NH", found.State);
+            Assert.Equal(2100, found.OneBedRent);
+            Assert.Equal(2600, found.TwoBedRent);
+            Assert.True(found.HasHousingData);
+
+            var notFound = await service.GetLocationByCbsaAsync("99999");
+            Assert.Null(notFound);
+        }
+        finally
+        {
+            if (File.Exists(databasePath))
+            {
+                File.Delete(databasePath);
+            }
+        }
+    }
 }
