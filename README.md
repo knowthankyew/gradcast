@@ -2,7 +2,9 @@
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-gradcast.fly.dev-00D1B2?style=for-the-badge&logo=fly.io&logoColor=white)](https://gradcast.fly.dev)
 
-An AI-generated proof-of-concept web application that helps students simulate their financial future after graduation — based on real college costs, program-level earnings data, local housing markets, and tax calculations. Built on the U.S. Department of Education's [College Scorecard API](https://collegescorecard.ed.gov/data/api/) and HUD Fair Market Rent data.
+Most college search tools stop at tuition. GradCast connects actual degree-level earnings to real local rent, federal/state taxes, and student loan amortization to show your real monthly take-home.
+
+A proof-of-concept web application that helps students simulate their financial future after graduation — based on real college costs, program-level earnings data, local housing markets, and tax calculations. Built on the U.S. Department of Education's [College Scorecard API](https://collegescorecard.ed.gov/data/api/) and HUD Fair Market Rent data.
 
 <p align="center">
   <img src="docs/assets/gradcast-demo.gif" alt="GradCast Interactive Walkthrough" width="100%" style="max-width: 960px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);" />
