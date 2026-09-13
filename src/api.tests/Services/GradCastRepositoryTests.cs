@@ -28,7 +28,8 @@ public class GradCastRepositoryTests
                     INSERT INTO programs (school_id, year, cip_code, credential_level, title, median_earnings) VALUES
                     (1, 2024, '11.07', 2, 'Legacy format', 45000),
                     (1, 2024, '1107', 3, 'Canonical format', 75000),
-                    (1, 2024, '1107', 5, 'Canonical format', 95000);
+                    (1, 2024, '1107', 5, 'Canonical format', 95000),
+                    (1, 2024, '1105', 3, 'Text decimal format', '47609.0');
                 """);
             }
 
@@ -37,10 +38,12 @@ public class GradCastRepositoryTests
             var selectedEarnings = await repository.GetProgramMedianEarningsAsync(1, "11.0701", 3);
             var legacyEarnings = await repository.GetProgramMedianEarningsAsync(1, "1107", 2);
             var fallbackEarnings = await repository.GetProgramMedianEarningsAsync(1, "1107");
+            var textDecimalEarnings = await repository.GetProgramMedianEarningsAsync(1, "1105", 3);
 
             Assert.Equal(75000m, selectedEarnings);
             Assert.Equal(45000m, legacyEarnings);
             Assert.Equal(75000m, fallbackEarnings);
+            Assert.Equal(47609m, textDecimalEarnings);
         }
         finally
         {

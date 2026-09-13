@@ -1,4 +1,5 @@
 using GradCast.Api.Models;
+using GradCast.Data;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace GradCast.Api.Services;
@@ -18,6 +19,7 @@ public class BudgetSimulatorService : IBudgetSimulatorService
     private readonly IHousingCostService _housingService;
     private readonly ITaxCalculationService _taxService;
     private readonly ILoanAmortizationService _loanService;
+    private readonly ICollegeScorecardService? _scorecardService;
     private readonly ILogger<BudgetSimulatorService> _logger;
 
     public BudgetSimulatorService(
@@ -25,12 +27,14 @@ public class BudgetSimulatorService : IBudgetSimulatorService
         IHousingCostService housingService,
         ITaxCalculationService taxService,
         ILoanAmortizationService loanService,
+        ICollegeScorecardService? scorecardService = null,
         ILogger<BudgetSimulatorService>? logger = null)
     {
         _repo = repo;
         _housingService = housingService;
         _taxService = taxService;
         _loanService = loanService;
+        _scorecardService = scorecardService;
         _logger = logger ?? NullLogger<BudgetSimulatorService>.Instance;
     }
 
@@ -130,6 +134,39 @@ public class BudgetSimulatorService : IBudgetSimulatorService
                 return new ResolvedSalary(programEarnings.Value, "program_median", true);
             }
 
+            // If local DB doesn't have it, check scorecard service (e.g. remote API in hybrid mode)
+            if (_scorecardService != null)
+            {
+                var schoolDetail = await _scorecardService.GetSchoolDetailAsync(request.SchoolId, ct: ct);
+                if (schoolDetail != null && schoolDetail.Programs.Count > 0)
+                {
+                    var normalized = CipCode.NormalizeToFourDigit(request.CipCode);
+                    var matching = schoolDetail.Programs
+                        .Where(p => CipCode.NormalizeToFourDigit(p.Code) == normalized && p.MedianEarnings.HasValue && p.MedianEarnings.Value > 0)
+                        .ToList();
+
+                    if (matching.Count > 0)
+                    {
+                        if (request.CredentialLevel.HasValue)
+                        {
+                            var exact = matching.FirstOrDefault(p => p.CredentialLevel == request.CredentialLevel.Value);
+                            if (exact != null && exact.MedianEarnings.HasValue)
+                            {
+                                return new ResolvedSalary(exact.MedianEarnings.Value, "program_median", true);
+                            }
+                        }
+
+                        var sorted = matching.Select(p => p.MedianEarnings!.Value).OrderBy(e => e).ToList();
+                        var middle = sorted.Count / 2;
+                        var medianVal = sorted.Count % 2 == 1
+                            ? sorted[middle]
+                            : (sorted[middle - 1] + sorted[middle]) / 2m;
+
+                        return new ResolvedSalary(medianVal, "program_median", true);
+                    }
+                }
+            }
+
             // Selected major has no reported earnings in College Scorecard
             return new ResolvedSalary(45000m, "national_fallback", false);
         }
@@ -142,6 +179,24 @@ public class BudgetSimulatorService : IBudgetSimulatorService
             if (schoolMedian > 0)
             {
                 return new ResolvedSalary(Math.Round(schoolMedian, 0), "school_median", true);
+            }
+        }
+
+        if (_scorecardService != null)
+        {
+            var schoolDetail = await _scorecardService.GetSchoolDetailAsync(request.SchoolId, ct: ct);
+            if (schoolDetail != null && schoolDetail.Programs.Count > 0)
+            {
+                var reportedEarnings = schoolDetail.Programs
+                    .Where(p => p.MedianEarnings.HasValue && p.MedianEarnings.Value > 0)
+                    .Select(p => p.MedianEarnings!.Value)
+                    .ToList();
+
+                if (reportedEarnings.Count > 0)
+                {
+                    var avg = reportedEarnings.Average();
+                    return new ResolvedSalary(Math.Round(avg, 0), "school_median", true);
+                }
             }
         }
 
