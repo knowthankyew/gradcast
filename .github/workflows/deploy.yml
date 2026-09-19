@@ -19,6 +19,9 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
+      - name: Audit NuGet Vulnerabilities
+        run: dotnet list package --vulnerable --include-transitive
+
       - name: Run Backend Tests
         run: dotnet test
 
@@ -32,6 +35,10 @@ jobs:
       - name: Install Frontend Dependencies
         working-directory: src/web
         run: npm ci
+
+      - name: Audit Frontend Dependencies
+        working-directory: src/web
+        run: npm audit --audit-level=high
 
       - name: Build Frontend
         working-directory: src/web
