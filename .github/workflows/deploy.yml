@@ -44,6 +44,15 @@ jobs:
         working-directory: src/web
         run: npm run build
 
+      - name: Generate CycloneDX SBOM
+        run: npx --yes @cyclonedx/cdxgen -o bom.json
+
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-gradcast-cyclonedx
+          path: bom.json
+
   deploy:
     name: Deploy to Fly.io
     needs: test
