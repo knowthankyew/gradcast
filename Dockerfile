@@ -14,8 +14,8 @@ RUN npm run build
 FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS api-build
 WORKDIR /app
 
-# Copy solution and project definitions for caching restore
-COPY GradCast.slnx ./
+# Copy solution, CPM definitions, and project definitions for caching restore
+COPY GradCast.slnx Directory.Build.props Directory.Packages.props ./
 COPY src/data/*.csproj src/data/
 COPY src/api/*.csproj src/api/
 RUN dotnet restore src/api/GradCast.Api.csproj
