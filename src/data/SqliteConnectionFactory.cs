@@ -6,6 +6,11 @@ public class SqliteConnectionFactory : ISqliteConnectionFactory
 {
     private readonly string _connectionString;
 
+    static SqliteConnectionFactory()
+    {
+        Dapper.DefaultTypeMap.MatchNamesWithUnderscores = true;
+    }
+
     public SqliteConnectionFactory(string connectionStringOrPath)
     {
         _connectionString = connectionStringOrPath.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
