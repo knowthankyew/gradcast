@@ -25,9 +25,19 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Maintain LTS stability - avoid non-LTS odd-numbered and major jumps
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "node"
+        versions: ["23.*", "25.*", "27.*"]
 
   # GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "monthly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
