@@ -361,6 +361,12 @@ Live instance is accessible at **https://gradcast.fly.dev**.
 | Federal tax brackets | Income tax calculations | Annual (hardcoded) |
 | [Adzuna](https://developer.adzuna.com/) | Job openings & local salaries by CIP/metro | Real-time API |
 
+## Portfolio Architecture Note: The Open Data Engine
+
+Within the [knowthankyew](https://github.com/knowthankyew) portfolio of consumer privacy reality engines:
+- Tools like `lease-audit`, `careCheck`, `paystub-check`, and `mailStripper` enforce ultra-strict client-side sandbox execution, air-gapped zero-egress policies, and volatile memory burnability because they ingest **sensitive, private, confidential personal records** (leases, medical bills, paystubs, personal emails).
+- **GradCast is the inherently public civic consequence engine in the portfolio.** It queries open public data (U.S. Department of Education, IPEDS, HUD FMR) to demystify college costs and projected earnings. It does not collect private user documents, requires no user authentication, retains zero user profiles, and saves budget simulations exclusively to the user's browser `localStorage`. It is intentionally designed for open web exploration and public access.
+
 ## License
 
 MIT
