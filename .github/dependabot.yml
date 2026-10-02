@@ -5,6 +5,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    assignees:
+      - "knowthankyew"
     groups:
       dotnet-dependencies:
         patterns:
@@ -15,6 +17,8 @@ updates:
     directory: "/src/web"
     schedule:
       interval: "weekly"
+    assignees:
+      - "knowthankyew"
     groups:
       npm-dependencies:
         patterns:
@@ -33,6 +37,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    assignees:
+      - "knowthankyew"
     ignore:
       # Maintain LTS stability - avoid major jumps
       - dependency-name: "node"
@@ -43,6 +49,8 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    assignees:
+      - "knowthankyew"
     groups:
       github-actions:
         patterns:
