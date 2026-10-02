@@ -19,10 +19,14 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "typescript"
     ignore:
       # vue-tsc v3 does not yet support TypeScript 7
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        versions: ["7.*", "8.*"]
 
   # Container Base Images
   - package-ecosystem: "docker"
