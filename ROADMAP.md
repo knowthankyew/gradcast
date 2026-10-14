@@ -47,7 +47,7 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 
 | Phase | Milestone | Focus Area | Deliverables & Scope | Status |
 | :--- | :--- | :--- | :--- | :---: |
-| **Stage 1** | **Edge SQLite Social Sharing Layer** | Edge / OLTP | Operational `shared_scenarios` table, Dapper repo, ASP.NET Core Minimal API endpoint with strict input allowlist, Vuetify share button. | 📋 **Specified** |
+| **Stage 1** | **Edge SQLite Social Sharing Layer** | Edge / OLTP | Operational `shared_scenarios` table, Dapper repo, ASP.NET Core Minimal API endpoint with strict input allowlist, Vuetify share button. | ✅ **Completed** |
 | **Stage 2** | **Lakehouse Foundation & IaC** | Cloud / Governance | Terraform Unity Catalog provisioning (catalogs, schemas, service principals), Databricks Asset Bundle (`databricks.yml`), OAuth M2M authentication. | 📋 **Specified** |
 | **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | 📋 **Specified** |
 | **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | 📋 **Specified** |
@@ -86,10 +86,10 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
    - `tests/GradCast.Api.Tests/ScenarioEndpointTests.cs`: xUnit integration tests.
 
 ### Acceptance Criteria
-- [ ] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
-- [ ] Client identity is never recorded; `client_hash` is computed as `SHA256(Date.UtcNow.ToString("yyyy-MM-dd") + IP + Salt)`.
-- [ ] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper in $< 5\text{ms}$.
-- [ ] Existing 78/78 xUnit backend tests continue to pass.
+- [x] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
+- [x] Client identity is never recorded; `client_hash` is computed as `SHA256(Date.UtcNow.ToString("yyyy-MM-dd") + IP + Salt)`.
+- [x] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper in $< 5\text{ms}$.
+- [x] Existing 78/78 xUnit backend tests continue to pass (now 107/107 total).
 
 ### AI Coder Execution Prompt
 ```text
