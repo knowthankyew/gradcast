@@ -52,3 +52,34 @@ jobs:
       - name: Validate Databricks Asset Bundle (Prod)
         run: |
           databricks bundle validate --bundle-dir lakehouse -t prod
+
+  lakehouse-tests:
+    name: Run Lakehouse Tests & Claims Linter Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Lakehouse Unit & Integration Tests
+        run: |
+          python3 -m unittest discover -s lakehouse/tests -v
+
+      - name: Execute Claims & Invariant Linter Gate
+        run: |
+          python3 lakehouse/scripts/audit_claims.py
+
+      - name: Generate Lakehouse CycloneDX SBOM
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements lakehouse/requirements.txt -o lakehouse/bom.json
+
+      - name: Upload Lakehouse SBOM Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-lakehouse-cyclonedx
+          path: lakehouse/bom.json

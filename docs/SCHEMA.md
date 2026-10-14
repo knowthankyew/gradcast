@@ -270,6 +270,45 @@ The Gold layer powers analytical dashboards, machine learning wage predictions, 
                                +-----------------------+
 ```
 
+#### Table: `gradcast_lakehouse.gold.dim_school`
+```sql
+CREATE TABLE IF NOT EXISTS gradcast_lakehouse.gold.dim_school (
+    school_key BIGINT GENERATED ALWAYS AS IDENTITY,
+    school_id INT NOT NULL,
+    school_name STRING NOT NULL,
+    city STRING NOT NULL,
+    state STRING NOT NULL,
+    school_url STRING,
+    ownership INT NOT NULL
+)
+USING DELTA
+CLUSTER BY (school_id);
+```
+
+#### Table: `gradcast_lakehouse.gold.dim_metro`
+```sql
+CREATE TABLE IF NOT EXISTS gradcast_lakehouse.gold.dim_metro (
+    cbsa_code STRING NOT NULL,
+    metro_name STRING NOT NULL,
+    state_code STRING NOT NULL,
+    metro_type STRING NOT NULL
+)
+USING DELTA
+CLUSTER BY (cbsa_code);
+```
+
+#### Table: `gradcast_lakehouse.gold.dim_program`
+```sql
+CREATE TABLE IF NOT EXISTS gradcast_lakehouse.gold.dim_program (
+    program_key BIGINT GENERATED ALWAYS AS IDENTITY,
+    cip_code STRING NOT NULL,
+    cip_family STRING NOT NULL,
+    program_title STRING
+)
+USING DELTA
+CLUSTER BY (cip_code);
+```
+
 #### Table: `gradcast_lakehouse.gold.fact_scenario_outcomes`
 ```sql
 CREATE TABLE IF NOT EXISTS gradcast_lakehouse.gold.fact_scenario_outcomes (
