@@ -128,6 +128,103 @@ def populate_fact_scenario_outcomes(
     """)
 
 
+def populate_dimensions(
+    spark: SparkSession,
+    catalog: str = "gradcast_lakehouse",
+) -> None:
+    """
+    Populate dim_school, dim_metro, and dim_program from Silver conformed tables.
+    Deduplicates strictly by natural keys to prevent join fan-out.
+    """
+    silver_scenarios = spark.table(f"{catalog}.silver.scenarios")
+
+    # 1. dim_program (unique per cip_code)
+    programs_df = (
+        silver_scenarios
+        .select(
+            F.col("cip_code"),
+            F.col("cip_family"),
+            F.concat(F.lit("Field of Study: "), F.col("cip_family")).alias("program_title"),
+        )
+        .dropDuplicates(["cip_code"])
+    )
+    programs_df.createOrReplaceTempView("stage_dim_programs")
+    spark.sql(f"""
+        MERGE INTO {catalog}.gold.dim_program AS target
+        USING stage_dim_programs AS source
+        ON target.cip_code = source.cip_code
+        WHEN MATCHED THEN
+            UPDATE SET
+                target.cip_family = source.cip_family,
+                target.program_title = source.program_title
+        WHEN NOT MATCHED THEN
+            INSERT (cip_code, cip_family, program_title)
+            VALUES (source.cip_code, source.cip_family, source.program_title)
+    """)
+
+    # 2. dim_metro (unique per cbsa_code)
+    metro_df = (
+        silver_scenarios
+        .select(
+            F.col("cbsa_code"),
+            F.concat(F.lit("Metro Area "), F.col("cbsa_code")).alias("metro_name"),
+            F.lit("US").alias("state_code"),
+            F.lit("Metropolitan").alias("metro_type"),
+        )
+        .dropDuplicates(["cbsa_code"])
+    )
+    metro_df.createOrReplaceTempView("stage_dim_metro")
+    spark.sql(f"""
+        MERGE INTO {catalog}.gold.dim_metro AS target
+        USING stage_dim_metro AS source
+        ON target.cbsa_code = source.cbsa_code
+        WHEN MATCHED THEN
+            UPDATE SET
+                target.metro_name = source.metro_name,
+                target.state_code = source.state_code,
+                target.metro_type = source.metro_type
+        WHEN NOT MATCHED THEN
+            INSERT (cbsa_code, metro_name, state_code, metro_type)
+            VALUES (source.cbsa_code, source.metro_name, source.state_code, source.metro_type)
+    """)
+
+    # 3. dim_school (unique per school_id)
+    school_df = (
+        silver_scenarios
+        .select(
+            F.col("school_id"),
+            F.concat(F.lit("Institution #"), F.col("school_id")).alias("school_name"),
+            F.lit("Unknown").alias("city"),
+            F.lit("US").alias("state"),
+            F.lit(None).cast("string").alias("school_url"),
+            F.lit(1).cast("int").alias("ownership"),
+        )
+        .dropDuplicates(["school_id"])
+    )
+    school_df.createOrReplaceTempView("stage_dim_school")
+    spark.sql(f"""
+        MERGE INTO {catalog}.gold.dim_school AS target
+        USING stage_dim_school AS source
+        ON target.school_id = source.school_id
+        WHEN MATCHED THEN
+            UPDATE SET
+                target.school_name = source.school_name
+        WHEN NOT MATCHED THEN
+            INSERT (school_id, school_name, city, state, school_url, ownership)
+            VALUES (source.school_id, source.school_name, source.city, source.state, source.school_url, source.ownership)
+    """)
+
+
+def run_gold_pipeline(
+    spark: SparkSession,
+    catalog: str = "gradcast_lakehouse",
+) -> None:
+    """Execute complete Gold dimensional pipeline."""
+    ensure_gold_tables(spark, catalog)
+    populate_dimensions(spark, catalog)
+    populate_fact_scenario_outcomes(spark, catalog)
+
+
 if __name__ == "__main__":
     spark = SparkSession.builder.appName("GoldModeling").getOrCreate()
     print("Gold Modeling module loaded successfully.")

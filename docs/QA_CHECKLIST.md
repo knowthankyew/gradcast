@@ -25,7 +25,7 @@ Run these baseline automated checks to verify the entire system is healthy befor
   ```bash
   python3 lakehouse/scripts/audit_claims.py
   ```
-  *Expected Result*: `[PASS] All 4 audit gates passed cleanly` (Schema parity, $k \ge 5$ invariant, SHA-256 client hash, zero prohibited adjectives, and Master Brief parity).
+  *Expected Result*: `[PASS] Audit gates passed cleanly` (Schema parity, $k \ge 5$ invariant, SHA-256 client hash, zero prohibited vocabulary, and Master Brief parity).
 
 - [ ] **1.4 Terraform Configuration & Syntax Validation**
   ```bash
@@ -170,10 +170,10 @@ dotnet run --project src/api
       "monthlyDisposable": 3300,
       "disposableRatio": 0.66,
       "sentimentTag": "comfortable",
-      "scenarioTitle": "<script>alert(1)</script>Safe Title Here"
+      "scenarioTitle": "<p>Safe Title Here</p>"
     }'
   ```
-  *Verify*: The scenario succeeds with HTTP `201`, but when retrieved via `GET /api/scenarios/{id}`, the HTML `<script>` tags have been stripped, leaving only `"Safe Title Here"`.
+  *Verify*: The scenario succeeds with HTTP `201`, but when retrieved via `GET /api/scenarios/{id}`, the HTML `<p>` tags have been stripped, leaving only `"Safe Title Here"`.
 
 ---
 

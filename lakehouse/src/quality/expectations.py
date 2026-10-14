@@ -32,6 +32,8 @@ def apply_quality_expectations(df: DataFrame) -> Tuple[DataFrame, DataFrame]:
     for c in conditions[1:]:
         all_passed_cond = all_passed_cond & c
 
+    all_passed_cond = F.coalesce(all_passed_cond, F.lit(False))
+
     passed_df = df.filter(all_passed_cond)
 
     quarantined_df = (

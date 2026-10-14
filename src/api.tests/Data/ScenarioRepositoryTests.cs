@@ -4,6 +4,7 @@ using GradCast.Api.Data;
 using GradCast.Api.Models;
 using GradCast.Data;
 using GradCast.Data.Entities;
+using Microsoft.Data.Sqlite;
 using Xunit;
 
 namespace GradCast.Api.Tests;
@@ -77,6 +78,7 @@ public class ScenarioRepositoryTests
         }
         finally
         {
+            SqliteConnection.ClearAllPools();
             if (File.Exists(dbPath))
             {
                 File.Delete(dbPath);
@@ -197,6 +199,7 @@ public class ScenarioRepositoryTests
         }
         finally
         {
+            SqliteConnection.ClearAllPools();
             if (File.Exists(dbPath))
             {
                 File.Delete(dbPath);
@@ -263,6 +266,7 @@ public class ScenarioRepositoryTests
         }
         finally
         {
+            SqliteConnection.ClearAllPools();
             if (File.Exists(dbPath))
             {
                 File.Delete(dbPath);

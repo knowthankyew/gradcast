@@ -9,24 +9,14 @@ import tempfile
 import unittest
 
 
-SQLITE_BENCHMARK_SCHEMA_DDL = """
-CREATE TABLE IF NOT EXISTS community_scenario_benchmarks (
-    cip_family TEXT NOT NULL,
-    cbsa_code TEXT NOT NULL,
-    credential_level INTEGER NOT NULL,
-    housing_type TEXT NOT NULL,
-    sample_count INTEGER NOT NULL,
-    p25_monthly_disposable INTEGER NOT NULL,
-    median_monthly_disposable INTEGER NOT NULL,
-    p75_monthly_disposable INTEGER NOT NULL,
-    top_contributing_school_id INTEGER NULL,
-    last_updated_at TEXT NOT NULL,
-    CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level, housing_type)
-);
+import sys
+from pathlib import Path
 
-CREATE INDEX IF NOT EXISTS IX_community_scenario_benchmarks_cbsa_cip 
-    ON community_scenario_benchmarks (cbsa_code, cip_family);
-"""
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from lakehouse.src.pipelines.export_sqlite import SQLITE_BENCHMARK_SCHEMA_DDL
 
 
 class TestReverseEtlSqlite(unittest.TestCase):

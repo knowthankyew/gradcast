@@ -74,8 +74,10 @@ def audit_privacy_invariants(errors: List[str]) -> None:
         return
 
     content = views_file.read_text(encoding="utf-8")
-    if "COUNT(*) >=" not in content and "min_cohort_size: int = 5" not in content:
-        errors.append("Privacy violation: v_public_positive_finds missing k-anonymity boundary (COUNT(*) >= 5)")
+    if "min_cohort_size: int = 5" not in content:
+        errors.append("Privacy violation: v_public_positive_finds missing default k-anonymity boundary (min_cohort_size: int = 5)")
+    if "effective_min_k = max(min_cohort_size, 5)" not in content and "HAVING COUNT(*) >= 5" not in content:
+        errors.append("Privacy violation: v_public_positive_finds does not enforce effective_min_k >= 5 clamp")
 
     # Verify SHA-256 hashing in ScenarioEndpoints
     endpoint_file = REPO_ROOT / "src/api/Endpoints/ScenarioEndpoints.cs"
@@ -107,7 +109,7 @@ def audit_vocabulary(errors: List[str]) -> None:
                     errors.append(f"Prohibited word '{pattern.pattern}' found in {doc.name}:{idx}: {line.strip()}")
 
 
-def audit_portfolio_master_brief(errors: List[str]) -> None:
+def audit_portfolio_master_brief(errors: List[str]) -> bool:
     """Verify that KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md matches current test inventory."""
     brief_candidates = [
         DEV_ROOT / "KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md",
@@ -116,8 +118,8 @@ def audit_portfolio_master_brief(errors: List[str]) -> None:
     brief_file = next((f for f in brief_candidates if f.is_file()), None)
 
     if not brief_file:
-        print("[audit-claims] Note: KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md not found in parent directory (skipping brief check).")
-        return
+        print("[audit-claims] Note: KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md not found in parent directory (skipping brief check in isolated CI).")
+        return False
 
     brief_content = brief_file.read_text(encoding="utf-8")
 
@@ -140,6 +142,7 @@ def audit_portfolio_master_brief(errors: List[str]) -> None:
         errors.append(
             f"Portfolio Brief Drift: {brief_file.name} does not reflect current GradCast test count ({expected_marker} Unit Tests)."
         )
+    return True
 
 
 def main() -> int:
@@ -149,7 +152,7 @@ def main() -> int:
     audit_schema_parity(errors)
     audit_privacy_invariants(errors)
     audit_vocabulary(errors)
-    audit_portfolio_master_brief(errors)
+    brief_checked = audit_portfolio_master_brief(errors)
 
     if errors:
         print(f"\n[FAIL] Found {len(errors)} documentation / architectural claim violation(s):")
@@ -157,12 +160,15 @@ def main() -> int:
             print(f"  - {err}")
         return 1
 
-    print("\n[PASS] All 4 audit gates passed cleanly:")
+    print("\n[PASS] Audit gates passed cleanly:")
     print("  ✓ Schema & DDL parity verified across 10 tables/views")
     print("  ✓ Hard k-anonymity invariant (k >= 5) verified in views.py")
     print("  ✓ Client privacy hash (SHA-256) verified in ScenarioEndpoints.cs")
     print("  ✓ Zero prohibited vocabulary words detected")
-    print("  ✓ Portfolio Master Brief parity verified (dynamic test suite)")
+    if brief_checked:
+        print("  ✓ Portfolio Master Brief parity verified (dynamic test suite)")
+    else:
+        print("  - Portfolio Master Brief check skipped (external file not present in isolated environment)")
     return 0
 
 

@@ -42,18 +42,28 @@ jobs:
         run: terraform -chdir=lakehouse/terraform validate
 
       - name: Setup Databricks CLI
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+        uses: databricks/setup-cli@v0.229.0
 
-      - name: Validate Databricks Asset Bundle (Dev)
+      - name: Validate Databricks Asset Bundle Syntax & Schema
+        run: |
+          python3 -c "
+          import yaml
+          with open('lakehouse/databricks.yml') as f:
+              data = yaml.safe_load(f)
+          assert 'bundle' in data, 'Missing bundle section'
+          assert 'resources' in data, 'Missing resources section'
+          assert 'pipelines' in data['resources'], 'Missing medallion pipeline in resources'
+          assert 'jobs' in data['resources'], 'Missing reverse ETL job in resources'
+          assert 'targets' in data, 'Missing targets definition'
+          print('databricks.yml bundle structure validated successfully.')
+          "
+
+      - name: Validate Databricks Asset Bundle (when credentials configured)
+        if: env.DATABRICKS_TOKEN != ''
         run: |
           cd lakehouse
-          databricks bundle validate -t dev || echo "::warning::Live workspace validation requires cloud credentials; bundle syntax passed."
-
-      - name: Validate Databricks Asset Bundle (Prod)
-        run: |
-          cd lakehouse
-          databricks bundle validate -t prod || echo "::warning::Live workspace validation requires cloud credentials; bundle syntax passed."
+          databricks bundle validate -t dev
+          databricks bundle validate -t prod
 
   lakehouse-tests:
     name: Run Lakehouse Tests & Claims Linter Gate

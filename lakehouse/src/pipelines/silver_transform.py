@@ -71,14 +71,14 @@ def ensure_silver_scenarios_table(
             disposable_ratio DOUBLE NOT NULL,
             sentiment_tag STRING NOT NULL,
             is_valid_positive_find BOOLEAN NOT NULL,
-            _updated_at TIMESTAMP NOT NULL
+            _updated_at TIMESTAMP NOT NULL,
+            CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00),
+            CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)
         )
         USING DELTA
         CLUSTER BY (cip_family, cbsa_code)
         TBLPROPERTIES (
-            'delta.enableChangeDataFeed' = 'true',
-            'delta.minReaderVersion' = '2',
-            'delta.minWriterVersion' = '5'
+            'delta.enableChangeDataFeed' = 'true'
         )
     """)
 
@@ -135,10 +135,12 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
             "rejection_reason",
             F.when(F.col("scenario_id").isNull(), "Missing scenario ID")
             .when(F.col("created_at").isNull(), "Invalid timestamp")
-            .when(F.col("school_id") <= 0, "Invalid school ID")
+            .when(F.col("school_id").isNull() | (F.col("school_id") <= 0), "Invalid school ID")
             .when(F.col("cip_code").isNull(), "Missing CIP code")
             .when(F.col("cbsa_code").isNull(), "Missing CBSA code")
+            .when(F.col("reported_annual_salary").isNull(), "Missing reported annual salary")
             .when(F.col("reported_annual_salary") < 10000.00, "Salary below $10,000 threshold")
+            .when(F.col("monthly_disposable").isNull(), "Missing monthly disposable")
             .when(F.col("monthly_disposable") < -20000.00, "Disposable below -$20,000 floor")
             .otherwise("Unknown validation error")
         )

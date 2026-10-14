@@ -125,22 +125,26 @@ public static partial class ScenarioEndpoints
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress;
 
-        // Fly.io trusted edge proxy header
-        if (httpContext.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp))
+        // Only trust forwarded edge headers when direct TCP connection is loopback (trusted reverse proxy hop)
+        if (remoteIp is not null && System.Net.IPAddress.IsLoopback(remoteIp))
         {
-            var ipStr = flyIp.ToString().Trim();
-            if (System.Net.IPAddress.TryParse(ipStr, out _))
+            // Fly.io trusted edge proxy header
+            if (httpContext.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp))
             {
-                return ipStr;
+                var ipStr = flyIp.ToString().Trim();
+                if (System.Net.IPAddress.TryParse(ipStr, out _))
+                {
+                    return ipStr;
+                }
             }
-        }
 
-        if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
-        {
-            var firstIp = forwardedFor.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstIp) && System.Net.IPAddress.TryParse(firstIp, out _))
+            if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
             {
-                return firstIp;
+                var firstIp = forwardedFor.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+                if (!string.IsNullOrWhiteSpace(firstIp) && System.Net.IPAddress.TryParse(firstIp, out _))
+                {
+                    return firstIp;
+                }
             }
         }
 

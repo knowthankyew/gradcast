@@ -9,8 +9,11 @@ table 'community_scenario_benchmarks'.
 import argparse
 import os
 import sqlite3
-from typing import Optional
-from pyspark.sql import DataFrame, SparkSession
+try:
+    from pyspark.sql import DataFrame, SparkSession
+except ImportError:
+    DataFrame = None  # type: ignore
+    SparkSession = None  # type: ignore
 
 
 SQLITE_BENCHMARK_SCHEMA_DDL = """
@@ -59,13 +62,18 @@ def export_gold_to_sqlite(
     df: DataFrame = spark.sql(query)
     rows = df.collect()
 
-    os.makedirs(os.path.dirname(os.path.abspath(sqlite_db_path)), exist_ok=True)
+    import contextlib
 
-    with sqlite3.connect(sqlite_db_path) as conn:
+    target_dir = os.path.dirname(os.path.abspath(sqlite_db_path))
+    os.makedirs(target_dir, exist_ok=True)
+    tmp_db_path = os.path.join(target_dir, f".tmp_{os.path.basename(sqlite_db_path)}")
+
+    if os.path.exists(tmp_db_path):
+        os.remove(tmp_db_path)
+
+    with contextlib.closing(sqlite3.connect(tmp_db_path)) as conn:
         cursor = conn.cursor()
         cursor.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
-
-        cursor.execute("DELETE FROM community_scenario_benchmarks;")
 
         insert_sql = """
             INSERT INTO community_scenario_benchmarks (
@@ -96,6 +104,9 @@ def export_gold_to_sqlite(
 
         # Run vacuum for maximum edge read performance and minimum file size
         cursor.execute("VACUUM;")
+
+    # Atomically replace published edge database
+    os.replace(tmp_db_path, sqlite_db_path)
 
     return len(records)
 

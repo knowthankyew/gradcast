@@ -56,6 +56,22 @@ def ingest_shared_scenarios_batch(
         )
     )
 
+    # Ensure target table exists upfront with appendOnly property
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {target_table} (
+            raw_payload STRING NOT NULL,
+            ingest_timestamp TIMESTAMP NOT NULL,
+            source_system STRING NOT NULL,
+            file_name STRING NOT NULL,
+            file_offset BIGINT NOT NULL
+        )
+        USING DELTA
+        TBLPROPERTIES (
+            'delta.appendOnly' = 'true',
+            'delta.autoOptimize.optimizeWrite' = 'true'
+        )
+    """)
+
     (
         bronze_df.write
         .format("delta")
@@ -63,15 +79,6 @@ def ingest_shared_scenarios_batch(
         .option("mergeSchema", "false")
         .saveAsTable(target_table)
     )
-
-    # Enforce appendOnly on the table properties
-    spark.sql(f"""
-        ALTER TABLE {target_table}
-        SET TBLPROPERTIES (
-            'delta.appendOnly' = 'true',
-            'delta.autoOptimize.optimizeWrite' = 'true'
-        )
-    """)
 
     return bronze_df
 
@@ -134,13 +141,30 @@ def ingest_college_scorecard_csv(
             F.col("INSTNM").alias("instnm"),
             F.col("CIPCODE").alias("cipcode"),
             F.col("CREDLEV").alias("credential_level"),
-            F.col("MD_EARN_WNE_P10").alias("earnings_1yr"),
+            F.col("MD_EARN_WNE_P10").alias("earnings_10yr"),
             F.col("MD_EARN_WNE_P4").alias("earnings_4yr"),
             F.col("DEBT_MDN").alias("debt_median"),
             F.lit(report_year).cast("int").alias("report_year"),
             F.current_timestamp().alias("_ingest_time"),
         )
     )
+
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {target_table} (
+            unitid STRING,
+            opeid STRING,
+            instnm STRING,
+            cipcode STRING,
+            credential_level STRING,
+            earnings_10yr STRING,
+            earnings_4yr STRING,
+            debt_median STRING,
+            report_year INT,
+            _ingest_time TIMESTAMP
+        )
+        USING DELTA
+        TBLPROPERTIES ('delta.appendOnly' = 'true')
+    """)
 
     (
         scorecard_df.write

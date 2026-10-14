@@ -28,7 +28,7 @@ resources:
   pipelines:
     gradcast_medallion_pipeline:
       name: "[${bundle.target}] GradCast Medallion Pipeline"
-      target: "${var.catalog_name}.silver"
+      schema: silver
       catalog: "${var.catalog_name}"
       continuous: false
       development: false

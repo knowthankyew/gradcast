@@ -17,6 +17,7 @@ def create_k_anonymity_views(
     """
     Create or replace the public reporting view enforcing k-anonymity (k >= 5).
     """
+    effective_min_k = max(min_cohort_size, 5)
     view_sql = f"""
         CREATE OR REPLACE VIEW {catalog}.gold.v_public_positive_finds AS
         SELECT 
@@ -39,7 +40,7 @@ def create_k_anonymity_views(
             p.cip_family, 
             f.credential_level,
             f.housing_type
-        HAVING COUNT(*) >= {min_cohort_size};
+        HAVING COUNT(*) >= {effective_min_k};
     """
     spark.sql(view_sql)
 
