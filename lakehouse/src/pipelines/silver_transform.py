@@ -170,7 +170,13 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
     quarantine_df = (
         parsed_df
         .filter(~is_valid_cond)
-        .drop("raw_payload")
+        .withColumn(
+            "quarantine_id",
+            F.coalesce(
+                F.col("scenario_id"),
+                F.sha2(F.coalesce(F.col("raw_payload"), F.lit("corrupt_record")), 256)
+            )
+        )
         .withColumn(
             "rejection_reason",
             F.when(F.col("scenario_id").isNull(), "Missing scenario ID")
@@ -205,11 +211,12 @@ def persist_quarantine_scenarios(
 ) -> None:
     """
     Persist quarantined scenarios into a dedicated audit table without failing the pipeline.
-    Strips raw payload and client identifiers to preserve zero-PII cloud invariants.
-    Idempotent: merges on scenario_id to prevent duplicate rows on re-runs.
+    Preserves raw payload for forensic investigation while maintaining zero-PII cloud invariants.
+    Idempotent: merges on surrogate quarantine_id to prevent duplicate rows on re-runs.
     """
     spark.sql(f"""
         CREATE TABLE IF NOT EXISTS {target_table} (
+            quarantine_id STRING NOT NULL,
             scenario_id STRING,
             created_at TIMESTAMP,
             school_id INT,
@@ -226,6 +233,7 @@ def persist_quarantine_scenarios(
             monthly_disposable DECIMAL(10, 2),
             disposable_ratio DOUBLE,
             sentiment_tag STRING,
+            raw_payload STRING,
             rejection_reason STRING NOT NULL,
             quarantined_at TIMESTAMP NOT NULL
         )
@@ -233,37 +241,54 @@ def persist_quarantine_scenarios(
     """)
 
     clean_cols = [
-        "scenario_id", "created_at", "school_id", "cip_code", "cip_family",
+        "quarantine_id", "scenario_id", "created_at", "school_id", "cip_code", "cip_family",
         "credential_level", "cbsa_code", "housing_type", "salary_mode",
         "reported_annual_salary", "monthly_net_take_home", "monthly_rent",
         "monthly_loan_payment", "monthly_disposable", "disposable_ratio",
-        "sentiment_tag", "rejection_reason", "quarantined_at"
+        "sentiment_tag", "raw_payload", "rejection_reason", "quarantined_at"
     ]
-    to_persist = quarantine_df.select(*[F.col(c) for c in clean_cols if c in quarantine_df.columns]).dropDuplicates(["scenario_id"])
+    to_persist = quarantine_df.select(*[F.col(c) for c in clean_cols if c in quarantine_df.columns]).dropDuplicates(["quarantine_id"])
     to_persist.createOrReplaceTempView("stage_quarantine_scenarios")
 
     spark.sql(f"""
         MERGE INTO {target_table} AS target
         USING stage_quarantine_scenarios AS source
-        ON target.scenario_id = source.scenario_id
+        ON target.quarantine_id = source.quarantine_id
         WHEN MATCHED THEN
             UPDATE SET
+                target.scenario_id = source.scenario_id,
+                target.created_at = source.created_at,
+                target.school_id = source.school_id,
+                target.cip_code = source.cip_code,
+                target.cip_family = source.cip_family,
+                target.credential_level = source.credential_level,
+                target.cbsa_code = source.cbsa_code,
+                target.housing_type = source.housing_type,
+                target.salary_mode = source.salary_mode,
+                target.reported_annual_salary = source.reported_annual_salary,
+                target.monthly_net_take_home = source.monthly_net_take_home,
+                target.monthly_rent = source.monthly_rent,
+                target.monthly_loan_payment = source.monthly_loan_payment,
+                target.monthly_disposable = source.monthly_disposable,
+                target.disposable_ratio = source.disposable_ratio,
+                target.sentiment_tag = source.sentiment_tag,
+                target.raw_payload = source.raw_payload,
                 target.rejection_reason = source.rejection_reason,
                 target.quarantined_at = source.quarantined_at
         WHEN NOT MATCHED THEN
             INSERT (
-                scenario_id, created_at, school_id, cip_code, cip_family,
+                quarantine_id, scenario_id, created_at, school_id, cip_code, cip_family,
                 credential_level, cbsa_code, housing_type, salary_mode,
                 reported_annual_salary, monthly_net_take_home, monthly_rent,
                 monthly_loan_payment, monthly_disposable, disposable_ratio,
-                sentiment_tag, rejection_reason, quarantined_at
+                sentiment_tag, raw_payload, rejection_reason, quarantined_at
             )
             VALUES (
-                source.scenario_id, source.created_at, source.school_id, source.cip_code, source.cip_family,
+                source.quarantine_id, source.scenario_id, source.created_at, source.school_id, source.cip_code, source.cip_family,
                 source.credential_level, source.cbsa_code, source.housing_type, source.salary_mode,
                 source.reported_annual_salary, source.monthly_net_take_home, source.monthly_rent,
                 source.monthly_loan_payment, source.monthly_disposable, source.disposable_ratio,
-                source.sentiment_tag, source.rejection_reason, source.quarantined_at
+                source.sentiment_tag, source.raw_payload, source.rejection_reason, source.quarantined_at
             )
     """)
 
@@ -354,7 +379,17 @@ def run_silver_pipeline(
     ensure_silver_scenarios_table(spark, table_name=tgt)
     raw_df = spark.table(src)
     if since_timestamp:
-        raw_df = raw_df.filter(F.col("ingest_timestamp") > F.to_timestamp(F.lit(since_timestamp)))
+        if hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
+            raw_df = raw_df.filter(F.col("ingest_timestamp") > F.to_timestamp(F.lit(since_timestamp)))
+    else:
+        # Incremental watermarking: determine last processed timestamp from target table if available
+        try:
+            max_ts_df = spark.sql(f"SELECT MAX(_updated_at) AS max_ts FROM {tgt}").collect()
+            if max_ts_df and max_ts_df[0]["max_ts"] is not None and hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
+                max_ts = max_ts_df[0]["max_ts"]
+                raw_df = raw_df.filter(F.col("ingest_timestamp") > F.lit(max_ts))
+        except Exception:
+            pass
 
     valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
     persist_quarantine_scenarios(spark, quarantine_df, target_table=quar)

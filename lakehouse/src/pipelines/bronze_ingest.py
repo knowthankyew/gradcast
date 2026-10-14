@@ -202,12 +202,19 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run Bronze Ingest Pipeline")
     parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
-    parser.add_argument("--source-path", default=None, help="Optional raw landing source path")
+    parser.add_argument("--source-path", default=None, help="Raw landing source path")
     args = parser.parse_args()
 
     spark = SparkSession.builder.appName("BronzeIngest").getOrCreate()
     target_table = f"{args.catalog}.bronze.shared_scenarios"
     ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
-    if args.source_path:
-        ingest_shared_scenarios_batch(spark, source_path=args.source_path, target_table=target_table)
+
+    source_path = args.source_path or f"/Volumes/{args.catalog}/bronze/raw_landing"
+    try:
+        ingest_shared_scenarios_batch(spark, source_path=source_path, target_table=target_table)
+        print(f"Bronze Ingest batch ingested from {source_path} into {target_table}.")
+    except Exception as exc:
+        if args.source_path:
+            raise
+        print(f"Notice: Default source landing path '{source_path}' not accessible or empty: {exc}")
     print(f"Bronze Ingest pipeline executed successfully for {target_table}.")

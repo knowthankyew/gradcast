@@ -47,6 +47,8 @@ resources:
             parameters:
               - "--catalog"
               - "${var.catalog_name}"
+              - "--source-path"
+              - "/Volumes/${var.catalog_name}/bronze/raw_landing"
           job_cluster_key: general_worker
 
         - task_key: run_silver_transformation

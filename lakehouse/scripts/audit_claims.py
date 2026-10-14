@@ -34,6 +34,7 @@ EXPECTED_SCHEMA_TABLES = [
     ("bronze.shared_scenarios", REPO_ROOT / "lakehouse/src/pipelines/bronze_ingest.py"),
     ("bronze.college_scorecard", REPO_ROOT / "lakehouse/src/pipelines/bronze_ingest.py"),
     ("silver.scenarios", REPO_ROOT / "lakehouse/src/pipelines/silver_transform.py"),
+    ("quarantine.scenarios_rejected", REPO_ROOT / "lakehouse/src/pipelines/silver_transform.py"),
     ("gold.dim_school", REPO_ROOT / "lakehouse/src/pipelines/gold_modeling.py"),
     ("gold.dim_metro", REPO_ROOT / "lakehouse/src/pipelines/gold_modeling.py"),
     ("gold.dim_program", REPO_ROOT / "lakehouse/src/pipelines/gold_modeling.py"),
@@ -44,26 +45,79 @@ EXPECTED_SCHEMA_TABLES = [
 
 
 def audit_schema_parity(errors: List[str]) -> None:
-    """Verify that all tables declared in SCHEMA.md exist in source code."""
+    """
+    Verify schema and DDL parity between docs/SCHEMA.md and source code:
+    1. Parses CREATE TABLE DDL blocks from docs/SCHEMA.md.
+    2. Validates that every table, column set, and CLUSTER BY key matches source code DDLs.
+    """
     schema_doc = REPO_ROOT / "docs" / "SCHEMA.md"
     if not schema_doc.is_file():
         errors.append(f"Missing schema document: {schema_doc}")
         return
 
     schema_content = schema_doc.read_text(encoding="utf-8")
+    content_clean = re.sub(r"--.*$", "", schema_content, flags=re.MULTILINE)
 
-    for table_name, source_file in EXPECTED_SCHEMA_TABLES:
-        if table_name not in schema_content:
-            errors.append(f"Table '{table_name}' declared in expectations but missing in docs/SCHEMA.md")
+    ddl_pattern = re.compile(
+        r"CREATE TABLE\s+(?:IF NOT EXISTS\s+)?([\"`\w\.]+)\s*\((.*?)\)\s*([^\n;]*?(?:USING DELTA|CLUSTER BY|TBLPROPERTIES)[^;]*)?;",
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    parsed_tables = {}
+    for match in ddl_pattern.finditer(content_clean):
+        raw_tbl = match.group(1).replace('"', "").replace("`", "")
+        parts = raw_tbl.split(".")
+        norm_key = ".".join(parts[-2:]) if len(parts) >= 2 else parts[0]
+
+        cols_body = match.group(2)
+        trailer = match.group(3) or ""
+
+        cols = []
+        for line in cols_body.strip().splitlines():
+            line = line.strip()
+            if not line or line.upper().startswith("CONSTRAINT") or line.upper().startswith("PRIMARY KEY"):
+                continue
+            col_m = re.match(r'["`]?([a-zA-Z0-9_]+)["`]?\s+', line)
+            if col_m:
+                cols.append(col_m.group(1))
+
+        cluster_m = re.search(r"CLUSTER BY\s*\(([^\)]+)\)", trailer, re.IGNORECASE)
+        cluster_keys = [k.strip() for k in cluster_m.group(1).split(",")] if cluster_m else []
+
+        parsed_tables[norm_key] = {
+            "full_name": raw_tbl,
+            "columns": cols,
+            "cluster_keys": cluster_keys,
+        }
+
+    for table_spec, source_file in EXPECTED_SCHEMA_TABLES:
+        if table_spec not in schema_content:
+            errors.append(f"Table '{table_spec}' declared in expectations but missing in docs/SCHEMA.md")
 
         if not source_file.is_file():
-            errors.append(f"Expected source file missing for table '{table_name}': {source_file}")
+            errors.append(f"Expected source file missing for table '{table_spec}': {source_file}")
             continue
 
         source_content = source_file.read_text(encoding="utf-8")
-        clean_table_name = table_name.split(".")[-1]
+        clean_table_name = table_spec.split(".")[-1]
         if clean_table_name not in source_content:
-            errors.append(f"Table '{clean_table_name}' declared in docs/SCHEMA.md but missing in {source_file.relative_to(REPO_ROOT)}")
+            errors.append(
+                f"Table '{clean_table_name}' declared in docs/SCHEMA.md but missing in {source_file.relative_to(REPO_ROOT)}"
+            )
+
+        # Deep DDL validation: verify column definitions and CLUSTER BY keys
+        spec = parsed_tables.get(table_spec)
+        if spec:
+            for col in spec["columns"]:
+                if not re.search(rf"\b{col}\b", source_content):
+                    errors.append(
+                        f"Schema parity mismatch: Column '{col}' of table '{table_spec}' not found in {source_file.relative_to(REPO_ROOT)}"
+                    )
+            for k in spec["cluster_keys"]:
+                if not re.search(rf"CLUSTER BY[^\;]*\b{k}\b", source_content, re.IGNORECASE):
+                    errors.append(
+                        f"Clustering key parity mismatch: Table '{table_spec}' expects CLUSTER BY '{k}' in {source_file.relative_to(REPO_ROOT)}"
+                    )
 
 
 def audit_privacy_invariants(errors: List[str]) -> None:
@@ -188,7 +242,7 @@ def main() -> int:
         return 1
 
     print("\n[PASS] Audit gates passed cleanly:")
-    print("  ✓ Schema & DDL parity verified across 10 tables/views")
+    print(f"  ✓ Schema & DDL parity verified across {len(EXPECTED_SCHEMA_TABLES)} tables/views")
     print("  ✓ Hard k-anonymity invariant (k >= 5) verified in views.py")
     print("  ✓ Client privacy hash (SHA-256) verified in ScenarioEndpoints.cs")
     print("  ✓ Zero prohibited vocabulary words detected")

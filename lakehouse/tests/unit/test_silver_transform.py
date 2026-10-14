@@ -178,22 +178,32 @@ class TestSilverTransform(unittest.TestCase):
                 # 5. Severe negative disposable floor record
                 ('{"id": "invalid-neg-floor", "created_at": "2026-10-14T12:00:00Z", "school_id": 101, "cip_code": "11.0701", "credential_level": 3, "cbsa_code": "41860", "housing_type": "alone", "salary_mode": "scorecard_median", "reported_annual_salary": 30000.00, "monthly_net_take_home": 2000.00, "monthly_rent": 1800.00, "monthly_loan_payment": 450.00, "monthly_disposable": -25000.00, "disposable_ratio": -12.5, "sentiment_tag": "stressed", "scenario_title": "Extreme Debt", "client_hash": "hash5"}',),
                 # 6. Malformed CIP code
-                ('{"id": "invalid-malformed-cip", "created_at": "2026-10-14T12:00:00Z", "school_id": 101, "cip_code": "x", "credential_level": 3, "cbsa_code": "41860", "housing_type": "alone", "salary_mode": "scorecard_median", "reported_annual_salary": 70000.00, "monthly_net_take_home": 4500.00, "monthly_rent": 1800.00, "monthly_loan_payment": 450.00, "monthly_disposable": 2250.00, "disposable_ratio": 0.5, "sentiment_tag": "comfortable", "scenario_title": "Bad CIP", "client_hash": "hash6"}',)
+                ('{"id": "invalid-malformed-cip", "created_at": "2026-10-14T12:00:00Z", "school_id": 101, "cip_code": "x", "credential_level": 3, "cbsa_code": "41860", "housing_type": "alone", "salary_mode": "scorecard_median", "reported_annual_salary": 70000.00, "monthly_net_take_home": 4500.00, "monthly_rent": 1800.00, "monthly_loan_payment": 450.00, "monthly_disposable": 2250.00, "disposable_ratio": 0.5, "sentiment_tag": "comfortable", "scenario_title": "Bad CIP", "client_hash": "hash6"}',),
+                # 7. Unparseable non-JSON record (null scenario_id)
+                ('not valid json payload at all',)
             ]
             raw_df = spark.createDataFrame(test_data, ["raw_payload"])
             valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
             self.assertEqual(valid_df.count(), 1)
-            self.assertEqual(quarantine_df.count(), 5)
+            self.assertEqual(quarantine_df.count(), 6)
             valid_row = valid_df.collect()[0]
             self.assertEqual(valid_row.scenario_id, "valid-1")
             self.assertEqual(valid_row.cip_family, "11")
 
-            reasons = {r.scenario_id: r.rejection_reason for r in quarantine_df.collect()}
+            quarantined_rows = quarantine_df.collect()
+            reasons = {r.scenario_id: r.rejection_reason for r in quarantined_rows if r.scenario_id is not None}
             self.assertIn("Salary below $10,000 threshold", reasons["invalid-low-salary"])
             self.assertIn("Missing reported annual salary", reasons["invalid-null-salary"])
             self.assertIn("Missing monthly disposable", reasons["invalid-null-disp"])
             self.assertIn("Disposable below -$20,000 floor", reasons["invalid-neg-floor"])
             self.assertIn("Invalid or unparseable CIP code", reasons["invalid-malformed-cip"])
+
+            # Verify unparseable record has valid surrogate quarantine_id and preserved raw_payload
+            corrupt_row = next(r for r in quarantined_rows if r.scenario_id is None)
+            self.assertIsNotNone(corrupt_row.quarantine_id)
+            self.assertEqual(len(corrupt_row.quarantine_id), 64)  # SHA-256 hash length
+            self.assertEqual(corrupt_row.raw_payload, "not valid json payload at all")
+            self.assertEqual(corrupt_row.rejection_reason, "Missing scenario ID")
         finally:
             spark.stop()
 

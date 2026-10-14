@@ -213,6 +213,34 @@ TBLPROPERTIES (
 );
 ```
 
+#### Table: `gradcast_lakehouse.quarantine.scenarios_rejected`
+Quarantine table capturing unparseable or out-of-boundary submissions with rejection diagnostics. Retains raw payload for forensic debugging while generating a deterministic surrogate key (`quarantine_id`) for deduplication.
+```sql
+CREATE TABLE IF NOT EXISTS gradcast_lakehouse.quarantine.scenarios_rejected (
+    quarantine_id STRING NOT NULL,
+    scenario_id STRING,
+    created_at TIMESTAMP,
+    school_id INT,
+    cip_code STRING,
+    cip_family STRING,
+    credential_level INT,
+    cbsa_code STRING,
+    housing_type STRING,
+    salary_mode STRING,
+    reported_annual_salary DECIMAL(12, 2),
+    monthly_net_take_home DECIMAL(10, 2),
+    monthly_rent DECIMAL(10, 2),
+    monthly_loan_payment DECIMAL(10, 2),
+    monthly_disposable DECIMAL(10, 2),
+    disposable_ratio DOUBLE,
+    sentiment_tag STRING,
+    raw_payload STRING,
+    rejection_reason STRING NOT NULL,
+    quarantined_at TIMESTAMP NOT NULL
+)
+USING DELTA;
+```
+
 #### Table: `gradcast_lakehouse.silver.programs`
 Conformed program master table integrating historic Scorecard median earnings.
 ```sql
