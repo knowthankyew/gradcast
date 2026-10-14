@@ -400,9 +400,9 @@ HAVING COUNT(*) >= 5; -- Invariant: Hard k-anonymity boundary
 A daily scheduled PySpark job executes the following query and writes the output directly into a SQLite database file:
 
 ```python
-# scripts/export_gold_to_sqlite.py
-def export_gold_to_sqlite(spark, sqlite_db_path: str):
-    df = spark.sql("""
+# lakehouse/src/pipelines/export_sqlite.py
+def export_gold_to_sqlite(spark, sqlite_db_path: str, catalog: str = "gradcast_lakehouse") -> int:
+    df = spark.sql(f"""
         SELECT 
             cip_family,
             cbsa_code,
@@ -412,21 +412,25 @@ def export_gold_to_sqlite(spark, sqlite_db_path: str):
             CAST(p25_disposable AS INT) AS p25_monthly_disposable,
             CAST(median_disposable AS INT) AS median_monthly_disposable,
             CAST(p75_disposable AS INT) AS p75_monthly_disposable,
-            NULL AS top_contributing_school_id,
-            CURRENT_TIMESTAMP() AS last_updated_at
-        FROM gradcast_lakehouse.gold.v_public_positive_finds
+            CAST(NULL AS INT) AS top_contributing_school_id,
+            DATE_FORMAT(TO_UTC_TIMESTAMP(CURRENT_TIMESTAMP(), CURRENT_TIMEZONE()), "yyyy-MM-dd'T'HH:mm:ss'Z'") AS last_updated_at
+        FROM {catalog}.gold.v_public_positive_finds
     """)
+    rows = df.collect()
     
-    # Write to local SQLite staging file via pandas / sqlite3 connector
-    pandas_df = df.toPandas()
-    import sqlite3
-    with sqlite3.connect(sqlite_db_path) as conn:
-        pandas_df.to_sql(
-            "community_scenario_benchmarks", 
-            conn, 
-            if_exists="replace", 
-            index=False
-        )
+    # Compile into local scratch SQLite database with explicit schema and covering index
+    with tempfile.TemporaryDirectory() as scratch_dir:
+        local_db_path = os.path.join(scratch_dir, "compiled_benchmarks.db")
+        with sqlite3.connect(local_db_path) as conn:
+            conn.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
+            conn.executemany(INSERT_BENCHMARKS_SQL, records)
+            conn.commit()
+            conn.execute("VACUUM;")
+        
+        # Atomically replace live SQLite database via staged temporary file
+        tmp_target = os.path.join(os.path.dirname(sqlite_db_path), f".tmp_{os.path.basename(sqlite_db_path)}")
+        shutil.copyfile(local_db_path, tmp_target)
+        os.replace(tmp_target, sqlite_db_path)
 ```
 
 ---

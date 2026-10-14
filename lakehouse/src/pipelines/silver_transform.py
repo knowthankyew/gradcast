@@ -368,50 +368,58 @@ def ensure_watermark_table(spark: SparkSession, catalog: str) -> None:
     spark.sql(f"""
         CREATE TABLE IF NOT EXISTS {catalog}.control.pipeline_watermarks (
             pipeline_name STRING NOT NULL,
-            last_ingest_timestamp TIMESTAMP NOT NULL,
+            last_commit_version BIGINT,
+            last_ingest_timestamp TIMESTAMP,
             updated_at TIMESTAMP NOT NULL
         )
         USING DELTA
     """)
 
 
-def get_pipeline_watermark(spark: SparkSession, catalog: str, pipeline_name: str = "silver_transform") -> Optional[Any]:
-    """Retrieve the high-watermark timestamp previously committed for this pipeline."""
+def get_pipeline_watermark(
+    spark: SparkSession, catalog: str, pipeline_name: str = "silver_transform"
+) -> Tuple[Optional[int], Optional[Any]]:
+    """Retrieve the high-watermark Delta commit version and timestamp previously committed for this pipeline."""
     ensure_watermark_table(spark, catalog)
     row = spark.sql(f"""
-        SELECT MAX(last_ingest_timestamp) AS watermark
+        SELECT MAX(last_commit_version) AS last_version, MAX(last_ingest_timestamp) AS watermark
         FROM {catalog}.control.pipeline_watermarks
         WHERE pipeline_name = '{pipeline_name}'
     """).collect()
-    if row and row[0]["watermark"] is not None:
-        return row[0]["watermark"]
-    return None
+    if row:
+        return row[0]["last_version"], row[0]["watermark"]
+    return None, None
 
 
 def commit_pipeline_watermark(
     spark: SparkSession,
     catalog: str,
-    max_ingest_timestamp: Any,
+    last_commit_version: Optional[int] = None,
+    max_ingest_timestamp: Optional[Any] = None,
     pipeline_name: str = "silver_transform",
 ) -> None:
-    """Idempotently persist high-watermark Bronze ingest_timestamp."""
+    """Idempotently persist high-watermark Delta commit version and Bronze ingest_timestamp."""
     ensure_watermark_table(spark, catalog)
+    version_sql = "NULL" if last_commit_version is None else str(int(last_commit_version))
+    ts_sql = "NULL" if max_ingest_timestamp is None else f"CAST('{max_ingest_timestamp}' AS TIMESTAMP)"
     spark.sql(f"""
         MERGE INTO {catalog}.control.pipeline_watermarks AS target
         USING (
             SELECT 
                 '{pipeline_name}' AS pipeline_name,
-                CAST('{max_ingest_timestamp}' AS TIMESTAMP) AS last_ingest_timestamp,
+                {version_sql} AS last_commit_version,
+                {ts_sql} AS last_ingest_timestamp,
                 CURRENT_TIMESTAMP() AS updated_at
         ) AS source
         ON target.pipeline_name = source.pipeline_name
         WHEN MATCHED THEN
             UPDATE SET 
+                target.last_commit_version = source.last_commit_version,
                 target.last_ingest_timestamp = source.last_ingest_timestamp,
                 target.updated_at = source.updated_at
         WHEN NOT MATCHED THEN
-            INSERT (pipeline_name, last_ingest_timestamp, updated_at)
-            VALUES (source.pipeline_name, source.last_ingest_timestamp, source.updated_at)
+            INSERT (pipeline_name, last_commit_version, last_ingest_timestamp, updated_at)
+            VALUES (source.pipeline_name, source.last_commit_version, source.last_ingest_timestamp, source.updated_at)
     """)
 
 
@@ -421,26 +429,56 @@ def run_silver_pipeline(
     source_table: Optional[str] = None,
     target_table: Optional[str] = None,
     quarantine_table: Optional[str] = None,
+    since_version: Optional[int] = None,
     since_timestamp: Optional[str] = None,
 ) -> None:
-    """Execute complete Silver Medallion ingestion, quarantine, and conformed MERGE."""
+    """
+    Execute complete Silver Medallion ingestion, quarantine, and conformed MERGE.
+    Uses Delta table versions or Change Data Feed to read newly committed Bronze batches incrementally,
+    guaranteeing that rows committed concurrently or sharing identical timestamps are processed.
+    """
     src = source_table or f"{catalog}.bronze.shared_scenarios"
     tgt = target_table or f"{catalog}.silver.scenarios"
     quar = quarantine_table or f"{catalog}.quarantine.scenarios_rejected"
 
     ensure_silver_scenarios_table(spark, table_name=tgt)
-    raw_df = spark.table(src)
 
-    # Resolve watermark against Bronze ingest_timestamp (same clock)
-    effective_watermark = since_timestamp
-    if not effective_watermark:
+    # Determine watermark via Delta commit version or timestamp
+    last_version = since_version
+    last_ts = None
+    if last_version is None:
         try:
-            effective_watermark = get_pipeline_watermark(spark, catalog, pipeline_name="silver_transform")
+            last_version, last_ts = get_pipeline_watermark(spark, catalog, pipeline_name="silver_transform")
         except Exception as e:
             print(f"Notice: Pipeline watermark lookup skipped: {e}")
 
-    if effective_watermark and hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
-        raw_df = raw_df.filter(F.col("ingest_timestamp") > F.to_timestamp(F.lit(effective_watermark)))
+    # Inspect current Delta table history to discover latest commit version
+    latest_table_version = None
+    try:
+        history_rows = spark.sql(f"DESCRIBE HISTORY {src} LIMIT 1").collect()
+        if history_rows and history_rows[0]["version"] is not None:
+            latest_table_version = int(history_rows[0]["version"])
+    except Exception:
+        pass
+
+    # Incremental Delta table version read
+    if last_version is not None and latest_table_version is not None:
+        start_version = last_version + 1
+        if start_version > latest_table_version:
+            print(f"Notice: No new commits in {src} (current version {latest_table_version} <= watermark {last_version}).")
+            return
+        raw_df = (
+            spark.read.format("delta")
+            .option("startingVersion", start_version)
+            .option("endingVersion", latest_table_version)
+            .table(src)
+        )
+    else:
+        raw_df = spark.table(src)
+        effective_ts = since_timestamp or last_ts
+        if effective_ts and hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
+            # Fallback timestamp filter using inclusive boundary for backfills
+            raw_df = raw_df.filter(F.col("ingest_timestamp") >= F.to_timestamp(F.lit(effective_ts)))
 
     # Capture the maximum Bronze ingest_timestamp of the current batch (covering valid & quarantined rows)
     batch_max_ts = None
@@ -457,9 +495,15 @@ def run_silver_pipeline(
     merge_scenarios_into_silver(spark, valid_df, target_table=tgt)
 
     # Advance pipeline high watermark upon successful commit of both Silver and Quarantine
-    if batch_max_ts is not None:
+    commit_version = latest_table_version if latest_table_version is not None else last_version
+    if commit_version is not None or batch_max_ts is not None:
         try:
-            commit_pipeline_watermark(spark, catalog, batch_max_ts, pipeline_name="silver_transform")
+            commit_pipeline_watermark(
+                spark, catalog,
+                last_commit_version=commit_version,
+                max_ingest_timestamp=batch_max_ts,
+                pipeline_name="silver_transform"
+            )
         except Exception as e:
             print(f"Notice: Failed to persist high watermark: {e}")
 
@@ -468,9 +512,15 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Run Silver Transform Pipeline")
     parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    parser.add_argument("--since-version", type=int, default=None, help="Optional Delta commit version for incremental processing")
     parser.add_argument("--since-timestamp", default=None, help="Optional ISO watermark for incremental processing")
     args = parser.parse_args()
 
     spark = SparkSession.builder.appName("SilverTransform").getOrCreate()
-    run_silver_pipeline(spark, catalog=args.catalog, since_timestamp=args.since_timestamp)
+    run_silver_pipeline(
+        spark,
+        catalog=args.catalog,
+        since_version=args.since_version,
+        since_timestamp=args.since_timestamp,
+    )
     print("Silver Transform pipeline executed successfully.")

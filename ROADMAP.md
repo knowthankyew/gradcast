@@ -93,7 +93,7 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-01 in /Users/cl0rkster/Dev/gradcast.
+Implement Story GC-LAKE-01 in the repository root.
 1. Add the "shared_scenarios" table definition to the SQLite database schema in accordance with docs/SCHEMA.md.
 2. Create src/api/Models/SharedScenario.cs with required validation attributes.
 3. Create src/api/Data/ScenarioRepository.cs using Dapper for inserting and querying scenarios.
@@ -138,7 +138,7 @@ To establish Databricks as the enterprise Single Source of Truth, all Lakehouse 
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-02 under /Users/cl0rkster/Dev/gradcast/lakehouse.
+Implement Story GC-LAKE-02 under lakehouse/.
 1. Create directory structure: lakehouse/terraform/ and lakehouse/src/.
 2. Write lakehouse/terraform/main.tf with provider "databricks" (>= 1.40.0).
 3. Write lakehouse/terraform/unity_catalog.tf declaring catalog "gradcast_lakehouse" and schemas "bronze", "silver", "gold".
@@ -181,7 +181,7 @@ The Lakehouse ingests two streams: high-volume public reference data (College Sc
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-03 in /Users/cl0rkster/Dev/gradcast/lakehouse/src/pipelines/.
+Implement Story GC-LAKE-03 in lakehouse/src/pipelines/.
 1. Write bronze_ingest.py implementing PySpark batch/streaming ingestion for raw scenario JSON and Scorecard CSV into bronze.shared_scenarios and bronze.college_scorecard.
 2. Write silver_transform.py performing:
    - Data validation and casting to decimal types.
@@ -224,7 +224,7 @@ To prevent user re-identification and supply GradCast's public edge tier with fr
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-04 in /Users/cl0rkster/Dev/gradcast/lakehouse/src/pipelines/.
+Implement Story GC-LAKE-04 in lakehouse/src/pipelines/.
 1. Write gold_modeling.py to populate fact_scenario_outcomes and dimensions (dim_school, dim_program, dim_metro).
 2. Create views.py implementing v_public_positive_finds with the strict HAVING COUNT(*) >= 5 filter from docs/SCHEMA.md.
 3. Write export_sqlite.py to query v_public_positive_finds and write community_scenario_benchmarks into a standalone SQLite DB using Python's sqlite3 and pandas/DuckDB.
@@ -264,7 +264,7 @@ Enterprise single sources of truth require continuous data quality verification.
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-05 in /Users/cl0rkster/Dev/gradcast/lakehouse/src/quality/.
+Implement Story GC-LAKE-05 in lakehouse/src/quality/.
 1. Write expectations.py implementing data quality rules using PySpark / DLT expectations or Great Expectations.
 2. Define expectations for salary boundaries, valid CIP codes, and non-empty metro mappings.
 3. Write an quarantine router directing failed records to silver_quarantine with error classification.
@@ -304,7 +304,7 @@ A core requirement for lead/architect roles at companies like Google is rigorous
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-06 in /Users/cl0rkster/Dev/gradcast/lakehouse/tests/.
+Implement Story GC-LAKE-06 in lakehouse/tests/.
 1. Setup pytest configuration with conftest.py providing a local SparkSession with Delta Lake packages configured.
 2. Install chispa and write unit tests for:
    - Deduplication and Liquid Clustering key derivation in silver_transform.py.
@@ -347,7 +347,7 @@ To ensure the codebase, documentation, schemas, and CI supply chain remain in ab
 
 ### AI Coder Execution Prompt
 ```text
-Implement Story GC-LAKE-07 in /Users/cl0rkster/Dev/gradcast.
+Implement Story GC-LAKE-07 in the repository root.
 1. Create lakehouse/scripts/audit_claims.py adapting the portfolio pattern from mac-screen-record and ml/scripts/sync_docs.py:
    - Parse docs/SCHEMA.md and verify all tables/columns exist in pipeline DDL.
    - Check that the k >= 5 filter is present in views.py.

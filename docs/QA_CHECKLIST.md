@@ -182,8 +182,9 @@ dotnet run --project src/api
 Here are interesting avenues to explore if you want to push boundaries:
 
 1. **Anti-Abuse Rate Limiting Stress Test**:
-   * Loop `curl` 55 times to `POST /api/scenarios/share`.
+   * Loop `curl` 55 times to `POST /api/scenarios/share` from the same client IP without rotating headers.
    * Verify that starting around submission #51, the API begins rejecting requests with `HTTP 429 Too Many Requests` (`"Daily scenario share limit reached for this client"`).
+   * *Architecture Note*: Local development trusts `X-Forwarded-For` from loopback hops (`127.0.0.1` / `::1`); production on Fly.io only trusts forwarded proxy headers from the internal WireGuard network (`fdaa::/16`), ensuring external untrusted clients cannot bypass limits by rotating headers.
 2. **Reverse-ETL SQLite Compilation**:
    * Run `python3 lakehouse/src/pipelines/export_sqlite.py --help`.
    * Inspect [`lakehouse/tests/e2e/test_reverse_etl.py`](../lakehouse/tests/e2e/test_reverse_etl.py) to see how SQLite tables are built and indexed directly from aggregated DataFrames.

@@ -236,7 +236,8 @@ def audit_portfolio_master_brief(errors: List[str]) -> bool:
         method_blocks = re.split(r"(?=\[Theory)", code)
         non_inline_theories = 0
         for block in method_blocks[1:]:
-            header = block.split("public async")[0].split("public void")[0]
+            match = re.search(r"public\s+(?:async\s+)?(?:void|Task(?:\<[^>]+\>)?)\s+\w+\s*\(", block)
+            header = block[:match.start()] if match else block
             if "[InlineData" not in header:
                 non_inline_theories += 1
         theory_count += inline_cases + non_inline_theories
