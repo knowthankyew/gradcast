@@ -132,10 +132,10 @@ public static partial class ScenarioEndpoints
         return null;
     }
 
-    public static string ComputeClientHash(string clientIp, string? customSalt = null)
+    public static string ComputeClientHash(string clientIp, string? customSalt = null, string? datePrefixUtc = null)
     {
         var salt = !string.IsNullOrWhiteSpace(customSalt) ? customSalt : DevelopmentFallbackSalt;
-        var dateStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var dateStr = !string.IsNullOrWhiteSpace(datePrefixUtc) ? datePrefixUtc : DateTime.UtcNow.ToString("yyyy-MM-dd");
         var payload = $"{dateStr}:{clientIp}:{salt}";
 
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(payload));
@@ -198,8 +198,9 @@ public static partial class ScenarioEndpoints
             configuredSalt = DevelopmentFallbackSalt;
         }
 
-        var clientHash = ComputeClientHash(clientIp, configuredSalt);
-        var todayPrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        var nowUtc = DateTime.UtcNow;
+        var todayPrefix = nowUtc.ToString("yyyy-MM-dd");
+        var clientHash = ComputeClientHash(clientIp, configuredSalt, todayPrefix);
 
         var scenarioId = Guid.NewGuid().ToString("N");
         var sanitizedTitle = request.ScenarioTitle is not null

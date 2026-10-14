@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS "shared_scenarios" (
     "client_hash" TEXT NOT NULL,                                    -- SHA-256 of daily salt + IP/session (anti-spam, no PII)
     CONSTRAINT "FK_shared_scenarios_schools" FOREIGN KEY ("school_id") REFERENCES "schools" ("id") ON DELETE RESTRICT,
     CONSTRAINT "FK_shared_scenarios_cbsa" FOREIGN KEY ("cbsa_code") REFERENCES "cbsa_locations" ("cbsa_code") ON DELETE RESTRICT,
-    CONSTRAINT "CHK_shared_scenarios_salary" CHECK ("reported_annual_salary" >= 10000),
+    CONSTRAINT "CHK_shared_scenarios_salary" CHECK ("reported_annual_salary" >= 0),
     CONSTRAINT "CHK_shared_scenarios_disposable" CHECK ("monthly_disposable" >= -20000)
 );
 
@@ -104,6 +104,8 @@ CREATE INDEX "IX_shared_scenarios_disposable" ON "shared_scenarios" ("monthly_di
 CREATE INDEX "IX_shared_scenarios_created_at" ON "shared_scenarios" ("created_at" DESC);
 CREATE INDEX "IX_shared_scenarios_client_hash_created_at" ON "shared_scenarios" ("client_hash", "created_at");
 ```
+
+> **Tiered Ingest Contract Note**: The operational edge SQLite layer accepts shared scenarios with `reported_annual_salary >= 0` (capped at $2,000,000). The downstream Medallion Silver pipeline applies an analytical-quality threshold requiring `reported_annual_salary >= 10000.00`, quarantining lower earnings to preserve statistical integrity in Gold benchmarks.
 
 ### 3.3 New Table: `community_scenario_benchmarks` (Reverse-ETL Cache)
 Read-only cache compiled by Databricks Gold and synced to SQLite for edge display.

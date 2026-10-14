@@ -73,11 +73,22 @@ def audit_privacy_invariants(errors: List[str]) -> None:
         errors.append("Missing views pipeline: lakehouse/src/pipelines/views.py")
         return
 
-    content = views_file.read_text(encoding="utf-8")
-    if "min_cohort_size: int = 5" not in content:
-        errors.append("Privacy violation: v_public_positive_finds missing default k-anonymity boundary (min_cohort_size: int = 5)")
-    if "effective_min_k = max(min_cohort_size, 5)" not in content and "HAVING COUNT(*) >= 5" not in content:
-        errors.append("Privacy violation: v_public_positive_finds does not enforce effective_min_k >= 5 clamp")
+    import ast
+    try:
+        raw_views_code = views_file.read_text(encoding="utf-8")
+        tree = ast.parse(raw_views_code)
+        fn_node = next(
+            (node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "get_k_anonymity_view_sql"),
+            None,
+        )
+        if not fn_node:
+            errors.append("Privacy violation: get_k_anonymity_view_sql function not found in views.py")
+        else:
+            fn_source = ast.get_source_segment(raw_views_code, fn_node) or ""
+            if "max(min_cohort_size, 5)" not in fn_source:
+                errors.append("Privacy violation: get_k_anonymity_view_sql does not enforce max(min_cohort_size, 5) clamp")
+    except Exception as exc:
+        errors.append(f"Failed to parse views.py AST: {exc}")
 
     # Dynamic execution test of k-anonymity SQL generator
     try:

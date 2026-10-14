@@ -59,57 +59,67 @@ def export_gold_to_sqlite(
             CAST(median_disposable AS INT) AS median_monthly_disposable,
             CAST(p75_disposable AS INT) AS p75_monthly_disposable,
             CAST(NULL AS INT) AS top_contributing_school_id,
-            DATE_FORMAT(CURRENT_TIMESTAMP(), 'yyyy-MM-dd HH:mm:ss') AS last_updated_at
+            DATE_FORMAT(TO_UTC_TIMESTAMP(CURRENT_TIMESTAMP(), CURRENT_TIMEZONE()), "yyyy-MM-dd'T'HH:mm:ss'Z'") AS last_updated_at
         FROM {catalog}.gold.v_public_positive_finds
     """
     df: DataFrame = spark.sql(query)
     rows = df.collect()
 
     import contextlib
+    import shutil
+    import tempfile
 
-    target_dir = os.path.dirname(os.path.abspath(sqlite_db_path))
-    os.makedirs(target_dir, exist_ok=True)
-    tmp_db_path = os.path.join(target_dir, f".tmp_{os.path.basename(sqlite_db_path)}")
+    # Build and VACUUM the database on local scratch disk (/tmp) before publishing to volume or edge target
+    with tempfile.TemporaryDirectory() as local_scratch_dir:
+        local_db_path = os.path.join(local_scratch_dir, "compiled_benchmarks.db")
 
-    if os.path.exists(tmp_db_path):
-        os.remove(tmp_db_path)
+        with contextlib.closing(sqlite3.connect(local_db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
 
-    with contextlib.closing(sqlite3.connect(tmp_db_path)) as conn:
-        cursor = conn.cursor()
-        cursor.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
+            insert_sql = """
+                INSERT INTO community_scenario_benchmarks (
+                    cip_family, cbsa_code, credential_level, housing_type, sample_count,
+                    p25_monthly_disposable, median_monthly_disposable, p75_monthly_disposable,
+                    top_contributing_school_id, last_updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """
 
-        insert_sql = """
-            INSERT INTO community_scenario_benchmarks (
-                cip_family, cbsa_code, credential_level, housing_type, sample_count,
-                p25_monthly_disposable, median_monthly_disposable, p75_monthly_disposable,
-                top_contributing_school_id, last_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
-        """
+            records = [
+                (
+                    r["cip_family"],
+                    r["cbsa_code"],
+                    r["credential_level"],
+                    r["housing_type"],
+                    r["sample_count"],
+                    r["p25_monthly_disposable"],
+                    r["median_monthly_disposable"],
+                    r["p75_monthly_disposable"],
+                    r["top_contributing_school_id"],
+                    r["last_updated_at"],
+                )
+                for r in rows
+            ]
 
-        records = [
-            (
-                r["cip_family"],
-                r["cbsa_code"],
-                r["credential_level"],
-                r["housing_type"],
-                r["sample_count"],
-                r["p25_monthly_disposable"],
-                r["median_monthly_disposable"],
-                r["p75_monthly_disposable"],
-                r["top_contributing_school_id"],
-                r["last_updated_at"],
-            )
-            for r in rows
-        ]
+            cursor.executemany(insert_sql, records)
+            conn.commit()
 
-        cursor.executemany(insert_sql, records)
-        conn.commit()
+            # Run vacuum on local scratch disk for maximum edge read performance and minimum file size
+            cursor.execute("VACUUM;")
 
-        # Run vacuum for maximum edge read performance and minimum file size
-        cursor.execute("VACUUM;")
+        target_dir = os.path.dirname(os.path.abspath(sqlite_db_path))
+        os.makedirs(target_dir, exist_ok=True)
+        tmp_target_path = os.path.join(target_dir, f".tmp_{os.path.basename(sqlite_db_path)}")
 
-    # Atomically replace published edge database
-    os.replace(tmp_db_path, sqlite_db_path)
+        # Copy local compiled database to target directory and publish atomically
+        shutil.copyfile(local_db_path, tmp_target_path)
+        try:
+            os.replace(tmp_target_path, sqlite_db_path)
+        except OSError:
+            # Fallback for cloud volume mounts (e.g. Databricks UC Volumes) that disallow atomic rename
+            shutil.copyfile(local_db_path, sqlite_db_path)
+            if os.path.exists(tmp_target_path):
+                os.remove(tmp_target_path)
 
     return len(records)
 

@@ -136,41 +136,33 @@ public class ScenarioRepository : IScenarioRepository
         CancellationToken ct = default)
     {
         await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
-        await using var tx = await conn.BeginTransactionAsync(ct);
 
-        const string countSql = """
-            SELECT COUNT(*) 
-            FROM shared_scenarios
-            WHERE client_hash = @ClientHash
-              AND created_at >= @DatePrefixUtc
-              AND created_at < date(@DatePrefixUtc, '+1 day');
-        """;
-
-        var count = await conn.ExecuteScalarAsync<int>(
-            new CommandDefinition(countSql, new { ClientHash = scenario.ClientHash, DatePrefixUtc = datePrefixUtc }, transaction: tx, cancellationToken: ct));
-
-        if (count >= maxDailyLimit)
-        {
-            await tx.RollbackAsync(ct);
-            return false;
-        }
-
-        const string insertSql = """
+        const string sql = """
             INSERT INTO shared_scenarios (
                 id, created_at, school_id, cip_code, credential_level, cbsa_code,
                 housing_type, salary_mode, reported_annual_salary, monthly_net_take_home,
                 monthly_rent, monthly_loan_payment, monthly_disposable, disposable_ratio,
                 sentiment_tag, scenario_title, client_hash
-            ) VALUES (
+            )
+            SELECT 
                 @Id, @CreatedAt, @SchoolId, @CipCode, @CredentialLevel, @CbsaCode,
                 @HousingType, @SalaryMode, @ReportedAnnualSalary, @MonthlyNetTakeHome,
                 @MonthlyRent, @MonthlyLoanPayment, @MonthlyDisposable, @DisposableRatio,
                 @SentimentTag, @ScenarioTitle, @ClientHash
-            );
+            WHERE (
+                SELECT COUNT(*) 
+                FROM shared_scenarios
+                WHERE client_hash = @ClientHash
+                  AND created_at >= @DatePrefixUtc
+                  AND created_at < date(@DatePrefixUtc, '+1 day')
+            ) < @MaxDailyLimit;
         """;
 
-        await conn.ExecuteAsync(new CommandDefinition(insertSql, scenario, transaction: tx, cancellationToken: ct));
-        await tx.CommitAsync(ct);
-        return true;
+        var parameters = new DynamicParameters(scenario);
+        parameters.Add("MaxDailyLimit", maxDailyLimit);
+        parameters.Add("DatePrefixUtc", datePrefixUtc);
+
+        var rowsAffected = await conn.ExecuteAsync(new CommandDefinition(sql, parameters, cancellationToken: ct));
+        return rowsAffected > 0;
     }
 }

@@ -10,7 +10,7 @@ Run these baseline automated checks to verify the entire system is healthy befor
 
 - [ ] **1.1 .NET 10 Backend Test Suite (112 Tests)**
   ```bash
-  cd /Users/cl0rkster/Dev/gradcast
+  cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   dotnet test
   ```
   *Expected Result*: `Passed! - Failed: 0, Passed: 112, Total: 112`.
@@ -36,7 +36,7 @@ Run these baseline automated checks to verify the entire system is healthy befor
 
 - [ ] **1.5 Portfolio Meta-Audit**
   ```bash
-  cd /Users/cl0rkster/Dev && ./audit-portfolio.sh -r gradcast
+  cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.." && ./audit-portfolio.sh -r gradcast
   ```
   *Expected Result*: Green status across CPM, FailClosed audit, Policy Pack, and Section 8 Master Brief verification (12/12 repos).
 
@@ -46,7 +46,7 @@ Run these baseline automated checks to verify the entire system is healthy befor
 
 Start the ASP.NET Core API server locally:
 ```bash
-cd /Users/cl0rkster/Dev/gradcast
+cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 dotnet run --project src/api
 # Or run ./start.sh
 ```
