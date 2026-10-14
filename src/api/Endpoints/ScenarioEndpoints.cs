@@ -224,7 +224,7 @@ public static partial class ScenarioEndpoints
             CredentialLevel = request.CredentialLevel,
             CbsaCode = request.CbsaCode.Trim(),
             HousingType = request.HousingType.Trim().ToLowerInvariant(),
-            SalaryMode = request.SalaryMode?.Trim().ToLowerInvariant() ?? "scorecard_median",
+            SalaryMode = string.IsNullOrWhiteSpace(request.SalaryMode) ? "scorecard_median" : request.SalaryMode.Trim().ToLowerInvariant(),
             ReportedAnnualSalary = request.ReportedAnnualSalary,
             MonthlyNetTakeHome = request.MonthlyNetTakeHome,
             MonthlyRent = request.MonthlyRent,

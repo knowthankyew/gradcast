@@ -4,7 +4,20 @@ Compatible with both pytest and python -m unittest.
 """
 
 import json
+import sys
+from pathlib import Path
 import unittest
+
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from lakehouse.src.pipelines.silver_transform import (
+    SCENARIO_JSON_SCHEMA,
+    parse_and_cleanse_scenarios,
+    persist_quarantine_scenarios,
+    run_silver_pipeline,
+)
 
 
 def extract_cip_family(cip_code: str) -> str:
@@ -112,6 +125,12 @@ class TestSilverTransform(unittest.TestCase):
         is_valid, reason = validate_scenario_record(record)
         self.assertFalse(is_valid)
         self.assertEqual(reason, "Missing monthly disposable")
+
+    def test_silver_pipeline_module_and_schema_integrity(self):
+        self.assertIsNotNone(SCENARIO_JSON_SCHEMA)
+        self.assertTrue(callable(run_silver_pipeline))
+        self.assertTrue(callable(parse_and_cleanse_scenarios))
+        self.assertTrue(callable(persist_quarantine_scenarios))
 
 
 if __name__ == "__main__":

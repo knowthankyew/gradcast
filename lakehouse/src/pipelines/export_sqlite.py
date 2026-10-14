@@ -32,7 +32,10 @@ CREATE TABLE IF NOT EXISTS community_scenario_benchmarks (
 );
 
 CREATE INDEX IF NOT EXISTS IX_community_scenario_benchmarks_cbsa_cip 
-    ON community_scenario_benchmarks (cbsa_code, cip_family);
+    ON community_scenario_benchmarks (
+        cbsa_code, cip_family, credential_level, housing_type,
+        sample_count, p25_monthly_disposable, median_monthly_disposable, p75_monthly_disposable
+    );
 """
 
 

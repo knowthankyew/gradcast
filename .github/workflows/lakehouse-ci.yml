@@ -23,6 +23,9 @@ jobs:
   validate-iac:
     name: Validate Terraform & Databricks Asset Bundles
     runs-on: ubuntu-latest
+    env:
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
@@ -52,17 +55,13 @@ jobs:
               data = yaml.safe_load(f)
           assert 'bundle' in data, 'Missing bundle section'
           assert 'resources' in data, 'Missing resources section'
-          assert 'pipelines' in data['resources'], 'Missing medallion pipeline in resources'
-          assert 'jobs' in data['resources'], 'Missing reverse ETL job in resources'
+          assert 'jobs' in data['resources'], 'Missing jobs in resources'
           assert 'targets' in data, 'Missing targets definition'
           print('databricks.yml bundle structure validated successfully.')
           "
 
       - name: Validate Databricks Asset Bundle (when credentials configured)
         if: env.DATABRICKS_CLIENT_ID != ''
-        env:
-          DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
-          DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
         run: |
           cd lakehouse
           databricks bundle validate -t dev

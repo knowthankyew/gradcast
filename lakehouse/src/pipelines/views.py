@@ -50,24 +50,25 @@ def create_k_anonymity_views(
     spark: SparkSession,
     catalog: str = "gradcast_lakehouse",
     min_cohort_size: int = 5,
+    analysts_group: str | None = None,
 ) -> None:
     """
     Create or replace the public reporting view enforcing k-anonymity (k >= 5).
+    Optionally grants SELECT to the designated Unity Catalog analysts group.
     """
     view_sql = get_k_anonymity_view_sql(catalog=catalog, min_cohort_size=min_cohort_size)
     spark.sql(view_sql)
-    try:
-        spark.sql(f"GRANT SELECT ON VIEW {catalog}.gold.v_public_positive_finds TO `analysts`")
-    except Exception:
-        pass
+    if analysts_group:
+        spark.sql(f"GRANT SELECT ON VIEW {catalog}.gold.v_public_positive_finds TO `{analysts_group}`")
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Create Lakehouse Views")
     parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    parser.add_argument("--analysts-group", default=None, help="Target Analysts group name for view GRANT")
     args = parser.parse_args()
 
     spark = SparkSession.builder.appName("LakehouseViews").getOrCreate()
-    create_k_anonymity_views(spark, catalog=args.catalog)
+    create_k_anonymity_views(spark, catalog=args.catalog, analysts_group=args.analysts_group)
     print("Views module loaded and k-anonymity views verified successfully.")

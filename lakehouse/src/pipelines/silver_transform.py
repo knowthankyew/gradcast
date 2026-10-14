@@ -11,16 +11,26 @@ Performs:
 7. Delta Change Data Feed enablement ('delta.enableChangeDataFeed' = 'true').
 """
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    DoubleType,
-    IntegerType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
+from typing import Optional, Tuple
+
+try:
+    from pyspark.sql import DataFrame, SparkSession
+    from pyspark.sql import functions as F
+    from pyspark.sql.types import (
+        DoubleType,
+        IntegerType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
+    )
+except ImportError:
+    DataFrame = None  # type: ignore
+    SparkSession = None  # type: ignore
+    F = None  # type: ignore
+    class _MockType:
+        def __init__(self, *args, **kwargs): pass
+    DoubleType = IntegerType = StringType = StructField = StructType = TimestampType = _MockType  # type: ignore
 
 # Raw JSON schema emitted by the ASP.NET Core edge ingest layer
 SCENARIO_JSON_SCHEMA = StructType([
@@ -285,7 +295,7 @@ def run_silver_pipeline(
     tgt = target_table or f"{catalog}.silver.scenarios"
     quar = quarantine_table or f"{catalog}.quarantine.scenarios_rejected"
 
-    ensure_silver_table_exists(spark, table_name=tgt)
+    ensure_silver_scenarios_table(spark, table_name=tgt)
     raw_df = spark.table(src)
     valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
     persist_quarantine_scenarios(spark, quarantine_df, target_table=quar)

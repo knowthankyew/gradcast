@@ -13,13 +13,13 @@ Run these baseline automated checks to verify the entire system is healthy befor
   cd /Users/cl0rkster/Dev/gradcast
   dotnet test
   ```
-  *Expected Result*: `Passed! - Failed: 0, Passed: 107, Total: 107`.
+  *Expected Result*: `Passed! - Failed: 0, Passed: 112, Total: 112`.
 
-- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (6 Tests)**
+- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (13 Tests)**
   ```bash
   python3 -m unittest discover -s lakehouse/tests -v
   ```
-  *Expected Result*: All 6 tests pass (`OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
+  *Expected Result*: All 13 tests pass (`OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
 
 - [ ] **1.3 Architectural & Claims Auditing Linter**
   ```bash

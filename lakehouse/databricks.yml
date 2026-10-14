@@ -5,6 +5,9 @@ variables:
   catalog_name:
     description: "Target Unity Catalog namespace"
     default: "gradcast_lakehouse"
+  service_principal_id:
+    description: "Production Service Principal Application ID (UUID)"
+    default: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
 
 targets:
   dev:
@@ -21,36 +24,29 @@ targets:
       host: "https://adb-prod-workspace.azuredatabricks.net"
     variables:
       catalog_name: "gradcast_lakehouse"
+      service_principal_id: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
     run_as:
-      service_principal_name: "gradcast-lakehouse-pipeline-runner-prod"
+      service_principal_name: "${var.service_principal_id}"
 
 resources:
-  pipelines:
-    gradcast_medallion_pipeline:
-      name: "[${bundle.target}] GradCast Medallion Pipeline"
-      schema: silver
-      catalog: "${var.catalog_name}"
-      continuous: false
-      development: false
-      channel: CURRENT
-      libraries:
-        - file:
-            path: ./src/pipelines/bronze_ingest.py
-        - file:
-            path: ./src/pipelines/silver_transform.py
-        - file:
-            path: ./src/pipelines/gold_modeling.py
-      configuration:
-        "bundle.source": "gradcast_lakehouse"
-
   jobs:
-    gradcast_reverse_etl_job:
-      name: "[${bundle.target}] GradCast Reverse-ETL SQLite Compiler"
+    gradcast_medallion_etl_job:
+      name: "[${bundle.target}] GradCast Medallion & Reverse-ETL Pipeline"
       schedule:
         quartz_cron_expression: "0 0 4 * * ?"
         timezone_id: "UTC"
       tasks:
+        - task_key: run_silver_transformation
+          spark_python_task:
+            python_file: ./src/pipelines/silver_transform.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+          job_cluster_key: general_worker
+
         - task_key: run_gold_dimensional_modeling
+          depends_on:
+            - task_key: run_silver_transformation
           spark_python_task:
             python_file: ./src/pipelines/gold_modeling.py
             parameters:
@@ -66,6 +62,8 @@ resources:
             parameters:
               - "--catalog"
               - "${var.catalog_name}"
+              - "--analysts-group"
+              - "gradcast-analysts-prod"
           job_cluster_key: general_worker
 
         - task_key: export_gold_to_sqlite

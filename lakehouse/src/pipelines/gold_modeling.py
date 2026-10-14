@@ -145,8 +145,8 @@ def populate_dimensions(
     if spark.catalog.tableExists(f"{catalog}.silver.programs"):
         silver_progs = (
             spark.table(f"{catalog}.silver.programs")
-            .filter(F.col("title").isNotNull())
-            .select("cip_code", F.col("title").alias("source_title"))
+            .filter(F.col("program_title").isNotNull())
+            .select("cip_code", F.col("program_title").alias("source_title"))
             .dropDuplicates(["cip_code"])
         )
         programs_df = (
