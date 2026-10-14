@@ -42,7 +42,8 @@ resource "databricks_grants" "silver_access" {
   }
 }
 
-# Gold schema grants (Service principal manages; Analysts have USE_SCHEMA)
+# Gold schema grants (Service principal manages; Analysts have USE_SCHEMA on gold schema.
+# Note: SELECT privilege on v_public_positive_finds is granted dynamically upon view creation by the pipeline runner).
 resource "databricks_grants" "gold_schema_access" {
   schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.gold.name}"
 

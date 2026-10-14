@@ -333,7 +333,7 @@ def merge_scenarios_into_silver(
         MERGE INTO {target_table} AS target
         USING stage_valid_scenarios AS source
         ON target.scenario_id = source.scenario_id
-        WHEN MATCHED AND source._updated_at >= target._updated_at THEN
+        WHEN MATCHED AND source.created_at >= target.created_at THEN
             UPDATE SET
                 target.created_at = source.created_at,
                 target.school_id = source.school_id,
