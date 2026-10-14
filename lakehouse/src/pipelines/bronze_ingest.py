@@ -75,8 +75,28 @@ def ingest_shared_scenarios_batch(
     """
     Read raw JSON scenario files and append to Bronze Delta table.
     Ensures delta.appendOnly is set to true.
+    Idempotent: uses left_anti join against existing file_names in target table to prevent duplicate ingestion.
     """
+    ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
+
     raw_text_df = spark.read.text(source_path)
+
+    # Filter out already-ingested files to prevent duplicate appends in append-only table
+    try:
+        existing_files = spark.table(target_table).select("file_name").distinct()
+        raw_text_df = raw_text_df.join(
+            existing_files,
+            raw_text_df["_metadata.file_name"] == existing_files["file_name"],
+            "left_anti",
+        )
+    except Exception:
+        pass
+
+    file_offset_col = (
+        F.coalesce(F.col("_metadata.row_index"), F.monotonically_increasing_id())
+        if hasattr(F, "col")
+        else F.monotonically_increasing_id()
+    )
 
     bronze_df = (
         raw_text_df
@@ -85,11 +105,9 @@ def ingest_shared_scenarios_batch(
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
             F.col("_metadata.file_name").alias("file_name"),
-            F.monotonically_increasing_id().alias("file_offset"),
+            file_offset_col.alias("file_offset"),
         )
     )
-
-    ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
 
     (
         bronze_df.write

@@ -142,12 +142,25 @@ public static partial class ScenarioEndpoints
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
+    private static bool IsTrustedProxy(System.Net.IPAddress? ip)
+    {
+        if (ip is null) return false;
+        if (System.Net.IPAddress.IsLoopback(ip)) return true;
+        // Fly.io internal mesh / private wireguard proxy network (fdaa::/16)
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            var bytes = ip.GetAddressBytes();
+            return bytes.Length >= 2 && bytes[0] == 0xfd && bytes[1] == 0xaa;
+        }
+        return false;
+    }
+
     public static string ExtractClientIp(HttpContext httpContext)
     {
         var remoteIp = httpContext.Connection.RemoteIpAddress;
 
-        // Only trust forwarded edge headers when direct TCP connection is loopback (trusted reverse proxy hop)
-        if (remoteIp is not null && System.Net.IPAddress.IsLoopback(remoteIp))
+        // Only trust forwarded edge headers when direct TCP connection is a trusted reverse proxy hop (loopback or Fly mesh)
+        if (IsTrustedProxy(remoteIp))
         {
             // Fly.io trusted edge proxy header
             if (httpContext.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp))

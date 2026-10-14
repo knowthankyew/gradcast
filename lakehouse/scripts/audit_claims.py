@@ -55,22 +55,38 @@ def audit_schema_parity(errors: List[str]) -> None:
         errors.append(f"Missing schema document: {schema_doc}")
         return
 
+    def extract_create_table_blocks(sql_text: str) -> List[Tuple[str, str, str]]:
+        """
+        Extract (table_name, columns_body, trailer) tuples from SQL text using
+        balanced-parenthesis scanning so that nested DECIMAL(10, 2) or CHECK(...)
+        expressions do not truncate the column list.
+        """
+        clean_sql = re.sub(r"--.*$", "", sql_text, flags=re.MULTILINE)
+        blocks = []
+        pattern = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\"`\w\.]+)\s*\(", re.IGNORECASE)
+        for match in pattern.finditer(clean_sql):
+            table_name = match.group(1).replace('"', "").replace("`", "")
+            start_idx = match.end()
+            depth = 1
+            i = start_idx
+            while i < len(clean_sql) and depth > 0:
+                if clean_sql[i] == "(":
+                    depth += 1
+                elif clean_sql[i] == ")":
+                    depth -= 1
+                i += 1
+            if depth == 0:
+                cols_body = clean_sql[start_idx : i - 1]
+                trailer_match = re.search(r"([^;]*?);", clean_sql[i:])
+                trailer = trailer_match.group(1) if trailer_match else clean_sql[i : i + 200]
+                blocks.append((table_name, cols_body, trailer))
+        return blocks
+
     schema_content = schema_doc.read_text(encoding="utf-8")
-    content_clean = re.sub(r"--.*$", "", schema_content, flags=re.MULTILINE)
-
-    ddl_pattern = re.compile(
-        r"CREATE TABLE\s+(?:IF NOT EXISTS\s+)?([\"`\w\.]+)\s*\((.*?)\)\s*([^\n;]*?(?:USING DELTA|CLUSTER BY|TBLPROPERTIES)[^;]*)?;",
-        re.DOTALL | re.IGNORECASE,
-    )
-
     parsed_tables = {}
-    for match in ddl_pattern.finditer(content_clean):
-        raw_tbl = match.group(1).replace('"', "").replace("`", "")
+    for raw_tbl, cols_body, trailer in extract_create_table_blocks(schema_content):
         parts = raw_tbl.split(".")
         norm_key = ".".join(parts[-2:]) if len(parts) >= 2 else parts[0]
-
-        cols_body = match.group(2)
-        trailer = match.group(3) or ""
 
         cols = []
         for line in cols_body.strip().splitlines():
@@ -106,12 +122,9 @@ def audit_schema_parity(errors: List[str]) -> None:
             )
 
         # Deep DDL validation: verify column definitions strictly within matching CREATE TABLE block
-        block_match = re.search(
-            rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[\w\.\"]*?{clean_table_name}[\w\.\"]*?\s*\((.*?)\)",
-            source_content,
-            re.DOTALL | re.IGNORECASE,
-        )
-        table_block = block_match.group(0) if block_match else source_content
+        source_blocks = extract_create_table_blocks(source_content)
+        matching_source = next((b for b in source_blocks if b[0].split(".")[-1] == clean_table_name), None)
+        table_block = matching_source[1] if matching_source else source_content
 
         spec = parsed_tables.get(table_spec)
         if spec:
