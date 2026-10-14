@@ -100,18 +100,15 @@ def ensure_silver_scenarios_table(
     """)
 
     # Databricks Delta Lake requires CHECK constraints to be applied via ALTER TABLE ADD CONSTRAINT
-    try:
-        existing = {
-            k for k, _ in (
-                (r["key"], r["value"]) for r in spark.sql(f"SHOW TBLPROPERTIES {table_name}").collect()
-            )
-        }
-        if "delta.constraints.chk_positive_salary" not in existing:
-            spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00)")
-        if "delta.constraints.chk_disposable_floor" not in existing:
-            spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)")
-    except Exception:
-        pass
+    existing = {
+        k for k, _ in (
+            (r["key"], r["value"]) for r in spark.sql(f"SHOW TBLPROPERTIES {table_name}").collect()
+        )
+    }
+    if "delta.constraints.chk_positive_salary" not in existing:
+        spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00)")
+    if "delta.constraints.chk_disposable_floor" not in existing:
+        spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)")
 
 
 
