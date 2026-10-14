@@ -97,12 +97,3 @@ resource "databricks_grants" "gold_exports_volume_access" {
   }
 }
 
-# Quarantine schema access for pipeline runner
-resource "databricks_grants" "quarantine_schema_access" {
-  schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.quarantine.name}"
-
-  grant {
-    principal  = databricks_service_principal.pipeline_runner.application_id
-    privileges = ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]
-  }
-}

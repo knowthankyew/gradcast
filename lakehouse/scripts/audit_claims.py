@@ -105,13 +105,20 @@ def audit_schema_parity(errors: List[str]) -> None:
                 f"Table '{clean_table_name}' declared in docs/SCHEMA.md but missing in {source_file.relative_to(REPO_ROOT)}"
             )
 
-        # Deep DDL validation: verify column definitions and CLUSTER BY keys
+        # Deep DDL validation: verify column definitions strictly within matching CREATE TABLE block
+        block_match = re.search(
+            rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[\w\.\"]*?{clean_table_name}[\w\.\"]*?\s*\((.*?)\)",
+            source_content,
+            re.DOTALL | re.IGNORECASE,
+        )
+        table_block = block_match.group(0) if block_match else source_content
+
         spec = parsed_tables.get(table_spec)
         if spec:
             for col in spec["columns"]:
-                if not re.search(rf"\b{col}\b", source_content):
+                if not re.search(rf"\b{col}\b", table_block):
                     errors.append(
-                        f"Schema parity mismatch: Column '{col}' of table '{table_spec}' not found in {source_file.relative_to(REPO_ROOT)}"
+                        f"Schema parity mismatch: Column '{col}' of table '{table_spec}' not found in DDL block of {source_file.relative_to(REPO_ROOT)}"
                     )
             for k in spec["cluster_keys"]:
                 if not re.search(rf"CLUSTER BY[^\;]*\b{k}\b", source_content, re.IGNORECASE):
