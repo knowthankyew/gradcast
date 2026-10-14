@@ -80,10 +80,10 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 ### Technical Specification
 1. **Schema DDL**: Execute migration in SQLite (see [`docs/SCHEMA.md`](docs/SCHEMA.md#32-new-table-shared_scenarios-edge-operational-ingest)).
 2. **Files to Modify/Create**:
-   - `src/GradCast.Api/Models/SharedScenario.cs`: Record defining payload matching `SAFE_ALLOWLIST_KEYS`.
-   - `src/GradCast.Api/Data/IScenarioRepository.cs` & `ScenarioRepository.cs`: Dapper implementation.
-   - `src/GradCast.Api/Endpoints/ScenarioEndpoints.cs`: Route group `/api/scenarios`.
-   - `tests/GradCast.Api.Tests/ScenarioEndpointTests.cs`: xUnit integration tests.
+   - `src/api/Models/SharedScenario.cs`: Record defining payload matching `SAFE_ALLOWLIST_KEYS`.
+   - `src/api/Data/IScenarioRepository.cs` & `ScenarioRepository.cs`: Dapper implementation.
+   - `src/api/Endpoints/ScenarioEndpoints.cs`: Route group `/api/scenarios`.
+   - `src/api.tests/Endpoints/ScenarioEndpointsTests.cs`: xUnit integration tests.
 
 ### Acceptance Criteria
 - [x] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
@@ -95,10 +95,10 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 ```text
 Implement Story GC-LAKE-01 in /Users/cl0rkster/Dev/gradcast.
 1. Add the "shared_scenarios" table definition to the SQLite database schema in accordance with docs/SCHEMA.md.
-2. Create src/GradCast.Api/Models/SharedScenario.cs with required validation attributes.
-3. Create src/GradCast.Api/Data/ScenarioRepository.cs using Dapper for inserting and querying scenarios.
-4. Register the repository in Program.cs and create src/GradCast.Api/Endpoints/ScenarioEndpoints.cs with POST /api/scenarios/share and GET /api/scenarios/positive-finds.
-5. Add unit tests in tests/GradCast.Api.Tests verifying valid insert, validation rejection, and sanitized query outputs.
+2. Create src/api/Models/SharedScenario.cs with required validation attributes.
+3. Create src/api/Data/ScenarioRepository.cs using Dapper for inserting and querying scenarios.
+4. Register the repository in Program.cs and create src/api/Endpoints/ScenarioEndpoints.cs with POST /api/scenarios/share and GET /api/scenarios/positive-finds.
+5. Add unit tests in src/api.tests verifying valid insert, validation rejection, and sanitized query outputs.
 Run 'dotnet test' to ensure all tests pass.
 ```
 
@@ -207,7 +207,7 @@ To prevent user re-identification and supply GradCast's public edge tier with fr
 - **IN SCOPE**:
   - Star schema DDL & pipeline: `fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`.
   - Secure View: `v_public_positive_finds` with strict `HAVING COUNT(*) >= 5` filter.
-  - Reverse-ETL export script: `scripts/export_gold_to_sqlite.py` querying Gold and generating a compressed `gradcast_gold.db` SQLite artifact.
+  - Reverse-ETL export script: `lakehouse/src/pipelines/export_sqlite.py` querying Gold and generating a compressed `gradcast_gold.db` SQLite artifact.
 - **OUT OF SCOPE**: Exposing unaggregated student-level microdata.
 
 ### Technical Specification

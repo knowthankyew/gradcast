@@ -214,7 +214,12 @@ if __name__ == "__main__":
         ingest_shared_scenarios_batch(spark, source_path=source_path, target_table=target_table)
         print(f"Bronze Ingest batch ingested from {source_path} into {target_table}.")
     except Exception as exc:
-        if args.source_path:
-            raise
-        print(f"Notice: Default source landing path '{source_path}' not accessible or empty: {exc}")
+        err_msg = str(exc)
+        # Only permit skipping if using default unconfigured volume path and the path does not exist yet
+        is_missing_path = any(s in err_msg for s in ["Path does not exist", "TABLE_OR_VIEW_NOT_FOUND", "FileNotFoundException"])
+        if not args.source_path and is_missing_path:
+            print(f"Notice: Default landing volume '{source_path}' does not exist yet; skipping ingest.")
+            return
+        # Fail-closed: re-raise permissions, corrupted payload, or explicit source-path failures
+        raise
     print(f"Bronze Ingest pipeline executed successfully for {target_table}.")

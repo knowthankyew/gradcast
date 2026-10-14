@@ -17,7 +17,7 @@ DLT_SCENARIO_EXPECTATIONS: Dict[str, str] = {
     "valid_school_id": "school_id > 0",
     "valid_cip_code": "cip_code IS NOT NULL AND length(cip_code) >= 2",
     "valid_cbsa_code": "cbsa_code IS NOT NULL AND length(cbsa_code) >= 4",
-    "valid_salary_bounds": "reported_annual_salary >= 0.00",
+    "valid_salary_bounds": "reported_annual_salary >= 10000.00",
     "valid_disposable_floor": "monthly_disposable >= -20000.00",
 }
 
@@ -47,7 +47,7 @@ def apply_quality_expectations(df: DataFrame) -> Tuple[DataFrame, DataFrame]:
                 F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_school_id"]), F.lit(False)), F.lit("invalid_school_id")),
                 F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cip_code"]), F.lit(False)), F.lit("invalid_cip_code")),
                 F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cbsa_code"]), F.lit(False)), F.lit("invalid_cbsa_code")),
-                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_salary_bounds"]), F.lit(False)), F.lit("negative_salary")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_salary_bounds"]), F.lit(False)), F.lit("salary_below_threshold")),
                 F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_disposable_floor"]), F.lit(False)), F.lit("disposable_below_floor")),
             )
         )

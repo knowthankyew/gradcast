@@ -210,11 +210,16 @@ def audit_portfolio_master_brief(errors: List[str]) -> bool:
     theory_count = 0
     for tf in test_files:
         code = tf.read_text(encoding="utf-8")
-        fact_count += len(re.findall(r"\[Fact\]", code))
-        # Note: [Theory] inline data attributes
-        inline_data = len(re.findall(r"\[InlineData\(", code))
-        theories = len(re.findall(r"\[Theory\]", code))
-        theory_count += inline_data if inline_data > 0 else theories
+        fact_count += len(re.findall(r"\[Fact(?:\(.*\))?\]", code))
+        inline_cases = len(re.findall(r"\[InlineData\(", code))
+        # Account for [Theory] methods with MemberData/ClassData rather than InlineData
+        method_blocks = re.split(r"(?=\[Theory)", code)
+        non_inline_theories = 0
+        for block in method_blocks[1:]:
+            header = block.split("public async")[0].split("public void")[0]
+            if "[InlineData" not in header:
+                non_inline_theories += 1
+        theory_count += inline_cases + non_inline_theories
 
     total_tests = fact_count + theory_count
 

@@ -11,7 +11,7 @@ Performs:
 7. Delta Change Data Feed enablement ('delta.enableChangeDataFeed' = 'true').
 """
 
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 try:
     from pyspark.sql import DataFrame, SparkSession
@@ -133,7 +133,7 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
             F.col("parsed.monthly_disposable").cast("decimal(10,2)").alias("monthly_disposable"),
             F.col("parsed.disposable_ratio").cast("double").alias("disposable_ratio"),
             F.lower(F.col("parsed.sentiment_tag")).alias("sentiment_tag"),
-            (F.col("parsed.monthly_disposable") > 0).alias("is_valid_positive_find"),
+            (F.col("parsed.monthly_disposable").cast("decimal(10,2)") > 0).alias("is_valid_positive_find"),
             ingest_ts_col.alias("ingest_timestamp"),
             F.current_timestamp().alias("_updated_at"),
             F.col("raw_payload"),
@@ -363,6 +363,58 @@ def merge_scenarios_into_silver(
     """)
 
 
+def ensure_watermark_table(spark: SparkSession, catalog: str) -> None:
+    """Ensure control schema and watermarks tracking table exist for incremental pipelines."""
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {catalog}.control.pipeline_watermarks (
+            pipeline_name STRING NOT NULL,
+            last_ingest_timestamp TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP NOT NULL
+        )
+        USING DELTA
+    """)
+
+
+def get_pipeline_watermark(spark: SparkSession, catalog: str, pipeline_name: str = "silver_transform") -> Optional[Any]:
+    """Retrieve the high-watermark timestamp previously committed for this pipeline."""
+    ensure_watermark_table(spark, catalog)
+    row = spark.sql(f"""
+        SELECT MAX(last_ingest_timestamp) AS watermark
+        FROM {catalog}.control.pipeline_watermarks
+        WHERE pipeline_name = '{pipeline_name}'
+    """).collect()
+    if row and row[0]["watermark"] is not None:
+        return row[0]["watermark"]
+    return None
+
+
+def commit_pipeline_watermark(
+    spark: SparkSession,
+    catalog: str,
+    max_ingest_timestamp: Any,
+    pipeline_name: str = "silver_transform",
+) -> None:
+    """Idempotently persist high-watermark Bronze ingest_timestamp."""
+    ensure_watermark_table(spark, catalog)
+    spark.sql(f"""
+        MERGE INTO {catalog}.control.pipeline_watermarks AS target
+        USING (
+            SELECT 
+                '{pipeline_name}' AS pipeline_name,
+                CAST('{max_ingest_timestamp}' AS TIMESTAMP) AS last_ingest_timestamp,
+                CURRENT_TIMESTAMP() AS updated_at
+        ) AS source
+        ON target.pipeline_name = source.pipeline_name
+        WHEN MATCHED THEN
+            UPDATE SET 
+                target.last_ingest_timestamp = source.last_ingest_timestamp,
+                target.updated_at = source.updated_at
+        WHEN NOT MATCHED THEN
+            INSERT (pipeline_name, last_ingest_timestamp, updated_at)
+            VALUES (source.pipeline_name, source.last_ingest_timestamp, source.updated_at)
+    """)
+
+
 def run_silver_pipeline(
     spark: SparkSession,
     catalog: str = "gradcast_lakehouse",
@@ -378,22 +430,38 @@ def run_silver_pipeline(
 
     ensure_silver_scenarios_table(spark, table_name=tgt)
     raw_df = spark.table(src)
-    if since_timestamp:
-        if hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
-            raw_df = raw_df.filter(F.col("ingest_timestamp") > F.to_timestamp(F.lit(since_timestamp)))
-    else:
-        # Incremental watermarking: determine last processed timestamp from target table if available
+
+    # Resolve watermark against Bronze ingest_timestamp (same clock)
+    effective_watermark = since_timestamp
+    if not effective_watermark:
         try:
-            max_ts_df = spark.sql(f"SELECT MAX(_updated_at) AS max_ts FROM {tgt}").collect()
-            if max_ts_df and max_ts_df[0]["max_ts"] is not None and hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
-                max_ts = max_ts_df[0]["max_ts"]
-                raw_df = raw_df.filter(F.col("ingest_timestamp") > F.lit(max_ts))
+            effective_watermark = get_pipeline_watermark(spark, catalog, pipeline_name="silver_transform")
+        except Exception as e:
+            print(f"Notice: Pipeline watermark lookup skipped: {e}")
+
+    if effective_watermark and hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
+        raw_df = raw_df.filter(F.col("ingest_timestamp") > F.to_timestamp(F.lit(effective_watermark)))
+
+    # Capture the maximum Bronze ingest_timestamp of the current batch (covering valid & quarantined rows)
+    batch_max_ts = None
+    if hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns:
+        try:
+            max_row = raw_df.select(F.max("ingest_timestamp").alias("max_ts")).collect()
+            if max_row and max_row[0]["max_ts"] is not None:
+                batch_max_ts = max_row[0]["max_ts"]
         except Exception:
             pass
 
     valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
     persist_quarantine_scenarios(spark, quarantine_df, target_table=quar)
     merge_scenarios_into_silver(spark, valid_df, target_table=tgt)
+
+    # Advance pipeline high watermark upon successful commit of both Silver and Quarantine
+    if batch_max_ts is not None:
+        try:
+            commit_pipeline_watermark(spark, catalog, batch_max_ts, pipeline_name="silver_transform")
+        except Exception as e:
+            print(f"Notice: Failed to persist high watermark: {e}")
 
 
 if __name__ == "__main__":

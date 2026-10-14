@@ -57,14 +57,20 @@ def compute_batch_health_metrics(
     # Independent distribution drift: flag if median salary or disposable deviates > 25% from baseline distribution,
     # or if quarantine rate exceeds 5% quality threshold.
     salary_drift = False
-    if baseline_median_salary > 0 and median_salary > 0:
-        salary_drift = abs(median_salary - baseline_median_salary) / baseline_median_salary > 0.25
+    if baseline_median_salary > 0:
+        if median_salary <= 0:
+            salary_drift = True
+        else:
+            salary_drift = abs(median_salary - baseline_median_salary) / baseline_median_salary > 0.25
 
     disposable_drift = False
-    if baseline_median_disposable != 0 and median_disposable != 0:
-        disposable_drift = abs(median_disposable - baseline_median_disposable) / abs(baseline_median_disposable) > 0.25
+    if baseline_median_disposable != 0:
+        if median_disposable == 0:
+            disposable_drift = True
+        else:
+            disposable_drift = abs(median_disposable - baseline_median_disposable) / abs(baseline_median_disposable) > 0.25
 
-    drift_detected = salary_drift or disposable_drift or (quarantine_rate > 0.05)
+    drift_detected = salary_drift or disposable_drift or (quarantine_rate > 0.05) or (valid_count == 0 and total_records > 0)
 
     raw_metrics = {
         "pipeline_name": pipeline_name,

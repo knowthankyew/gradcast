@@ -89,13 +89,15 @@ CREATE TABLE IF NOT EXISTS "shared_scenarios" (
     "monthly_loan_payment" INTEGER NOT NULL,                        -- 10-year standard amortization
     "monthly_disposable" INTEGER NOT NULL,                          -- Take-home minus rent and loan
     "disposable_ratio" REAL NOT NULL,                               -- monthly_disposable / monthly_net_take_home
-    "sentiment_tag" TEXT NOT NULL,                                  -- 'comfortable' | 'surplus_plus' | 'hidden_gem'
+    "sentiment_tag" TEXT NOT NULL,                                  -- 'comfortable' | 'surplus_plus' | 'hidden_gem' | 'tight' | 'stretch'
     "scenario_title" TEXT NULL,                                     -- Sanitized user label (max 60 chars)
     "client_hash" TEXT NOT NULL,                                    -- SHA-256 of daily salt + IP/session (anti-spam, no PII)
     CONSTRAINT "FK_shared_scenarios_schools" FOREIGN KEY ("school_id") REFERENCES "schools" ("id") ON DELETE RESTRICT,
     CONSTRAINT "FK_shared_scenarios_cbsa" FOREIGN KEY ("cbsa_code") REFERENCES "cbsa_locations" ("cbsa_code") ON DELETE RESTRICT,
-    CONSTRAINT "CHK_shared_scenarios_salary" CHECK ("reported_annual_salary" >= 0),
-    CONSTRAINT "CHK_shared_scenarios_disposable" CHECK ("monthly_disposable" >= -20000)
+    CONSTRAINT "CK_shared_scenarios_salary" CHECK ("reported_annual_salary" >= 0 AND "reported_annual_salary" <= 2000000),
+    CONSTRAINT "CK_shared_scenarios_disposable" CHECK ("monthly_disposable" >= -20000),
+    CONSTRAINT "CK_shared_scenarios_housing" CHECK ("housing_type" IN ('alone', 'roommate')),
+    CONSTRAINT "CK_shared_scenarios_client_hash" CHECK (length("client_hash") = 64)
 );
 
 -- Indexing for edge querying (top positive finds by metro and field of study)
