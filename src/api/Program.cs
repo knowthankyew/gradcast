@@ -56,6 +56,7 @@ app.MapSchoolEndpoints();
 app.MapLocationEndpoints();
 app.MapFinanceEndpoints();
 app.MapJobEndpoints();
+app.MapScenarioEndpoints();
 
 // SPA Fallback: serve index.html for non-API routes when frontend is present
 if (staticRoot != null)

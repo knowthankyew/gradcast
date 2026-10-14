@@ -1,4 +1,5 @@
 using GradCast.Api.Configuration;
+using GradCast.Api.Data;
 using GradCast.Api.Middleware;
 using GradCast.Api.Services;
 using GradCast.Data;
@@ -37,6 +38,7 @@ public static class GradCastServiceCollectionExtensions
         services.AddSingleton<ITaxCalculationService, TaxCalculationService>();
         services.AddSingleton<ILoanAmortizationService, LoanAmortizationService>();
         services.AddScoped<IGradCastRepository, GradCastRepository>();
+        services.AddScoped<IScenarioRepository, ScenarioRepository>();
         services.AddScoped<IBudgetSimulatorService, BudgetSimulatorService>();
 
         services.AddHttpLogging(logging =>
