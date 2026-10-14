@@ -8,12 +8,12 @@
 
 Run these baseline automated checks to verify the entire system is healthy before manual probing:
 
-- [ ] **1.1 .NET 10 Backend Test Suite (112 Tests)**
+- [ ] **1.1 .NET 10 Backend Test Suite (116 Tests)**
   ```bash
   cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
   dotnet test
   ```
-  *Expected Result*: `Passed! - Failed: 0, Passed: 112, Total: 112`.
+  *Expected Result*: `Passed! - Failed: 0, Passed: 116, Total: 116`.
 
 - [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (15 Tests)**
   ```bash

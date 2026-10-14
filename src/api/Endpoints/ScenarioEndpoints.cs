@@ -40,6 +40,9 @@ public static partial class ScenarioEndpoints
     [GeneratedRegex(@"^\d{5}$", RegexOptions.Compiled)]
     private static partial Regex CbsaCodeRegex();
 
+    [GeneratedRegex(@"^\d{2}$", RegexOptions.Compiled)]
+    private static partial Regex CipFamilyRegex();
+
     public static void MapScenarioEndpoints(this WebApplication app)
     {
         var group = app.MapGroup("/api/scenarios");
@@ -263,7 +266,18 @@ public static partial class ScenarioEndpoints
         IScenarioRepository repository = default!,
         CancellationToken ct = default)
     {
-        var results = await repository.GetPositiveFindsAsync(cbsaCode, cipFamily, limit, ct);
+        if (!string.IsNullOrWhiteSpace(cbsaCode) && !CbsaCodeRegex().IsMatch(cbsaCode.Trim()))
+        {
+            return ValidationFailure("Invalid CBSA code", "CBSA code must be a 5-digit FIPS metro identifier.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(cipFamily) && !CipFamilyRegex().IsMatch(cipFamily.Trim()))
+        {
+            return ValidationFailure("Invalid CIP family", "CIP family must be a 2-digit code (e.g., '11').");
+        }
+
+        var clampedLimit = Math.Clamp(limit, 1, 100);
+        var results = await repository.GetPositiveFindsAsync(cbsaCode?.Trim(), cipFamily?.Trim(), clampedLimit, ct);
         return Results.Ok(results);
     }
 

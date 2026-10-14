@@ -111,15 +111,20 @@ def export_gold_to_sqlite(
         os.makedirs(target_dir, exist_ok=True)
         tmp_target_path = os.path.join(target_dir, f".tmp_{os.path.basename(sqlite_db_path)}")
 
-        # Copy local compiled database to target directory and publish atomically
+        # Copy local compiled database to target directory and publish atomically via os.replace
         shutil.copyfile(local_db_path, tmp_target_path)
         try:
             os.replace(tmp_target_path, sqlite_db_path)
-        except OSError:
-            # Fallback for cloud volume mounts (e.g. Databricks UC Volumes) that disallow atomic rename
-            shutil.copyfile(local_db_path, sqlite_db_path)
+        except OSError as err:
             if os.path.exists(tmp_target_path):
-                os.remove(tmp_target_path)
+                try:
+                    os.remove(tmp_target_path)
+                except OSError:
+                    pass
+            raise RuntimeError(
+                f"Failed to atomically publish compiled SQLite database to '{sqlite_db_path}': {err}. "
+                "Direct non-atomic overwrites are disallowed to prevent edge serving corruption."
+            ) from err
 
     return len(records)
 

@@ -75,22 +75,21 @@ def ingest_shared_scenarios_batch(
     """
     Read raw JSON scenario files and append to Bronze Delta table.
     Ensures delta.appendOnly is set to true.
-    Idempotent: uses left_anti join against existing file_names in target table to prevent duplicate ingestion.
+    Idempotent: uses left_anti join against existing canonical file paths in target table to prevent duplicate ingestion across subdirectories.
     """
     ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
 
     raw_text_df = spark.read.text(source_path)
 
-    # Filter out already-ingested files to prevent duplicate appends in append-only table
-    try:
-        existing_files = spark.table(target_table).select("file_name").distinct()
-        raw_text_df = raw_text_df.join(
-            existing_files,
-            raw_text_df["_metadata.file_name"] == existing_files["file_name"],
-            "left_anti",
-        )
-    except Exception:
-        pass
+    # Filter out already-ingested files to prevent duplicate appends in append-only table.
+    # Uses full canonical _metadata.file_path so identical filenames across distinct directories remain separate.
+    # No broad exception suppression: unexpected lookup or join errors propagate fail-closed.
+    existing_files = spark.table(target_table).select("file_name").distinct()
+    raw_text_df = raw_text_df.join(
+        existing_files,
+        raw_text_df["_metadata.file_path"] == existing_files["file_name"],
+        "left_anti",
+    )
 
     file_offset_col = (
         F.coalesce(F.col("_metadata.row_index"), F.monotonically_increasing_id())
@@ -104,7 +103,7 @@ def ingest_shared_scenarios_batch(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.col("_metadata.file_name").alias("file_name"),
+            F.col("_metadata.file_path").alias("file_name"),
             file_offset_col.alias("file_offset"),
         )
     )
@@ -143,7 +142,7 @@ def stream_shared_scenarios_autoloader(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.col("_metadata.file_name").alias("file_name"),
+            F.col("_metadata.file_path").alias("file_name"),
             F.coalesce(F.col("_metadata.row_index"), F.monotonically_increasing_id()).cast("bigint").alias("file_offset"),
         )
     )

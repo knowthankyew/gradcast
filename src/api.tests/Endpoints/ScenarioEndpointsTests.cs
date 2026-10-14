@@ -348,6 +348,17 @@ public class ScenarioEndpointHttpIntegrationTests : IClassFixture<WebApplication
         Assert.NotNull(items);
     }
 
+    [Theory]
+    [InlineData("invalid-cbsa", "11")]
+    [InlineData("41860", "1")]
+    [InlineData("41860", "111")]
+    [InlineData("41860", "ab")]
+    public async Task GetPositiveFinds_InvalidParameters_ReturnsBadRequest(string cbsaCode, string cipFamily)
+    {
+        var response = await _client.GetAsync($"/api/scenarios/positive-finds?cbsaCode={cbsaCode}&cipFamily={cipFamily}");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task GetScenarioById_ReturnsNotFound_WhenNotExists()
     {

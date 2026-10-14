@@ -89,7 +89,7 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 - [x] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
 - [x] Client identity is never recorded; `client_hash` is computed as `SHA256(Date.UtcNow.ToString("yyyy-MM-dd") + IP + Salt)`.
 - [x] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper in $< 5\text{ms}$.
-- [x] Existing 78/78 xUnit backend tests continue to pass (now 112/112 total).
+- [x] Existing 78/78 xUnit backend tests continue to pass (now 116/116 total).
 
 ### AI Coder Execution Prompt
 ```text
