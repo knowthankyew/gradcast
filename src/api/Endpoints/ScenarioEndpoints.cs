@@ -87,27 +87,32 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid salary", "Reported annual salary must be between $0 and $2,000,000.");
         }
 
-        if (request.MonthlyDisposable < -20_000)
+        if (request.MonthlyDisposable is < -20_000 or > 200_000)
         {
-            return ValidationFailure("Invalid disposable income", "Monthly disposable income cannot be below -$20,000.");
+            return ValidationFailure("Invalid disposable income", "Monthly disposable income must be between -$20,000 and $200,000.");
         }
 
-        if (request.MonthlyNetTakeHome < 0)
+        if (request.MonthlyNetTakeHome is < 0 or > 200_000)
         {
-            return ValidationFailure("Invalid take-home pay", "Monthly net take-home pay cannot be negative.");
+            return ValidationFailure("Invalid take-home pay", "Monthly net take-home pay must be between $0 and $200,000.");
         }
 
-        if (request.MonthlyRent < 0)
+        if (request.MonthlyRent is < 0 or > 50_000)
         {
-            return ValidationFailure("Invalid rent", "Monthly rent cannot be negative.");
+            return ValidationFailure("Invalid rent", "Monthly rent must be between $0 and $50,000.");
         }
 
-        if (request.MonthlyLoanPayment < 0)
+        if (request.MonthlyLoanPayment is < 0 or > 50_000)
         {
-            return ValidationFailure("Invalid loan payment", "Monthly loan payment cannot be negative.");
+            return ValidationFailure("Invalid loan payment", "Monthly loan payment must be between $0 and $50,000.");
         }
 
-        if (request.MonthlyDisposable != request.MonthlyNetTakeHome - request.MonthlyRent - request.MonthlyLoanPayment)
+        if (double.IsNaN(request.DisposableRatio) || double.IsInfinity(request.DisposableRatio) || request.DisposableRatio is < -100.0 or > 100.0)
+        {
+            return ValidationFailure("Invalid disposable ratio", "Disposable ratio is out of range.");
+        }
+
+        if ((long)request.MonthlyDisposable != (long)request.MonthlyNetTakeHome - request.MonthlyRent - request.MonthlyLoanPayment)
         {
             return ValidationFailure("Inconsistent financials", "Monthly disposable must equal net take-home minus rent and loan payment.");
         }

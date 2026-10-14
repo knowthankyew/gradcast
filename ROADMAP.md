@@ -51,9 +51,9 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 | **Stage 2** | **Lakehouse Foundation & IaC** | Cloud / Governance | Terraform Unity Catalog provisioning (catalogs, schemas, service principals), Databricks Asset Bundle (`databricks.yml`), OAuth M2M authentication. | ✅ **Completed** |
 | **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | ✅ **Completed** |
 | **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | ✅ **Completed** |
-| **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | ✅ **Completed** |
+| **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Declarative data quality contracts (`expectations.py`), quarantine error classification, Databricks Lakehouse Monitor configuration, and distribution drift profiling. | ✅ **Completed** |
 | **Stage 6** | **Testing Harness & Verification** | Quality Engineering | Isolated unit testing across Silver transforms, $k$-anonymity view generation, Reverse-ETL SQLite compiler, and ASP.NET Core API suite. | ✅ **Completed** |
-| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `lakehouse/scripts/audit_claims.py` documentation linter and CycloneDX SBOM generation (`bom.json`) for multi-language supply chain security. | ✅ **Completed** |
+| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `lakehouse/scripts/audit_claims.py` documentation linter and CycloneDX SBOM generation (`lakehouse/bom.json`) for supply chain assurance. | ✅ **Completed** |
 
 ---
 
@@ -88,7 +88,7 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 ### Acceptance Criteria
 - [x] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
 - [x] Client identity is never recorded; `client_hash` is computed as `SHA256(Date.UtcNow.ToString("yyyy-MM-dd") + IP + Salt)`.
-- [x] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper in $< 5\text{ms}$.
+- [x] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper with covering index optimization.
 - [x] Existing 78/78 xUnit backend tests continue to pass (now 116/116 total).
 
 ### AI Coder Execution Prompt
@@ -258,9 +258,9 @@ Enterprise single sources of truth require continuous data quality verification.
    - `expect_or_fail`: Schema corruption halts execution immediately.
 
 ### Acceptance Criteria
-- [x] Data quality checks execute in $< 30\text{s}$ over 100,000 records.
+- [x] Data quality expectations and quarantine routing execute cleanly over batch transformations.
 - [x] Quarantined records write to `quarantine.scenarios_rejected` with failure reason string.
-- [x] OpenTelemetry trace attributes adhere strictly to `SAFE_ALLOWLIST_KEYS`.
+- [x] Lakehouse telemetry attributes adhere strictly to `SAFE_TELEMETRY_ALLOWLIST` (zero PII).
 
 ### AI Coder Execution Prompt
 ```text
@@ -298,7 +298,7 @@ A core requirement for lead/architect roles at companies like Google is rigorous
    - `lakehouse/tests/e2e/test_reverse_etl.py`: Exercises `export_gold_to_sqlite`, SQLite VACUUM, and covering indexes.
 
 ### Acceptance Criteria
-- [x] All unit and integration tests execute locally via `python3 -m unittest discover -s lakehouse/tests` in $< 5\text{s}$.
+- [x] All unit and integration tests execute locally in fast headless mode via `python3 -m unittest discover -s lakehouse/tests`.
 - [x] Tests run cleanly in GitHub Actions CI with zero cloud credentials.
 - [x] Reverse-ETL compiler verifies atomic replace and SQLite query performance.
 
@@ -332,7 +332,7 @@ To ensure the codebase, documentation, schemas, and CI supply chain remain in ab
     2. Presence of the $k \ge 5$ invariant in Gold view definitions.
     3. Absence of prohibited adjectives (*"bulletproof"*, *"instant"*, *"conclusive"*).
     4. Guarded word verification (*"verified"*, *"ACID"*, *"100%"*).
-  - GitHub Actions CI workflow generating CycloneDX SBOM (`bom.json`) across Python, .NET, and frontend dependencies.
+  - GitHub Actions CI workflow generating CycloneDX SBOM (`lakehouse/bom.json`) for Python Lakehouse dependencies.
 - **OUT OF SCOPE**: Manual audit reviews.
 
 ### Technical Specification
@@ -342,7 +342,7 @@ To ensure the codebase, documentation, schemas, and CI supply chain remain in ab
 
 ### Acceptance Criteria
 - [x] `python3 lakehouse/scripts/audit_claims.py` exits `0` on parity, exits `1` with clear diff on drift.
-- [x] CycloneDX SBOM (`bom.json`) generated automatically for Python and .NET dependencies.
+- [x] CycloneDX SBOM (`lakehouse/bom.json`) generated automatically for Python Lakehouse dependencies in CI.
 - [x] CI pipeline fails-closed if any claim, invariant, or test fails.
 
 ### AI Coder Execution Prompt

@@ -156,7 +156,9 @@ CREATE TABLE IF NOT EXISTS gradcast_lakehouse.bronze.shared_scenarios (
 USING DELTA
 TBLPROPERTIES (
     'delta.appendOnly' = 'true',
-    'delta.autoOptimize.optimizeWrite' = 'true'
+    'delta.autoOptimize.optimizeWrite' = 'true',
+    'delta.enableChangeDataFeed' = 'true',
+    'delta.deletedFileRetentionDuration' = 'interval 30 days'
 );
 ```
 
@@ -208,18 +210,16 @@ CREATE TABLE IF NOT EXISTS gradcast_lakehouse.silver.scenarios (
     disposable_ratio DOUBLE NOT NULL,
     sentiment_tag STRING NOT NULL,
     is_valid_positive_find BOOLEAN NOT NULL,
-    _updated_at TIMESTAMP NOT NULL,
-
-    CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00),
-    CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)
+    _updated_at TIMESTAMP NOT NULL
 )
 USING DELTA
 CLUSTER BY (cip_family, cbsa_code)
 TBLPROPERTIES (
-    'delta.enableChangeDataFeed' = 'true',
-    'delta.minReaderVersion' = '2',
-    'delta.minWriterVersion' = '5'
+    'delta.enableChangeDataFeed' = 'true'
 );
+
+ALTER TABLE gradcast_lakehouse.silver.scenarios ADD CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00);
+ALTER TABLE gradcast_lakehouse.silver.scenarios ADD CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00);
 ```
 
 #### Table: `gradcast_lakehouse.quarantine.scenarios_rejected`
@@ -462,11 +462,11 @@ def export_gold_to_sqlite(spark, sqlite_db_path: str, catalog: str = "gradcast_l
 ## 6. Security, Identity & Governance Controls
 
 1. **Unity Catalog Privileges**:
-   - `service_principal_etl`: `ALL PRIVILEGES` on `bronze`, `silver`, `gold`.
-   - `web_api_ingest`: `INSERT` on `bronze.shared_scenarios`.
-   - `analyst_role`: `SELECT` on `gold.*` (Denied access to raw bronze strings).
-2. **Column Masking**:
-   - `client_hash` is masked with a cryptographic salt in Silver; stripped entirely in Gold.
+   - `gradcast-lakehouse-pipeline-runner-${environment}`: Service principal with `USE_SCHEMA`, `SELECT`, `MODIFY`, and `CREATE_TABLE` across `bronze`, `silver`, `gold`, `quarantine`, and `control`, plus read/write volume permissions.
+   - `gradcast-analysts-${environment}`: Analyst group with `USE_CATALOG` and `USE_SCHEMA` on `gold` (strictly denied access to raw bronze strings and quarantine payloads).
+2. **Privacy Boundary & Column Conformance**:
+   - `client_hash` is computed at the edge using a daily salted SHA-256 hash. In Silver conformance, `client_hash` and `scenario_title` are excluded entirely from `silver.scenarios`.
+   - Raw edge payloads in `quarantine.scenarios_rejected` are isolated strictly to the automated pipeline runner service principal for data engineering diagnosis.
 3. **Data Retention & VACUUM**:
    - Bronze tables retain 30 days of transaction history (`delta.deletedFileRetentionDuration = 'interval 30 days'`).
    - Silver/Gold retain 7 days (`VACUUM gradcast_lakehouse.silver.scenarios RETAIN 168 HOURS`).

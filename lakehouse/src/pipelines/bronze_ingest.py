@@ -61,7 +61,9 @@ def ensure_bronze_shared_scenarios_table(
         USING DELTA
         TBLPROPERTIES (
             'delta.appendOnly' = 'true',
-            'delta.autoOptimize.optimizeWrite' = 'true'
+            'delta.autoOptimize.optimizeWrite' = 'true',
+            'delta.enableChangeDataFeed' = 'true',
+            'delta.deletedFileRetentionDuration' = 'interval 30 days'
         )
     """)
 

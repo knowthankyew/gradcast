@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'lakehouse/**'
+      - 'src/**'
       - '.github/workflows/lakehouse-ci.yml'
       - 'docs/SCHEMA.md'
       - 'ROADMAP.md'
@@ -14,6 +15,7 @@ on:
       - main
     paths:
       - 'lakehouse/**'
+      - 'src/**'
       - '.github/workflows/lakehouse-ci.yml'
       - 'docs/SCHEMA.md'
       - 'ROADMAP.md'

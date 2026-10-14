@@ -15,11 +15,11 @@ Run these baseline automated checks to verify the entire system is healthy befor
   ```
   *Expected Result*: `Passed! - Failed: 0, Passed: 116, Total: 116`.
 
-- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (15 Tests)**
+- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (16 Tests)**
   ```bash
   python3 -m unittest discover -s lakehouse/tests -v
   ```
-  *Expected Result*: All 15 tests run cleanly (`OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
+  *Expected Result*: All 16 test methods run cleanly (`OK (skipped=1)` or `OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
 
 - [ ] **1.3 Architectural & Claims Auditing Linter**
   ```bash

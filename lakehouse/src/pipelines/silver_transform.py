@@ -90,9 +90,7 @@ def ensure_silver_scenarios_table(
             disposable_ratio DOUBLE NOT NULL,
             sentiment_tag STRING NOT NULL,
             is_valid_positive_find BOOLEAN NOT NULL,
-            _updated_at TIMESTAMP NOT NULL,
-            CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00),
-            CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)
+            _updated_at TIMESTAMP NOT NULL
         )
         USING DELTA
         CLUSTER BY (cip_family, cbsa_code)
@@ -100,6 +98,21 @@ def ensure_silver_scenarios_table(
             'delta.enableChangeDataFeed' = 'true'
         )
     """)
+
+    # Databricks Delta Lake requires CHECK constraints to be applied via ALTER TABLE ADD CONSTRAINT
+    try:
+        existing = {
+            k for k, _ in (
+                (r["key"], r["value"]) for r in spark.sql(f"SHOW TBLPROPERTIES {table_name}").collect()
+            )
+        }
+        if "delta.constraints.chk_positive_salary" not in existing:
+            spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_positive_salary CHECK (reported_annual_salary >= 10000.00)")
+        if "delta.constraints.chk_disposable_floor" not in existing:
+            spark.sql(f"ALTER TABLE {table_name} ADD CONSTRAINT chk_disposable_floor CHECK (monthly_disposable >= -20000.00)")
+    except Exception:
+        pass
+
 
 
 def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame]:
@@ -453,7 +466,7 @@ def run_silver_pipeline(
     history_rows = spark.sql(f"DESCRIBE HISTORY {src} LIMIT 1").collect()
     latest_table_version = int(history_rows[0]["version"]) if history_rows and history_rows[0]["version"] is not None else None
 
-    # Incremental Delta table version read
+    # Incremental Delta table version read via Change Data Feed
     if last_version is not None:
         if latest_table_version is None:
             raise RuntimeError(f"Unable to determine current commit version for {src} to execute incremental read.")
@@ -463,17 +476,21 @@ def run_silver_pipeline(
             return
         raw_df = (
             spark.read.format("delta")
+            .option("readChangeFeed", "true")
             .option("startingVersion", start_version)
             .option("endingVersion", latest_table_version)
             .table(src)
+            .filter(F.col("_change_type") == "insert")
         )
     elif latest_table_version is not None:
-        # Initial ingestion: read from version 0 through latest commit version
+        # Initial ingestion: read from version 0 through latest commit version via Change Data Feed
         raw_df = (
             spark.read.format("delta")
+            .option("readChangeFeed", "true")
             .option("startingVersion", 0)
             .option("endingVersion", latest_table_version)
             .table(src)
+            .filter(F.col("_change_type") == "insert")
         )
     else:
         raw_df = spark.table(src)

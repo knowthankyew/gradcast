@@ -27,6 +27,7 @@ PROHIBITED_WORDS = [
     re.compile(r"\bconclusive\b", re.IGNORECASE),
     re.compile(r"\bdefinitive\b", re.IGNORECASE),
     re.compile(r"\binfinitely scalable\b", re.IGNORECASE),
+    re.compile(r"\binstant\b", re.IGNORECASE),
 ]
 
 EXPECTED_SCHEMA_TABLES = [
@@ -213,6 +214,7 @@ def audit_vocabulary(errors: List[str]) -> None:
     """Check markdown docs and source comments for prohibited marketing terms."""
     docs_to_check = [
         REPO_ROOT / "docs" / "SCHEMA.md",
+        REPO_ROOT / "docs" / "QA_CHECKLIST.md",
         REPO_ROOT / "ROADMAP.md",
     ]
 
