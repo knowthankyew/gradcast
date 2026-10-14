@@ -126,7 +126,7 @@ def stream_shared_scenarios_autoloader(
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
             F.col("_metadata.file_name").alias("file_name"),
-            F.monotonically_increasing_id().alias("file_offset"),
+            F.coalesce(F.col("_metadata.row_index"), F.monotonically_increasing_id()).cast("bigint").alias("file_offset"),
         )
     )
 

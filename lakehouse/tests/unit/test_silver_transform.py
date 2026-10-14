@@ -29,14 +29,15 @@ def extract_cip_family(cip_code: str) -> str:
 
 def validate_scenario_record(record: dict) -> tuple[bool, str]:
     """Pure-logic validator mirroring Silver quarantine rules."""
+    import re
     if not record.get("id"):
         return False, "Missing scenario ID"
     if not record.get("created_at"):
         return False, "Invalid timestamp"
     if record.get("school_id") is None or record.get("school_id", 0) <= 0:
         return False, "Invalid school ID"
-    if not record.get("cip_code"):
-        return False, "Missing CIP code"
+    if not record.get("cip_code") or not re.match(r"^\d{2}(\.\d{2,4})?$", str(record.get("cip_code"))):
+        return False, "Invalid or unparseable CIP code"
     if not record.get("cbsa_code"):
         return False, "Missing CBSA code"
     if record.get("reported_annual_salary") is None:
@@ -126,6 +127,20 @@ class TestSilverTransform(unittest.TestCase):
         is_valid, reason = validate_scenario_record(record)
         self.assertFalse(is_valid)
         self.assertEqual(reason, "Missing monthly disposable")
+
+    def test_malformed_cip_quarantined(self):
+        record = {
+            "id": "scen-test-06",
+            "created_at": "2026-10-14T12:00:00Z",
+            "school_id": 101,
+            "cip_code": "x",
+            "cbsa_code": "41860",
+            "reported_annual_salary": 95000.00,
+            "monthly_disposable": 3500.00,
+        }
+        is_valid, reason = validate_scenario_record(record)
+        self.assertFalse(is_valid)
+        self.assertEqual(reason, "Invalid or unparseable CIP code")
 
     def test_silver_pipeline_module_and_schema_integrity(self):
         self.assertIsNotNone(SCENARIO_JSON_SCHEMA)

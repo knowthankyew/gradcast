@@ -32,9 +32,13 @@ def compute_batch_health_metrics(
     quarantine_df: DataFrame,
     pipeline_name: str = "gradcast_medallion",
     table_name: str = "silver.scenarios",
+    batch_id: str = "batch-latest",
+    baseline_median_salary: float = 65000.0,
+    baseline_median_disposable: float = 1500.0,
 ) -> Dict[str, Any]:
     """
     Compute structured health metrics for an ingestion batch without persisting PII.
+    Evaluates distribution drift against reference baselines independently of quarantine rate.
     """
     valid_count = valid_df.count()
     quarantine_count = quarantine_df.count()
@@ -50,13 +54,22 @@ def compute_batch_health_metrics(
     median_salary = float(salary_stats["median_salary"]) if salary_stats and salary_stats["median_salary"] is not None else 0.0
     median_disposable = float(salary_stats["median_disposable"]) if salary_stats and salary_stats["median_disposable"] is not None else 0.0
 
-    # Drift heuristic: flag if quarantine rate exceeds 5%
-    drift_detected = quarantine_rate > 0.05
+    # Independent distribution drift: flag if median salary or disposable deviates > 25% from baseline distribution,
+    # or if quarantine rate exceeds 5% quality threshold.
+    salary_drift = False
+    if baseline_median_salary > 0 and median_salary > 0:
+        salary_drift = abs(median_salary - baseline_median_salary) / baseline_median_salary > 0.25
+
+    disposable_drift = False
+    if baseline_median_disposable != 0 and median_disposable != 0:
+        disposable_drift = abs(median_disposable - baseline_median_disposable) / abs(baseline_median_disposable) > 0.25
+
+    drift_detected = salary_drift or disposable_drift or (quarantine_rate > 0.05)
 
     raw_metrics = {
         "pipeline_name": pipeline_name,
         "table_name": table_name,
-        "batch_id": "batch-latest",
+        "batch_id": batch_id,
         "total_records": total_records,
         "quarantined_records": quarantine_count,
         "quarantine_rate": round(quarantine_rate, 4),

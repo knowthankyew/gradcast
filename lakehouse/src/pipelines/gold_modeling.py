@@ -210,7 +210,11 @@ def populate_dimensions(
         ON target.cbsa_code = source.cbsa_code
         WHEN MATCHED THEN
             UPDATE SET
-                target.metro_name = source.metro_name,
+                target.metro_name = CASE 
+                    WHEN source.metro_name NOT LIKE 'Metro Area %' THEN source.metro_name
+                    WHEN target.metro_name IS NULL OR target.metro_name LIKE 'Metro Area %' THEN source.metro_name
+                    ELSE target.metro_name
+                END,
                 target.state_code = source.state_code,
                 target.metro_type = source.metro_type
         WHEN NOT MATCHED THEN
@@ -238,7 +242,11 @@ def populate_dimensions(
         ON target.school_id = source.school_id
         WHEN MATCHED THEN
             UPDATE SET
-                target.school_name = source.school_name
+                target.school_name = CASE 
+                    WHEN source.school_name NOT LIKE 'Institution #%' THEN source.school_name
+                    WHEN target.school_name IS NULL OR target.school_name LIKE 'Institution #%' THEN source.school_name
+                    ELSE target.school_name
+                END
         WHEN NOT MATCHED THEN
             INSERT (school_id, school_name, city, state, school_url, ownership)
             VALUES (source.school_id, source.school_name, source.city, source.state, source.school_url, source.ownership)

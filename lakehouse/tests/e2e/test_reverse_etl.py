@@ -79,6 +79,17 @@ class TestReverseEtlSqlite(unittest.TestCase):
             index_row = cursor.fetchone()
             self.assertIsNotNone(index_row)
 
+            # Verify query plan utilizes the covering index
+            cursor.execute("""
+                EXPLAIN QUERY PLAN
+                SELECT sample_count, median_monthly_disposable
+                FROM community_scenario_benchmarks
+                WHERE cbsa_code = ? AND cip_family = ?;
+            """, ("41860", "11"))
+            plan_rows = cursor.fetchall()
+            plan_str = " ".join([str(col) for r in plan_rows for col in r])
+            self.assertIn("IX_community_scenario_benchmarks_cbsa_cip", plan_str)
+
     def test_export_gold_to_sqlite_full_pipeline(self):
         fake_rows = [
             {

@@ -31,6 +31,7 @@ public record ShareScenarioRequest(
     [Range(0, 2_000_000, ErrorMessage = "Reported annual salary must be between $0 and $2,000,000.")]
     int ReportedAnnualSalary,
 
+    [Range(0, 200_000, ErrorMessage = "Monthly net take-home must be non-negative.")]
     int MonthlyNetTakeHome,
 
     [Range(0, 50_000, ErrorMessage = "Monthly rent must be non-negative.")]
@@ -42,6 +43,7 @@ public record ShareScenarioRequest(
     [Range(-20_000, 1_000_000, ErrorMessage = "Monthly disposable cannot be below -$20,000.")]
     int MonthlyDisposable,
 
+    [Range(-100.0, 100.0, ErrorMessage = "Disposable ratio is out of range.")]
     double DisposableRatio,
 
     [Required(ErrorMessage = "Sentiment tag is required.")]

@@ -362,35 +362,41 @@ public class StubScenarioRepository : IScenarioRepository
 
     public Task<string> InsertScenarioAsync(SharedScenario scenario, CancellationToken ct = default)
     {
-        _scenarios.Add(scenario);
-        return Task.FromResult(scenario.Id);
+        lock (_scenarios)
+        {
+            _scenarios.Add(scenario);
+            return Task.FromResult(scenario.Id);
+        }
     }
 
     public Task<SharedScenarioDto?> GetByIdAsync(string id, CancellationToken ct = default)
     {
-        var found = _scenarios.FirstOrDefault(s => s.Id == id);
-        if (found == null) return Task.FromResult<SharedScenarioDto?>(null);
+        lock (_scenarios)
+        {
+            var found = _scenarios.FirstOrDefault(s => s.Id == id);
+            if (found == null) return Task.FromResult<SharedScenarioDto?>(null);
 
-        return Task.FromResult<SharedScenarioDto?>(new SharedScenarioDto(
-            found.Id,
-            found.CreatedAt,
-            found.SchoolId,
-            "Stub School",
-            found.CipCode,
-            found.CredentialLevel,
-            found.CbsaCode,
-            "Stub Location",
-            found.HousingType,
-            found.SalaryMode,
-            found.ReportedAnnualSalary,
-            found.MonthlyNetTakeHome,
-            found.MonthlyRent,
-            found.MonthlyLoanPayment,
-            found.MonthlyDisposable,
-            found.DisposableRatio,
-            found.SentimentTag,
-            found.ScenarioTitle
-        ));
+            return Task.FromResult<SharedScenarioDto?>(new SharedScenarioDto(
+                found.Id,
+                found.CreatedAt,
+                found.SchoolId,
+                "Stub School",
+                found.CipCode,
+                found.CredentialLevel,
+                found.CbsaCode,
+                "Stub Location",
+                found.HousingType,
+                found.SalaryMode,
+                found.ReportedAnnualSalary,
+                found.MonthlyNetTakeHome,
+                found.MonthlyRent,
+                found.MonthlyLoanPayment,
+                found.MonthlyDisposable,
+                found.DisposableRatio,
+                found.SentimentTag,
+                found.ScenarioTitle
+            ));
+        }
     }
 
     public Task<IReadOnlyList<SharedScenarioDto>> GetPositiveFindsAsync(
@@ -399,39 +405,45 @@ public class StubScenarioRepository : IScenarioRepository
         int limit = 20,
         CancellationToken ct = default)
     {
-        var items = _scenarios
-            .Where(s => s.MonthlyDisposable > 0)
-            .Where(s => cbsaCode == null || s.CbsaCode == cbsaCode)
-            .Select(s => new SharedScenarioDto(
-                s.Id,
-                s.CreatedAt,
-                s.SchoolId,
-                "Stub School",
-                s.CipCode,
-                s.CredentialLevel,
-                s.CbsaCode,
-                "Stub Location",
-                s.HousingType,
-                s.SalaryMode,
-                s.ReportedAnnualSalary,
-                s.MonthlyNetTakeHome,
-                s.MonthlyRent,
-                s.MonthlyLoanPayment,
-                s.MonthlyDisposable,
-                s.DisposableRatio,
-                s.SentimentTag,
-                s.ScenarioTitle
-            ))
-            .Take(limit)
-            .ToList();
+        lock (_scenarios)
+        {
+            var items = _scenarios
+                .Where(s => s.MonthlyDisposable > 0)
+                .Where(s => cbsaCode == null || s.CbsaCode == cbsaCode)
+                .Select(s => new SharedScenarioDto(
+                    s.Id,
+                    s.CreatedAt,
+                    s.SchoolId,
+                    "Stub School",
+                    s.CipCode,
+                    s.CredentialLevel,
+                    s.CbsaCode,
+                    "Stub Location",
+                    s.HousingType,
+                    s.SalaryMode,
+                    s.ReportedAnnualSalary,
+                    s.MonthlyNetTakeHome,
+                    s.MonthlyRent,
+                    s.MonthlyLoanPayment,
+                    s.MonthlyDisposable,
+                    s.DisposableRatio,
+                    s.SentimentTag,
+                    s.ScenarioTitle
+                ))
+                .Take(limit)
+                .ToList();
 
-        return Task.FromResult<IReadOnlyList<SharedScenarioDto>>(items);
+            return Task.FromResult<IReadOnlyList<SharedScenarioDto>>(items);
+        }
     }
 
     public Task<int> GetDailySubmissionCountByClientHashAsync(string clientHash, string datePrefixUtc, CancellationToken ct = default)
     {
-        var count = _scenarios.Count(s => s.ClientHash == clientHash && s.CreatedAt.StartsWith(datePrefixUtc));
-        return Task.FromResult(count);
+        lock (_scenarios)
+        {
+            var count = _scenarios.Count(s => s.ClientHash == clientHash && s.CreatedAt.StartsWith(datePrefixUtc));
+            return Task.FromResult(count);
+        }
     }
 
     public Task<bool> TryInsertScenarioWithDailyLimitAsync(SharedScenario scenario, int maxDailyLimit, string datePrefixUtc, CancellationToken ct = default)
