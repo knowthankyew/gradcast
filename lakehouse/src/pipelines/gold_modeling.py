@@ -223,18 +223,48 @@ def populate_dimensions(
     """)
 
     # 3. dim_school (unique per school_id)
-    school_df = (
-        silver_scenarios
-        .select(
-            F.col("school_id"),
-            F.concat(F.lit("Institution #"), F.col("school_id")).alias("school_name"),
-            F.lit("Unknown").alias("city"),
-            F.lit("US").alias("state"),
-            F.lit(None).cast("string").alias("school_url"),
-            F.lit(1).cast("int").alias("ownership"),
+    try:
+        scorecard_df = spark.table(f"{catalog}.bronze.college_scorecard")
+        scorecard_schools = (
+            scorecard_df
+            .select(
+                F.col("unitid").cast("int").alias("school_id"),
+                F.coalesce(F.col("instnm"), F.concat(F.lit("Institution #"), F.col("unitid"))).alias("school_name"),
+                F.lit("Unknown").alias("city"),
+                F.lit("US").alias("state"),
+                F.lit(None).cast("string").alias("school_url"),
+                F.lit(1).cast("int").alias("ownership"),
+            )
+            .filter(F.col("school_id").isNotNull())
+            .dropDuplicates(["school_id"])
         )
-        .dropDuplicates(["school_id"])
-    )
+        scenario_schools = (
+            silver_scenarios
+            .select(
+                F.col("school_id"),
+                F.concat(F.lit("Institution #"), F.col("school_id")).alias("school_name"),
+                F.lit("Unknown").alias("city"),
+                F.lit("US").alias("state"),
+                F.lit(None).cast("string").alias("school_url"),
+                F.lit(1).cast("int").alias("ownership"),
+            )
+            .dropDuplicates(["school_id"])
+        )
+        school_df = scorecard_schools.unionByName(scenario_schools).dropDuplicates(["school_id"])
+    except Exception:
+        school_df = (
+            silver_scenarios
+            .select(
+                F.col("school_id"),
+                F.concat(F.lit("Institution #"), F.col("school_id")).alias("school_name"),
+                F.lit("Unknown").alias("city"),
+                F.lit("US").alias("state"),
+                F.lit(None).cast("string").alias("school_url"),
+                F.lit(1).cast("int").alias("ownership"),
+            )
+            .dropDuplicates(["school_id"])
+        )
+
     school_df.createOrReplaceTempView("stage_dim_school")
     spark.sql(f"""
         MERGE INTO {catalog}.gold.dim_school AS target
@@ -246,7 +276,11 @@ def populate_dimensions(
                     WHEN source.school_name NOT LIKE 'Institution #%' THEN source.school_name
                     WHEN target.school_name IS NULL OR target.school_name LIKE 'Institution #%' THEN source.school_name
                     ELSE target.school_name
-                END
+                END,
+                target.city = CASE WHEN source.city != 'Unknown' THEN source.city ELSE target.city END,
+                target.state = CASE WHEN source.state != 'US' THEN source.state ELSE target.state END,
+                target.school_url = COALESCE(source.school_url, target.school_url),
+                target.ownership = COALESCE(source.ownership, target.ownership)
         WHEN NOT MATCHED THEN
             INSERT (school_id, school_name, city, state, school_url, ownership)
             VALUES (source.school_id, source.school_name, source.city, source.state, source.school_url, source.ownership)

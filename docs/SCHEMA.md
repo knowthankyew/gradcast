@@ -124,7 +124,14 @@ CREATE TABLE IF NOT EXISTS "community_scenario_benchmarks" (
     "p75_monthly_disposable" INTEGER NOT NULL,
     "top_contributing_school_id" INTEGER NULL,
     "last_updated_at" TEXT NOT NULL,
-    CONSTRAINT "PK_community_scenario_benchmarks" PRIMARY KEY ("cip_family", "cbsa_code", "credential_level", "housing_type")
+    CONSTRAINT "PK_community_scenario_benchmarks" PRIMARY KEY ("cip_family", "cbsa_code", "credential_level", "housing_type"),
+    CONSTRAINT "FK_community_benchmarks_cbsa" FOREIGN KEY ("cbsa_code") REFERENCES "cbsa_locations" ("cbsa_code") ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS "IX_community_scenario_benchmarks_cbsa_cip" 
+ON "community_scenario_benchmarks" (
+    "cbsa_code", "cip_family", "credential_level", "housing_type",
+    "sample_count", "p25_monthly_disposable", "median_monthly_disposable", "p75_monthly_disposable"
 );
 ```
 

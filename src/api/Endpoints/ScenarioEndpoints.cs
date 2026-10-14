@@ -226,7 +226,7 @@ public static partial class ScenarioEndpoints
         var entity = new SharedScenario
         {
             Id = scenarioId,
-            CreatedAt = DateTime.UtcNow.ToString("o"),
+            CreatedAt = nowUtc.ToString("o"),
             SchoolId = request.SchoolId,
             CipCode = request.CipCode.Trim(),
             CredentialLevel = request.CredentialLevel,

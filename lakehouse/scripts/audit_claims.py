@@ -41,6 +41,7 @@ EXPECTED_SCHEMA_TABLES = [
     ("gold.fact_scenario_outcomes", REPO_ROOT / "lakehouse/src/pipelines/gold_modeling.py"),
     ("v_public_positive_finds", REPO_ROOT / "lakehouse/src/pipelines/views.py"),
     ("community_scenario_benchmarks", REPO_ROOT / "lakehouse/src/pipelines/export_sqlite.py"),
+    ("community_scenario_benchmarks", REPO_ROOT / "src/data/SqliteDatabaseInitializer.cs"),
 ]
 
 
@@ -229,7 +230,7 @@ def audit_vocabulary(errors: List[str]) -> None:
                     errors.append(f"Prohibited word '{pattern.pattern}' found in {doc.name}:{idx}: {line.strip()}")
 
 
-def audit_portfolio_master_brief(errors: List[str]) -> bool:
+def audit_portfolio_master_brief(errors: List[str], require_brief: bool = False) -> bool:
     """Verify that KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md matches current test inventory."""
     brief_candidates = [
         DEV_ROOT / "KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md",
@@ -238,6 +239,9 @@ def audit_portfolio_master_brief(errors: List[str]) -> bool:
     brief_file = next((f for f in brief_candidates if f.is_file()), None)
 
     if not brief_file:
+        if require_brief:
+            errors.append("KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md not found but required via --require-brief.")
+            return False
         print("[audit-claims] Note: KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md not found in parent directory (skipping brief check in isolated CI).")
         return False
 
@@ -272,13 +276,18 @@ def audit_portfolio_master_brief(errors: List[str]) -> bool:
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description="GradCast Claims, Architecture & Privacy Invariant Audit")
+    parser.add_argument("--require-brief", action="store_true", help="Require Portfolio Master Brief to be present")
+    args = parser.parse_args()
+
     print("=== GradCast Claims, Architecture & Privacy Invariant Audit ===")
     errors: List[str] = []
 
     audit_schema_parity(errors)
     audit_privacy_invariants(errors)
     audit_vocabulary(errors)
-    brief_checked = audit_portfolio_master_brief(errors)
+    brief_checked = audit_portfolio_master_brief(errors, require_brief=args.require_brief)
 
     if errors:
         print(f"\n[FAIL] Found {len(errors)} documentation / architectural claim violation(s):")

@@ -507,7 +507,8 @@ def run_silver_pipeline(
                 pipeline_name="silver_transform"
             )
         except Exception as e:
-            print(f"Notice: Failed to persist high watermark: {e}")
+            print(f"Error: Failed to persist high watermark: {e}")
+            raise
 
 
 if __name__ == "__main__":
