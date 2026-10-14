@@ -79,6 +79,21 @@ def audit_privacy_invariants(errors: List[str]) -> None:
     if "effective_min_k = max(min_cohort_size, 5)" not in content and "HAVING COUNT(*) >= 5" not in content:
         errors.append("Privacy violation: v_public_positive_finds does not enforce effective_min_k >= 5 clamp")
 
+    # Dynamic execution test of k-anonymity SQL generator
+    try:
+        import sys
+        lakehouse_dir = str(REPO_ROOT / "lakehouse")
+        if lakehouse_dir not in sys.path:
+            sys.path.insert(0, lakehouse_dir)
+        from src.pipelines.views import get_k_anonymity_view_sql
+        generated_sql_clamped = get_k_anonymity_view_sql(catalog="audit_cat", min_cohort_size=1)
+        if "HAVING COUNT(*) >= 5" not in generated_sql_clamped:
+            errors.append("Privacy violation: get_k_anonymity_view_sql(min_cohort_size=1) failed to enforce k >= 5 clamp")
+        if "HAVING COUNT(*) >= 1" in generated_sql_clamped:
+            errors.append("Privacy violation: get_k_anonymity_view_sql(min_cohort_size=1) emitted unsuppressed threshold >= 1")
+    except Exception as exc:
+        errors.append(f"Failed to execute dynamic k-anonymity invariant test: {exc}")
+
     # Verify SHA-256 hashing in ScenarioEndpoints
     endpoint_file = REPO_ROOT / "src/api/Endpoints/ScenarioEndpoints.cs"
     if not endpoint_file.is_file():
@@ -139,7 +154,7 @@ def audit_portfolio_master_brief(errors: List[str]) -> bool:
     total_tests = fact_count + theory_count
 
     expected_marker = f"{total_tests}/{total_tests}"
-    if expected_marker not in brief_content:
+    if not re.search(rf"\b{total_tests}/{total_tests}\b", brief_content):
         errors.append(
             f"Portfolio Brief Drift: {brief_file.name} does not reflect current GradCast test count ({expected_marker} Unit Tests)."
         )

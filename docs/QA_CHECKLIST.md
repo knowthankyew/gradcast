@@ -8,18 +8,18 @@
 
 Run these baseline automated checks to verify the entire system is healthy before manual probing:
 
-- [ ] **1.1 .NET 10 Backend Test Suite (107 Tests)**
+- [ ] **1.1 .NET 10 Backend Test Suite (112 Tests)**
   ```bash
   cd /Users/cl0rkster/Dev/gradcast
   dotnet test
   ```
   *Expected Result*: `Passed! - Failed: 0, Passed: 112, Total: 112`.
 
-- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (13 Tests)**
+- [ ] **1.2 Lakehouse Python & SQLite Compiler Unit Tests (14 Tests)**
   ```bash
   python3 -m unittest discover -s lakehouse/tests -v
   ```
-  *Expected Result*: All 13 tests pass (`OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
+  *Expected Result*: All 14 tests run cleanly (`OK`), confirming Silver validation, $k$-anonymity suppression, and SQLite benchmark table creation.
 
 - [ ] **1.3 Architectural & Claims Auditing Linter**
   ```bash

@@ -93,13 +93,16 @@ CREATE TABLE IF NOT EXISTS "shared_scenarios" (
     "scenario_title" TEXT NULL,                                     -- Sanitized user label (max 60 chars)
     "client_hash" TEXT NOT NULL,                                    -- SHA-256 of daily salt + IP/session (anti-spam, no PII)
     CONSTRAINT "FK_shared_scenarios_schools" FOREIGN KEY ("school_id") REFERENCES "schools" ("id") ON DELETE RESTRICT,
-    CONSTRAINT "FK_shared_scenarios_cbsa" FOREIGN KEY ("cbsa_code") REFERENCES "cbsa_locations" ("cbsa_code") ON DELETE RESTRICT
+    CONSTRAINT "FK_shared_scenarios_cbsa" FOREIGN KEY ("cbsa_code") REFERENCES "cbsa_locations" ("cbsa_code") ON DELETE RESTRICT,
+    CONSTRAINT "CHK_shared_scenarios_salary" CHECK ("reported_annual_salary" >= 10000),
+    CONSTRAINT "CHK_shared_scenarios_disposable" CHECK ("monthly_disposable" >= -20000)
 );
 
 -- Indexing for edge querying (top positive finds by metro and field of study)
 CREATE INDEX "IX_shared_scenarios_cbsa_cip" ON "shared_scenarios" ("cbsa_code", "cip_code");
 CREATE INDEX "IX_shared_scenarios_disposable" ON "shared_scenarios" ("monthly_disposable" DESC);
 CREATE INDEX "IX_shared_scenarios_created_at" ON "shared_scenarios" ("created_at" DESC);
+CREATE INDEX "IX_shared_scenarios_client_hash_created_at" ON "shared_scenarios" ("client_hash", "created_at");
 ```
 
 ### 3.3 New Table: `community_scenario_benchmarks` (Reverse-ETL Cache)

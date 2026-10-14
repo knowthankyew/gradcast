@@ -13,6 +13,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from lakehouse.src.pipelines.silver_transform import (
+    DataFrame,
     SCENARIO_JSON_SCHEMA,
     parse_and_cleanse_scenarios,
     persist_quarantine_scenarios,
@@ -131,6 +132,38 @@ class TestSilverTransform(unittest.TestCase):
         self.assertTrue(callable(run_silver_pipeline))
         self.assertTrue(callable(parse_and_cleanse_scenarios))
         self.assertTrue(callable(persist_quarantine_scenarios))
+
+    def test_scenario_json_schema_fields(self):
+        """Verify that SCENARIO_JSON_SCHEMA specifies all expected operational ingest fields."""
+        expected_fields = {
+            "id", "created_at", "school_id", "cip_code", "credential_level",
+            "cbsa_code", "housing_type", "salary_mode", "reported_annual_salary",
+            "monthly_net_take_home", "monthly_rent", "monthly_loan_payment",
+            "monthly_disposable", "disposable_ratio", "sentiment_tag",
+            "scenario_title", "client_hash",
+        }
+        actual_fields = {f.name for f in SCENARIO_JSON_SCHEMA.fields}
+        self.assertEqual(actual_fields, expected_fields)
+
+    @unittest.skipIf(DataFrame is None, "PySpark not installed in local environment")
+    def test_parse_and_cleanse_scenarios_pyspark(self):
+        """Verify parse_and_cleanse_scenarios with real SparkSession when PySpark is available."""
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder.master("local[1]").appName("SilverTransformTest").getOrCreate()
+        try:
+            test_data = [
+                ('{"id": "valid-1", "created_at": "2026-10-14T12:00:00Z", "school_id": 101, "cip_code": "11.0701", "credential_level": 3, "cbsa_code": "41860", "housing_type": "alone", "salary_mode": "scorecard_median", "reported_annual_salary": 95000.00, "monthly_net_take_home": 5800.00, "monthly_rent": 1800.00, "monthly_loan_payment": 450.00, "monthly_disposable": 3550.00, "disposable_ratio": 0.61, "sentiment_tag": "comfortable", "scenario_title": "CS Grad", "client_hash": "hash1"}',),
+                ('{"id": "invalid-2", "created_at": "2026-10-14T12:00:00Z", "school_id": 101, "cip_code": "11.0701", "credential_level": 3, "cbsa_code": "41860", "housing_type": "alone", "salary_mode": "scorecard_median", "reported_annual_salary": 5000.00, "monthly_net_take_home": 500.00, "monthly_rent": 1800.00, "monthly_loan_payment": 450.00, "monthly_disposable": -1750.00, "disposable_ratio": -3.5, "sentiment_tag": "stressed", "scenario_title": "Low Wage", "client_hash": "hash2"}',)
+            ]
+            raw_df = spark.createDataFrame(test_data, ["raw_payload"])
+            valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
+            self.assertEqual(valid_df.count(), 1)
+            self.assertEqual(quarantine_df.count(), 1)
+            valid_row = valid_df.collect()[0]
+            self.assertEqual(valid_row.scenario_id, "valid-1")
+            self.assertEqual(valid_row.cip_family, "11")
+        finally:
+            spark.stop()
 
 
 if __name__ == "__main__":

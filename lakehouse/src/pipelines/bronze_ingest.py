@@ -11,15 +11,24 @@ Enforces:
 """
 
 from typing import Optional
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.types import (
-    LongType,
-    StringType,
-    StructField,
-    StructType,
-    TimestampType,
-)
+
+try:
+    from pyspark.sql import DataFrame, SparkSession
+    from pyspark.sql import functions as F
+    from pyspark.sql.types import (
+        LongType,
+        StringType,
+        StructField,
+        StructType,
+        TimestampType,
+    )
+except ImportError:
+    DataFrame = None  # type: ignore
+    SparkSession = None  # type: ignore
+    F = None  # type: ignore
+    class _MockType:
+        def __init__(self, *args, **kwargs): pass
+    LongType = StringType = StructField = StructType = TimestampType = _MockType  # type: ignore
 
 
 def get_shared_scenarios_bronze_schema() -> StructType:
@@ -34,6 +43,27 @@ def get_shared_scenarios_bronze_schema() -> StructType:
         StructField("file_name", StringType(), False),
         StructField("file_offset", LongType(), False),
     ])
+
+
+def ensure_bronze_shared_scenarios_table(
+    spark: SparkSession,
+    target_table: str = "gradcast_lakehouse.bronze.shared_scenarios",
+) -> None:
+    """Ensure target bronze table exists upfront with appendOnly property."""
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {target_table} (
+            raw_payload STRING NOT NULL,
+            ingest_timestamp TIMESTAMP NOT NULL,
+            source_system STRING NOT NULL,
+            file_name STRING NOT NULL,
+            file_offset BIGINT NOT NULL
+        )
+        USING DELTA
+        TBLPROPERTIES (
+            'delta.appendOnly' = 'true',
+            'delta.autoOptimize.optimizeWrite' = 'true'
+        )
+    """)
 
 
 def ingest_shared_scenarios_batch(
@@ -54,26 +84,12 @@ def ingest_shared_scenarios_batch(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.coalesce(F.col("_metadata.file_name"), F.input_file_name()).alias("file_name"),
+            F.col("_metadata.file_name").alias("file_name"),
             F.monotonically_increasing_id().alias("file_offset"),
         )
     )
 
-    # Ensure target table exists upfront with appendOnly property
-    spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {target_table} (
-            raw_payload STRING NOT NULL,
-            ingest_timestamp TIMESTAMP NOT NULL,
-            source_system STRING NOT NULL,
-            file_name STRING NOT NULL,
-            file_offset BIGINT NOT NULL
-        )
-        USING DELTA
-        TBLPROPERTIES (
-            'delta.appendOnly' = 'true',
-            'delta.autoOptimize.optimizeWrite' = 'true'
-        )
-    """)
+    ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
 
     (
         bronze_df.write
@@ -97,20 +113,7 @@ def stream_shared_scenarios_autoloader(
     Stream incoming JSON files using Databricks Auto Loader (cloudFiles).
     Ensures delta.appendOnly is enabled upfront.
     """
-    spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {target_table} (
-            raw_payload STRING NOT NULL,
-            ingest_timestamp TIMESTAMP NOT NULL,
-            source_system STRING NOT NULL,
-            file_name STRING NOT NULL,
-            file_offset BIGINT NOT NULL
-        )
-        USING DELTA
-        TBLPROPERTIES (
-            'delta.appendOnly' = 'true',
-            'delta.autoOptimize.optimizeWrite' = 'true'
-        )
-    """)
+    ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
 
     stream_df = (
         spark.readStream
@@ -122,7 +125,7 @@ def stream_shared_scenarios_autoloader(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.coalesce(F.col("_metadata.file_name"), F.input_file_name()).alias("file_name"),
+            F.col("_metadata.file_name").alias("file_name"),
             F.monotonically_increasing_id().alias("file_offset"),
         )
     )
@@ -196,5 +199,15 @@ def ingest_college_scorecard_csv(
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Run Bronze Ingest Pipeline")
+    parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    parser.add_argument("--source-path", default=None, help="Optional raw landing source path")
+    args = parser.parse_args()
+
     spark = SparkSession.builder.appName("BronzeIngest").getOrCreate()
-    print("Bronze Ingest module loaded successfully.")
+    target_table = f"{args.catalog}.bronze.shared_scenarios"
+    ensure_bronze_shared_scenarios_table(spark, target_table=target_table)
+    if args.source_path:
+        ingest_shared_scenarios_batch(spark, source_path=args.source_path, target_table=target_table)
+    print(f"Bronze Ingest pipeline executed successfully for {target_table}.")

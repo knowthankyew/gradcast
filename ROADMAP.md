@@ -33,8 +33,8 @@ In modern Data Platform, ML, and Lakehouse engineering, **Documentation Drift** 
 - Documentation promises $k$-anonymity suppression ($k \ge 5$) to protect students in small programs, but a query change leaks unaggregated records.
 - Documentation advertises 100% test coverage or specific SLA query latencies that no longer hold.
 
-### The Portfolio Pattern: `scripts/audit-claims.py`
-Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (`ml/scripts/sync_docs.py`), GradCast Lakehouse includes an automated **Claims & Architecture Linter** (`scripts/audit-claims.py`). Executed in GitHub Actions CI before any merge, it enforces:
+### The Portfolio Pattern: `lakehouse/scripts/audit_claims.py`
+Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (`ml/scripts/sync_docs.py`), GradCast Lakehouse includes an automated **Claims & Architecture Linter** (`lakehouse/scripts/audit_claims.py`). Executed in GitHub Actions CI before any merge, it enforces:
 
 1. **Schema & DDL Parity**: Validates that all tables, columns, constraints, and Liquid Clustering keys declared in `docs/SCHEMA.md` and `ROADMAP.md` match the actual PySpark/SQL DDL and SQLite migrations.
 2. **Invariant & Privacy Enforcement**: Statically scans data transformations for the $k \ge 5$ filter, verifies that client identifiers are hashed/salted, and guarantees that no raw PII fields enter Silver or Gold.
@@ -89,7 +89,7 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 - [x] `POST /api/scenarios/share` rejects payloads with negative salary or disposable income below $-\$20,000$.
 - [x] Client identity is never recorded; `client_hash` is computed as `SHA256(Date.UtcNow.ToString("yyyy-MM-dd") + IP + Salt)`.
 - [x] Anonymized scenarios persist into `gradcast.db` and query cleanly via Dapper in $< 5\text{ms}$.
-- [x] Existing 78/78 xUnit backend tests continue to pass (now 107/107 total).
+- [x] Existing 78/78 xUnit backend tests continue to pass (now 112/112 total).
 
 ### AI Coder Execution Prompt
 ```text
@@ -323,7 +323,7 @@ STORY GC-LAKE-07: Automated Claims Auditing, Documentation Linter & CI Security 
 ```
 
 ### Context & Motivation
-To ensure the codebase, documentation, schemas, and CI supply chain remain in absolute alignment, we implement an automated documentation claims linter (`scripts/audit-claims.py`) and a supply-chain attestation workflow.
+To ensure the codebase, documentation, schemas, and CI supply chain remain in absolute alignment, we implement an automated documentation claims linter (`lakehouse/scripts/audit_claims.py`) and a supply-chain attestation workflow.
 
 ### Scope & Explicit Boundaries
 - **IN SCOPE**:

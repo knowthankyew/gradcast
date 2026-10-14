@@ -433,4 +433,18 @@ public class StubScenarioRepository : IScenarioRepository
         var count = _scenarios.Count(s => s.ClientHash == clientHash && s.CreatedAt.StartsWith(datePrefixUtc));
         return Task.FromResult(count);
     }
+
+    public Task<bool> TryInsertScenarioWithDailyLimitAsync(SharedScenario scenario, int maxDailyLimit, string datePrefixUtc, CancellationToken ct = default)
+    {
+        lock (_scenarios)
+        {
+            var count = _scenarios.Count(s => s.ClientHash == scenario.ClientHash && s.CreatedAt.StartsWith(datePrefixUtc));
+            if (count >= maxDailyLimit)
+            {
+                return Task.FromResult(false);
+            }
+            _scenarios.Add(scenario);
+            return Task.FromResult(true);
+        }
+    }
 }

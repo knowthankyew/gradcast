@@ -13,4 +13,5 @@ public interface IScenarioRepository
         int limit = 20,
         CancellationToken ct = default);
     Task<int> GetDailySubmissionCountByClientHashAsync(string clientHash, string datePrefixUtc, CancellationToken ct = default);
+    Task<bool> TryInsertScenarioWithDailyLimitAsync(SharedScenario scenario, int maxDailyLimit, string datePrefixUtc, CancellationToken ct = default);
 }

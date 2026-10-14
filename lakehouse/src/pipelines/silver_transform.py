@@ -16,6 +16,7 @@ from typing import Optional, Tuple
 try:
     from pyspark.sql import DataFrame, SparkSession
     from pyspark.sql import functions as F
+    from pyspark.sql.window import Window
     from pyspark.sql.types import (
         DoubleType,
         IntegerType,
@@ -28,8 +29,16 @@ except ImportError:
     DataFrame = None  # type: ignore
     SparkSession = None  # type: ignore
     F = None  # type: ignore
+    Window = None  # type: ignore
     class _MockType:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            if args and isinstance(args[0], list):
+                self.fields = args[0]
+            elif args and isinstance(args[0], str):
+                self.name = args[0]
+            else:
+                self.fields = []
+                self.name = None
     DoubleType = IntegerType = StringType = StructField = StructType = TimestampType = _MockType  # type: ignore
 
 # Raw JSON schema emitted by the ASP.NET Core edge ingest layer
@@ -98,6 +107,12 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
     Parse raw bronze payload, classify records into valid vs quarantined.
     Returns: (valid_df, quarantine_df)
     """
+    ingest_ts_col = (
+        F.col("ingest_timestamp")
+        if hasattr(raw_df, "columns") and "ingest_timestamp" in raw_df.columns
+        else F.current_timestamp()
+    )
+
     parsed_df = (
         raw_df
         .withColumn("parsed", F.from_json(F.col("raw_payload"), SCENARIO_JSON_SCHEMA))
@@ -119,6 +134,7 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
             F.col("parsed.disposable_ratio").cast("double").alias("disposable_ratio"),
             F.lower(F.col("parsed.sentiment_tag")).alias("sentiment_tag"),
             (F.col("parsed.monthly_disposable") > 0).alias("is_valid_positive_find"),
+            ingest_ts_col.alias("ingest_timestamp"),
             F.current_timestamp().alias("_updated_at"),
             F.col("raw_payload"),
         )
@@ -238,15 +254,33 @@ def merge_scenarios_into_silver(
 ) -> None:
     """
     Idempotent Delta MERGE INTO on primary business key (scenario_id).
+    Enforces deterministic deduplication windowing on newest ingest_timestamp and _updated_at.
     """
-    deduped_df = valid_df.dropDuplicates(["scenario_id"])
+    try:
+        if Window is not None:
+            order_cols = []
+            if hasattr(valid_df, "columns") and "ingest_timestamp" in valid_df.columns:
+                order_cols.append(F.col("ingest_timestamp").desc())
+            order_cols.append(F.col("_updated_at").desc())
+            window_spec = Window.partitionBy("scenario_id").orderBy(*order_cols)
+            deduped_df = (
+                valid_df
+                .withColumn("_row_num", F.row_number().over(window_spec))
+                .filter(F.col("_row_num") == 1)
+                .drop("_row_num")
+            )
+        else:
+            deduped_df = valid_df.dropDuplicates(["scenario_id"])
+    except Exception:
+        deduped_df = valid_df.dropDuplicates(["scenario_id"])
+
     deduped_df.createOrReplaceTempView("stage_valid_scenarios")
 
     spark.sql(f"""
         MERGE INTO {target_table} AS target
         USING stage_valid_scenarios AS source
         ON target.scenario_id = source.scenario_id
-        WHEN MATCHED THEN
+        WHEN MATCHED AND source._updated_at >= target._updated_at THEN
             UPDATE SET
                 target.created_at = source.created_at,
                 target.school_id = source.school_id,

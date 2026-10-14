@@ -128,4 +128,49 @@ public class ScenarioRepository : IScenarioRepository
         return await conn.ExecuteScalarAsync<int>(
             new CommandDefinition(sql, new { ClientHash = clientHash, DatePrefixUtc = datePrefixUtc }, cancellationToken: ct));
     }
+
+    public async Task<bool> TryInsertScenarioWithDailyLimitAsync(
+        SharedScenario scenario,
+        int maxDailyLimit,
+        string datePrefixUtc,
+        CancellationToken ct = default)
+    {
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        await using var tx = await conn.BeginTransactionAsync(ct);
+
+        const string countSql = """
+            SELECT COUNT(*) 
+            FROM shared_scenarios
+            WHERE client_hash = @ClientHash
+              AND created_at >= @DatePrefixUtc
+              AND created_at < date(@DatePrefixUtc, '+1 day');
+        """;
+
+        var count = await conn.ExecuteScalarAsync<int>(
+            new CommandDefinition(countSql, new { ClientHash = scenario.ClientHash, DatePrefixUtc = datePrefixUtc }, transaction: tx, cancellationToken: ct));
+
+        if (count >= maxDailyLimit)
+        {
+            await tx.RollbackAsync(ct);
+            return false;
+        }
+
+        const string insertSql = """
+            INSERT INTO shared_scenarios (
+                id, created_at, school_id, cip_code, credential_level, cbsa_code,
+                housing_type, salary_mode, reported_annual_salary, monthly_net_take_home,
+                monthly_rent, monthly_loan_payment, monthly_disposable, disposable_ratio,
+                sentiment_tag, scenario_title, client_hash
+            ) VALUES (
+                @Id, @CreatedAt, @SchoolId, @CipCode, @CredentialLevel, @CbsaCode,
+                @HousingType, @SalaryMode, @ReportedAnnualSalary, @MonthlyNetTakeHome,
+                @MonthlyRent, @MonthlyLoanPayment, @MonthlyDisposable, @DisposableRatio,
+                @SentimentTag, @ScenarioTitle, @ClientHash
+            );
+        """;
+
+        await conn.ExecuteAsync(new CommandDefinition(insertSql, scenario, transaction: tx, cancellationToken: ct));
+        await tx.CommitAsync(ct);
+        return true;
+    }
 }

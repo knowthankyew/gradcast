@@ -8,6 +8,9 @@ variables:
   service_principal_id:
     description: "Production Service Principal Application ID (UUID)"
     default: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
+  analysts_group:
+    description: "Target Analysts group name"
+    default: "gradcast-analysts-dev"
 
 targets:
   dev:
@@ -17,6 +20,7 @@ targets:
       host: "https://adb-mock-workspace.azuredatabricks.net"
     variables:
       catalog_name: "gradcast_lakehouse_dev"
+      analysts_group: "gradcast-analysts-dev"
 
   prod:
     mode: production
@@ -25,6 +29,7 @@ targets:
     variables:
       catalog_name: "gradcast_lakehouse"
       service_principal_id: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
+      analysts_group: "gradcast-analysts-prod"
     run_as:
       service_principal_name: "${var.service_principal_id}"
 
@@ -36,7 +41,17 @@ resources:
         quartz_cron_expression: "0 0 4 * * ?"
         timezone_id: "UTC"
       tasks:
+        - task_key: run_bronze_ingest
+          spark_python_task:
+            python_file: ./src/pipelines/bronze_ingest.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+          job_cluster_key: general_worker
+
         - task_key: run_silver_transformation
+          depends_on:
+            - task_key: run_bronze_ingest
           spark_python_task:
             python_file: ./src/pipelines/silver_transform.py
             parameters:
@@ -63,7 +78,7 @@ resources:
               - "--catalog"
               - "${var.catalog_name}"
               - "--analysts-group"
-              - "gradcast-analysts-prod"
+              - "${var.analysts_group}"
           job_cluster_key: general_worker
 
         - task_key: export_gold_to_sqlite

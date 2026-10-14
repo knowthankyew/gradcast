@@ -201,15 +201,6 @@ public static partial class ScenarioEndpoints
         var clientHash = ComputeClientHash(clientIp, configuredSalt);
         var todayPrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
-        var dailySubmissions = await repository.GetDailySubmissionCountByClientHashAsync(clientHash, todayPrefix, ct);
-        if (dailySubmissions >= MaxDailySharesPerClient)
-        {
-            return Results.Problem(
-                title: "Rate limit exceeded",
-                detail: "Daily scenario share limit reached for this client. Please try again tomorrow.",
-                statusCode: StatusCodes.Status429TooManyRequests);
-        }
-
         var scenarioId = Guid.NewGuid().ToString("N");
         var sanitizedTitle = request.ScenarioTitle is not null
             ? HtmlTagRegex().Replace(request.ScenarioTitle, string.Empty).Trim()
@@ -236,7 +227,14 @@ public static partial class ScenarioEndpoints
             ClientHash = clientHash
         };
 
-        await repository.InsertScenarioAsync(entity, ct);
+        var inserted = await repository.TryInsertScenarioWithDailyLimitAsync(entity, MaxDailySharesPerClient, todayPrefix, ct);
+        if (!inserted)
+        {
+            return Results.Problem(
+                title: "Rate limit exceeded",
+                detail: "Daily scenario share limit reached for this client. Please try again tomorrow.",
+                statusCode: StatusCodes.Status429TooManyRequests);
+        }
 
         return Results.Created($"/api/scenarios/{scenarioId}", new ShareScenarioResponse(
             Id: scenarioId,
