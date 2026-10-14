@@ -67,7 +67,10 @@
             </template>
             <template #no-data>
               <div class="pa-4 text-caption text-medium-emphasis text-center">
-                <div v-if="store.hideMissingLocationData">
+                <div v-if="searchQuery && searchQuery.trim().length === 1">
+                  Type at least 2 characters to search across U.S. metro areas.
+                </div>
+                <div v-else-if="store.hideMissingLocationData">
                   No metro areas with available rent data found.
                   <div class="mt-1">
                     <v-btn
@@ -80,8 +83,11 @@
                     </v-btn>
                   </div>
                 </div>
+                <div v-else-if="searchQuery && searchQuery.trim().length >= 2">
+                  No matching metro areas found for "{{ searchQuery }}".
+                </div>
                 <div v-else>
-                  No matching metro areas found.
+                  Start typing a city or metro area (e.g. Phoenix, Austin, Chicago).
                 </div>
               </div>
             </template>
@@ -113,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore, type LocationSelection } from '../stores/appStore'
 import { formatCurrency } from '../utils/format'
 
@@ -149,17 +155,26 @@ function fetchLocations(val: string) {
   if (debounceTimer) clearTimeout(debounceTimer)
   if (abortController) abortController.abort()
 
-  if (!val || val.length < 2) {
-    results.value = []
+  const trimmed = val ? val.trim() : ''
+
+  // If user typed only 1 character, wait for the next character
+  if (trimmed.length === 1) {
     return
   }
+
+  // Preload immediately without delay when empty, debounce when typing
+  const delay = trimmed.length >= 2 ? 300 : 0
 
   debounceTimer = setTimeout(async () => {
     loading.value = true
     abortController = new AbortController()
     try {
       const requireHousingParam = store.hideMissingLocationData ? '&requireHousing=true' : ''
-      const response = await fetch(`/api/locations/search?q=${encodeURIComponent(val)}${requireHousingParam}`, {
+      const qParam = trimmed.length >= 2 ? `q=${encodeURIComponent(trimmed)}` : ''
+      const queryPart = qParam ? `${qParam}${requireHousingParam}` : (requireHousingParam ? requireHousingParam.slice(1) : '')
+      const url = queryPart ? `/api/locations/search?${queryPart}` : '/api/locations/search'
+
+      const response = await fetch(url, {
         signal: abortController.signal,
       })
       if (response.ok) {
@@ -172,8 +187,14 @@ function fetchLocations(val: string) {
     } finally {
       loading.value = false
     }
-  }, 300)
+  }, delay)
 }
+
+onMounted(() => {
+  if (!store.selectedLocation) {
+    fetchLocations('')
+  }
+})
 
 watch(searchQuery, (val) => {
   fetchLocations(val)
@@ -182,9 +203,7 @@ watch(searchQuery, (val) => {
 watch(
   () => store.hideMissingLocationData,
   () => {
-    if (searchQuery.value && searchQuery.value.length >= 2) {
-      fetchLocations(searchQuery.value)
-    }
+    fetchLocations(searchQuery.value)
   }
 )
 

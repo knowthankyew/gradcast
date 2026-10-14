@@ -53,7 +53,7 @@ public static class LocationEndpoints
         ILocationService service,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+        if (!string.IsNullOrWhiteSpace(query) && query.Trim().Length == 1)
         {
             return Results.Problem(
                 title: "Invalid query",
@@ -61,7 +61,7 @@ public static class LocationEndpoints
                 statusCode: 400);
         }
 
-        var results = await service.SearchLocationsAsync(query, requireHousing ?? false, ct);
+        var results = await service.SearchLocationsAsync(query?.Trim() ?? string.Empty, requireHousing ?? false, ct);
         return Results.Ok(results);
     }
 
