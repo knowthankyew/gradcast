@@ -51,7 +51,7 @@ def ingest_shared_scenarios_batch(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.input_file_name().alias("file_name"),
+            F.coalesce(F.col("_metadata.file_name"), F.input_file_name()).alias("file_name"),
             F.monotonically_increasing_id().alias("file_offset"),
         )
     )
@@ -92,7 +92,23 @@ def stream_shared_scenarios_autoloader(
 ):
     """
     Stream incoming JSON files using Databricks Auto Loader (cloudFiles).
+    Ensures delta.appendOnly is enabled upfront.
     """
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {target_table} (
+            raw_payload STRING NOT NULL,
+            ingest_timestamp TIMESTAMP NOT NULL,
+            source_system STRING NOT NULL,
+            file_name STRING NOT NULL,
+            file_offset BIGINT NOT NULL
+        )
+        USING DELTA
+        TBLPROPERTIES (
+            'delta.appendOnly' = 'true',
+            'delta.autoOptimize.optimizeWrite' = 'true'
+        )
+    """)
+
     stream_df = (
         spark.readStream
         .format("cloudFiles")
@@ -103,7 +119,7 @@ def stream_shared_scenarios_autoloader(
             F.col("value").alias("raw_payload"),
             F.current_timestamp().alias("ingest_timestamp"),
             F.lit(source_system).alias("source_system"),
-            F.input_file_name().alias("file_name"),
+            F.coalesce(F.col("_metadata.file_name"), F.input_file_name()).alias("file_name"),
             F.monotonically_increasing_id().alias("file_offset"),
         )
     )

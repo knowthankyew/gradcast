@@ -43,12 +43,12 @@ def apply_quality_expectations(df: DataFrame) -> Tuple[DataFrame, DataFrame]:
             "quarantine_reason",
             F.concat_ws(
                 "; ",
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_scenario_id"]), F.lit("invalid_scenario_id")),
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_school_id"]), F.lit("invalid_school_id")),
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cip_code"]), F.lit("invalid_cip_code")),
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cbsa_code"]), F.lit("invalid_cbsa_code")),
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_salary_bounds"]), F.lit("salary_below_10k")),
-                F.when(~F.expr(DLT_SCENARIO_EXPECTATIONS["valid_disposable_floor"]), F.lit("disposable_below_floor")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_scenario_id"]), F.lit(False)), F.lit("invalid_scenario_id")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_school_id"]), F.lit(False)), F.lit("invalid_school_id")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cip_code"]), F.lit(False)), F.lit("invalid_cip_code")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_cbsa_code"]), F.lit(False)), F.lit("invalid_cbsa_code")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_salary_bounds"]), F.lit(False)), F.lit("salary_below_10k")),
+                F.when(~F.coalesce(F.expr(DLT_SCENARIO_EXPECTATIONS["valid_disposable_floor"]), F.lit(False)), F.lit("disposable_below_floor")),
             )
         )
         .withColumn("quarantined_at", F.current_timestamp())

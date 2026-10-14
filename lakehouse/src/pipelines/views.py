@@ -46,5 +46,11 @@ def create_k_anonymity_views(
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Create Lakehouse Views")
+    parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    args = parser.parse_args()
+
     spark = SparkSession.builder.appName("LakehouseViews").getOrCreate()
-    print("Views module loaded successfully.")
+    create_k_anonymity_views(spark, catalog=args.catalog)
+    print("Views module loaded and k-anonymity views verified successfully.")

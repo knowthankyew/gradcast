@@ -81,7 +81,6 @@ def populate_fact_scenario_outcomes(
 
     fact_df = (
         silver_df
-        .filter(F.col("is_valid_positive_find") == True)
         .select(
             F.col("scenario_id"),
             F.col("school_id"),
@@ -94,6 +93,7 @@ def populate_fact_scenario_outcomes(
             F.col("monthly_rent"),
             F.col("monthly_disposable"),
             F.col("disposable_ratio"),
+            F.col("is_valid_positive_find"),
         )
         .dropDuplicates(["scenario_id"])
     )
@@ -104,7 +104,9 @@ def populate_fact_scenario_outcomes(
         MERGE INTO {catalog}.gold.fact_scenario_outcomes AS target
         USING stage_fact_scenarios AS source
         ON target.scenario_id = source.scenario_id
-        WHEN MATCHED THEN
+        WHEN MATCHED AND source.is_valid_positive_find = false THEN
+            DELETE
+        WHEN MATCHED AND source.is_valid_positive_find = true THEN
             UPDATE SET
                 target.school_id = source.school_id,
                 target.cip_code = source.cip_code,
@@ -116,7 +118,7 @@ def populate_fact_scenario_outcomes(
                 target.monthly_rent = source.monthly_rent,
                 target.monthly_disposable = source.monthly_disposable,
                 target.disposable_ratio = source.disposable_ratio
-        WHEN NOT MATCHED THEN
+        WHEN NOT MATCHED AND source.is_valid_positive_find = true THEN
             INSERT (
                 scenario_id, school_id, cip_code, credential_level, cbsa_code, date_key,
                 housing_type, annual_salary, monthly_rent, monthly_disposable, disposable_ratio
@@ -226,5 +228,11 @@ def run_gold_pipeline(
 
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Run Gold Dimensional Pipeline")
+    parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    args = parser.parse_args()
+
     spark = SparkSession.builder.appName("GoldModeling").getOrCreate()
-    print("Gold Modeling module loaded successfully.")
+    run_gold_pipeline(spark, catalog=args.catalog)
+    print("Gold Modeling pipeline completed successfully.")

@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS gradcast_lakehouse.bronze.college_scorecard (
     instnm STRING,
     cipcode STRING,
     credential_level STRING,
-    earnings_1yr STRING,
+    earnings_10yr STRING,
     earnings_4yr STRING,
     debt_median STRING,
     report_year INT,

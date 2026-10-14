@@ -53,7 +53,7 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 | **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | ✅ **Completed** |
 | **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | ✅ **Completed** |
 | **Stage 6** | **Google-Grade Testing Harness** | Quality Engineering | PySpark DataFrame unit testing with `chispa`, schema contract tests, local SQLite vs Spark integration suite, 100% CI pass. | ✅ **Completed** |
-| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `scripts/audit-claims.py` documentation linter, CycloneDX SBOM generation (`bom.json`), SLSA build provenance attestation. | ✅ **Completed** |
+| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `lakehouse/scripts/audit_claims.py` documentation linter and CycloneDX SBOM generation (`bom.json`) for multi-language supply chain security. | ✅ **Completed** |
 
 ---
 
@@ -332,7 +332,7 @@ To ensure the codebase, documentation, schemas, and CI supply chain remain in ab
     2. Presence of the $k \ge 5$ invariant in Gold view definitions.
     3. Absence of prohibited adjectives (*"bulletproof"*, *"instant"*, *"conclusive"*).
     4. Guarded word verification (*"verified"*, *"ACID"*, *"100%"*).
-  - GitHub Actions CI workflow generating CycloneDX SBOM (`bom.json`) and SLSA build provenance.
+  - GitHub Actions CI workflow generating CycloneDX SBOM (`bom.json`) across Python, .NET, and frontend dependencies.
 - **OUT OF SCOPE**: Manual audit reviews.
 
 ### Technical Specification

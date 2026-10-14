@@ -258,6 +258,28 @@ public class ScenarioRepositoryTests
                 ClientHash = clientHash
             });
 
+            // Prior-day scenario with same client hash; should NOT be included in today's count
+            var yesterday = DateTime.UtcNow.AddDays(-1).ToString("yyyy-MM-dd");
+            await repo.InsertScenarioAsync(new SharedScenario
+            {
+                Id = "sub-yesterday",
+                CreatedAt = $"{yesterday}T23:59:59Z",
+                SchoolId = 101,
+                CipCode = "11.0701",
+                CredentialLevel = 3,
+                CbsaCode = "41860",
+                HousingType = "alone",
+                SalaryMode = "scorecard_median",
+                ReportedAnnualSalary = 100_000,
+                MonthlyNetTakeHome = 6_000,
+                MonthlyRent = 2_000,
+                MonthlyLoanPayment = 300,
+                MonthlyDisposable = 3_700,
+                DisposableRatio = 0.61,
+                SentimentTag = "comfortable",
+                ClientHash = clientHash
+            });
+
             var count = await repo.GetDailySubmissionCountByClientHashAsync(clientHash, today);
             Assert.Equal(2, count);
 

@@ -88,6 +88,26 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid disposable income", "Monthly disposable income cannot be below -$20,000.");
         }
 
+        if (request.MonthlyNetTakeHome < 0)
+        {
+            return ValidationFailure("Invalid take-home pay", "Monthly net take-home pay cannot be negative.");
+        }
+
+        if (request.MonthlyRent < 0)
+        {
+            return ValidationFailure("Invalid rent", "Monthly rent cannot be negative.");
+        }
+
+        if (request.MonthlyLoanPayment < 0)
+        {
+            return ValidationFailure("Invalid loan payment", "Monthly loan payment cannot be negative.");
+        }
+
+        if (request.MonthlyDisposable != request.MonthlyNetTakeHome - request.MonthlyRent - request.MonthlyLoanPayment)
+        {
+            return ValidationFailure("Inconsistent financials", "Monthly disposable must equal net take-home minus rent and loan payment.");
+        }
+
         if (string.IsNullOrWhiteSpace(request.HousingType) || !AllowedHousingTypes.Contains(request.HousingType.Trim()))
         {
             return ValidationFailure("Invalid housing type", "Housing type must be either 'alone' or 'roommate'.");

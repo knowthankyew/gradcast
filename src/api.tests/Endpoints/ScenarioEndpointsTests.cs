@@ -64,9 +64,47 @@ public class ScenarioEndpointValidationTests
     [Fact]
     public void DisposableAtNegativeTwentyThousand_IsAccepted()
     {
-        var request = CreateValidRequest() with { MonthlyDisposable = -20_000 };
+        var request = CreateValidRequest() with
+        {
+            MonthlyNetTakeHome = 0,
+            MonthlyRent = 20_000,
+            MonthlyLoanPayment = 0,
+            MonthlyDisposable = -20_000
+        };
         var error = ScenarioEndpoints.ValidateShareRequest(request);
         Assert.Null(error);
+    }
+
+    [Fact]
+    public void NegativeTakeHomePay_IsRejected()
+    {
+        var request = CreateValidRequest() with { MonthlyNetTakeHome = -1, MonthlyDisposable = -2_101 };
+        var error = ScenarioEndpoints.ValidateShareRequest(request);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void NegativeRent_IsRejected()
+    {
+        var request = CreateValidRequest() with { MonthlyRent = -1, MonthlyDisposable = 4_901 };
+        var error = ScenarioEndpoints.ValidateShareRequest(request);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void NegativeLoanPayment_IsRejected()
+    {
+        var request = CreateValidRequest() with { MonthlyLoanPayment = -1, MonthlyDisposable = 3_401 };
+        var error = ScenarioEndpoints.ValidateShareRequest(request);
+        Assert.NotNull(error);
+    }
+
+    [Fact]
+    public void InconsistentDisposable_IsRejected()
+    {
+        var request = CreateValidRequest() with { MonthlyDisposable = 9_999 };
+        var error = ScenarioEndpoints.ValidateShareRequest(request);
+        Assert.NotNull(error);
     }
 
     [Theory]
