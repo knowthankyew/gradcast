@@ -297,10 +297,40 @@ const categories = computed<ProgramCategory[]>(() => {
   return result.sort((a, b) => a.name.localeCompare(b.name))
 })
 
+// Auto-expand any department category that contains the currently selected program
+function expandSelectedCategory() {
+  if (!store.selectedProgram) return
+  const progCip = store.selectedProgram.cipCode
+  const progCred = store.selectedProgram.credentialLevel
+
+  const matchingCat = categories.value.find((c) =>
+    c.programs.some(
+      (p) => p.code === progCip && (progCred == null || p.credentialLevel === progCred)
+    ) || c.code === progCip.substring(0, 2)
+  )
+
+  if (matchingCat && !openedPanels.value.includes(matchingCat.code)) {
+    openedPanels.value = [...openedPanels.value, matchingCat.code]
+  }
+}
+
+// Ensure the category containing active selections expands on initial load / reload
+watch(
+  [() => store.selectedProgram, () => categories.value],
+  ([prog, cats]) => {
+    if (prog && cats && cats.length > 0) {
+      expandSelectedCategory()
+    }
+  },
+  { immediate: true }
+)
+
 // Auto-expand all categories when searching so matching programs are visible
 watch(searchQuery, (newQuery) => {
   if (newQuery.trim().length > 0) {
     openedPanels.value = categories.value.map((c) => c.code)
+  } else {
+    expandSelectedCategory()
   }
 })
 
