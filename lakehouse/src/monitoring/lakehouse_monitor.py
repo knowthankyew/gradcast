@@ -47,8 +47,8 @@ def compute_batch_health_metrics(
         F.percentile_approx("monthly_disposable", 0.5).alias("median_disposable"),
     ).first()
 
-    median_salary = float(salary_stats["median_salary"]) if salary_stats and salary_stats["median_salary"] else 0.0
-    median_disposable = float(salary_stats["median_disposable"]) if salary_stats and salary_stats["median_disposable"] else 0.0
+    median_salary = float(salary_stats["median_salary"]) if salary_stats and salary_stats["median_salary"] is not None else 0.0
+    median_disposable = float(salary_stats["median_disposable"]) if salary_stats and salary_stats["median_disposable"] is not None else 0.0
 
     # Drift heuristic: flag if quarantine rate exceeds 5%
     drift_detected = quarantine_rate > 0.05

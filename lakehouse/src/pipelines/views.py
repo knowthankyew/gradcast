@@ -23,6 +23,7 @@ def create_k_anonymity_views(
             f.cbsa_code,
             m.metro_name,
             p.cip_family,
+            f.credential_level,
             f.housing_type,
             COUNT(*) AS sample_count,
             ROUND(AVG(f.monthly_disposable), 2) AS mean_monthly_disposable,
@@ -36,6 +37,7 @@ def create_k_anonymity_views(
             f.cbsa_code, 
             m.metro_name, 
             p.cip_family, 
+            f.credential_level,
             f.housing_type
         HAVING COUNT(*) >= {min_cohort_size};
     """

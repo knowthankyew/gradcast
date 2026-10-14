@@ -14,13 +14,14 @@ CREATE TABLE IF NOT EXISTS community_scenario_benchmarks (
     cip_family TEXT NOT NULL,
     cbsa_code TEXT NOT NULL,
     credential_level INTEGER NOT NULL,
+    housing_type TEXT NOT NULL,
     sample_count INTEGER NOT NULL,
     p25_monthly_disposable INTEGER NOT NULL,
     median_monthly_disposable INTEGER NOT NULL,
     p75_monthly_disposable INTEGER NOT NULL,
     top_contributing_school_id INTEGER NULL,
     last_updated_at TEXT NOT NULL,
-    CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level)
+    CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level, housing_type)
 );
 
 CREATE INDEX IF NOT EXISTS IX_community_scenario_benchmarks_cbsa_cip 
@@ -44,11 +45,11 @@ class TestReverseEtlSqlite(unittest.TestCase):
             # Insert sample compiled benchmark
             cursor.execute("""
                 INSERT INTO community_scenario_benchmarks (
-                    cip_family, cbsa_code, credential_level, sample_count,
+                    cip_family, cbsa_code, credential_level, housing_type, sample_count,
                     p25_monthly_disposable, median_monthly_disposable, p75_monthly_disposable,
                     top_contributing_school_id, last_updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
-            """, ("11", "41860", 3, 25, 3200, 4500, 5800, 101, "2026-10-14 12:00:00"))
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """, ("11", "41860", 3, "alone", 25, 3200, 4500, 5800, 101, "2026-10-14 12:00:00"))
 
             conn.commit()
 

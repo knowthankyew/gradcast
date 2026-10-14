@@ -186,7 +186,7 @@ Here are interesting avenues to explore if you want to push boundaries:
    * Verify that starting around submission #51, the API begins rejecting requests with `HTTP 429 Too Many Requests` (`"Daily scenario share limit reached for this client"`).
 2. **Reverse-ETL SQLite Compilation**:
    * Run `python3 lakehouse/src/pipelines/export_sqlite.py --help`.
-   * Inspect [`lakehouse/tests/e2e/test_reverse_etl.py`](file:///Users/cl0rkster/Dev/gradcast/lakehouse/tests/e2e/test_reverse_etl.py) to see how SQLite tables are built and indexed directly from aggregated DataFrames.
+   * Inspect [`lakehouse/tests/e2e/test_reverse_etl.py`](../lakehouse/tests/e2e/test_reverse_etl.py) to see how SQLite tables are built and indexed directly from aggregated DataFrames.
 3. **Intentional Documentation Drift Test**:
    * Add a prohibited word like `"bulletproof"` into `ROADMAP.md` or change a table name in `docs/SCHEMA.md`.
    * Run `python3 lakehouse/scripts/audit_claims.py`.

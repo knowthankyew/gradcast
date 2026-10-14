@@ -135,7 +135,7 @@ def audit_portfolio_master_brief(errors: List[str]) -> None:
 
     total_tests = fact_count + theory_count
 
-    expected_marker = "107/107"
+    expected_marker = f"{total_tests}/{total_tests}"
     if expected_marker not in brief_content:
         errors.append(
             f"Portfolio Brief Drift: {brief_file.name} does not reflect current GradCast test count ({expected_marker} Unit Tests)."
@@ -162,7 +162,7 @@ def main() -> int:
     print("  ✓ Hard k-anonymity invariant (k >= 5) verified in views.py")
     print("  ✓ Client privacy hash (SHA-256) verified in ScenarioEndpoints.cs")
     print("  ✓ Zero prohibited vocabulary words detected")
-    print("  ✓ Portfolio Master Brief parity verified (107/107 test suite)")
+    print("  ✓ Portfolio Master Brief parity verified (dynamic test suite)")
     return 0
 
 

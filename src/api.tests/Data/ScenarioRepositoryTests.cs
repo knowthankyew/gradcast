@@ -112,7 +112,7 @@ public class ScenarioRepositoryTests
                 MonthlyDisposable = 5_300,
                 DisposableRatio = 0.679,
                 SentimentTag = "surplus_plus",
-                ClientHash = "hash1"
+                ClientHash = "1111111111111111111111111111111111111111111111111111111111111111"
             });
 
             // 2. Medium disposable, CS (11.0101), SF (41860)
@@ -133,7 +133,7 @@ public class ScenarioRepositoryTests
                 MonthlyDisposable = 4_000,
                 DisposableRatio = 0.677,
                 SentimentTag = "comfortable",
-                ClientHash = "hash2"
+                ClientHash = "2222222222222222222222222222222222222222222222222222222222222222"
             });
 
             // 3. Negative disposable, should NOT be returned by positive finds
@@ -154,7 +154,7 @@ public class ScenarioRepositoryTests
                 MonthlyDisposable = -300,
                 DisposableRatio = -0.115,
                 SentimentTag = "tight",
-                ClientHash = "hash3"
+                ClientHash = "3333333333333333333333333333333333333333333333333333333333333333"
             });
 
             // 4. LA scenario, CS
@@ -175,7 +175,7 @@ public class ScenarioRepositoryTests
                 MonthlyDisposable = 4_400,
                 DisposableRatio = 0.647,
                 SentimentTag = "comfortable",
-                ClientHash = "hash4"
+                ClientHash = "4444444444444444444444444444444444444444444444444444444444444444"
             });
 
             // Query SF positive finds
@@ -212,7 +212,7 @@ public class ScenarioRepositoryTests
         try
         {
             var repo = new ScenarioRepository(factory);
-            const string clientHash = "testclienthash123";
+            const string clientHash = "5555555555555555555555555555555555555555555555555555555555555555";
             var today = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
             await repo.InsertScenarioAsync(new SharedScenario
@@ -258,7 +258,7 @@ public class ScenarioRepositoryTests
             var count = await repo.GetDailySubmissionCountByClientHashAsync(clientHash, today);
             Assert.Equal(2, count);
 
-            var otherCount = await repo.GetDailySubmissionCountByClientHashAsync("otherhash", today);
+            var otherCount = await repo.GetDailySubmissionCountByClientHashAsync("6666666666666666666666666666666666666666666666666666666666666666", today);
             Assert.Equal(0, otherCount);
         }
         finally

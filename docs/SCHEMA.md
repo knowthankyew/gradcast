@@ -34,7 +34,7 @@ GradCast operates under a **Dual-Mode Storage Architecture**:
 |                                                                               |
 |  [BRONZE]  bronze_shared_scenarios   bronze_college_scorecard   bronze_hud_fmr |
 |     │                                                                         |
-|     ▼ Liquid Clustering CLUSTER BY (cip_code, cbsa_code) + Delta CDF           |
+|     ▼ Liquid Clustering CLUSTER BY (cip_family, cbsa_code) + Delta CDF           |
 |  [SILVER]  silver_scenarios          silver_programs           silver_schools |
 |     │                                                                         |
 |     ▼ k-Anonymity Row Filter (k >= 5) + Star Schema Modeling                  |
@@ -110,13 +110,14 @@ CREATE TABLE IF NOT EXISTS "community_scenario_benchmarks" (
     "cip_family" TEXT NOT NULL,                                     -- First 2 digits of CIP (e.g. '11' for CS)
     "cbsa_code" TEXT NOT NULL,
     "credential_level" INTEGER NOT NULL,
+    "housing_type" TEXT NOT NULL,                                   -- 'alone' | 'roommate'
     "sample_count" INTEGER NOT NULL,                                -- Must be >= 5 (k-anonymity)
     "p25_monthly_disposable" INTEGER NOT NULL,
     "median_monthly_disposable" INTEGER NOT NULL,
     "p75_monthly_disposable" INTEGER NOT NULL,
     "top_contributing_school_id" INTEGER NULL,
     "last_updated_at" TEXT NOT NULL,
-    CONSTRAINT "PK_community_scenario_benchmarks" PRIMARY KEY ("cip_family", "cbsa_code", "credential_level")
+    CONSTRAINT "PK_community_scenario_benchmarks" PRIMARY KEY ("cip_family", "cbsa_code", "credential_level", "housing_type")
 );
 ```
 
@@ -169,7 +170,7 @@ USING DELTA;
 Data in Silver is validated against schemas, deduplicated, and enriched with standard geographic codes.
 
 #### Delta Table Features:
-- **Liquid Clustering**: `CLUSTER BY (cip_code, cbsa_code)` optimizes query filtering across metro areas and programs without directory-partition skew.
+- **Liquid Clustering**: `CLUSTER BY (cip_family, cbsa_code)` optimizes query filtering across metro areas and programs without directory-partition skew.
 - **Change Data Feed**: `delta.enableChangeDataFeed = true` allows downstream incremental streaming into Gold.
 - **Constraints**: Enforces physical boundaries on valid salaries and disposable ratios.
 
@@ -316,6 +317,7 @@ CREATE TABLE IF NOT EXISTS gradcast_lakehouse.gold.fact_scenario_outcomes (
     scenario_id STRING NOT NULL,
     school_id INT NOT NULL,
     cip_code STRING NOT NULL,
+    credential_level INT NOT NULL,
     cbsa_code STRING NOT NULL,
     date_key INT NOT NULL,                       -- Format: YYYYMMDD
     housing_type STRING NOT NULL,
@@ -337,6 +339,7 @@ SELECT
     f.cbsa_code,
     m.name AS metro_name,
     p.cip_family,
+    f.credential_level,
     f.housing_type,
     COUNT(*) AS sample_count,
     ROUND(AVG(f.monthly_disposable), 2) AS mean_monthly_disposable,
@@ -350,6 +353,7 @@ GROUP BY
     f.cbsa_code, 
     m.name, 
     p.cip_family, 
+    f.credential_level,
     f.housing_type
 HAVING COUNT(*) >= 5; -- Invariant: Hard k-anonymity boundary
 ```
@@ -367,7 +371,8 @@ def export_gold_to_sqlite(spark, sqlite_db_path: str):
         SELECT 
             cip_family,
             cbsa_code,
-            1 AS credential_level,
+            credential_level,
+            housing_type,
             sample_count,
             CAST(p25_disposable AS INT) AS p25_monthly_disposable,
             CAST(median_disposable AS INT) AS median_monthly_disposable,

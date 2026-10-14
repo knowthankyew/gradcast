@@ -5,6 +5,8 @@ using GradCast.Api.Data;
 using GradCast.Api.Models;
 using GradCast.Data.Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace GradCast.Api.Endpoints;
 
@@ -13,8 +15,29 @@ public static partial class ScenarioEndpoints
     private const int MaxDailySharesPerClient = 50;
     private const string DefaultClientSalt = "gradcast-lakehouse-client-salt-v1";
 
+    private static readonly HashSet<string> AllowedHousingTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "alone", "roommate"
+    };
+
+    private static readonly HashSet<string> AllowedSentimentTags = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "comfortable", "surplus_plus", "tight", "hidden_gem", "stretch"
+    };
+
+    private static readonly HashSet<string> AllowedSalaryModes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "scorecard_median", "user_override"
+    };
+
     [GeneratedRegex("<.*?>", RegexOptions.Compiled)]
     private static partial Regex HtmlTagRegex();
+
+    [GeneratedRegex(@"^\d{2}(\.\d{4})?$", RegexOptions.Compiled)]
+    private static partial Regex CipCodeRegex();
+
+    [GeneratedRegex(@"^\d{5}$", RegexOptions.Compiled)]
+    private static partial Regex CbsaCodeRegex();
 
     public static void MapScenarioEndpoints(this WebApplication app)
     {
@@ -40,14 +63,14 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid school ID", "A valid school ID is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.CipCode))
+        if (string.IsNullOrWhiteSpace(request.CipCode) || !CipCodeRegex().IsMatch(request.CipCode.Trim()))
         {
-            return ValidationFailure("Invalid CIP code", "CIP code is required.");
+            return ValidationFailure("Invalid CIP code", "CIP code must be in 2-digit (XX) or 6-digit (XX.XXXX) format.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.CbsaCode))
+        if (string.IsNullOrWhiteSpace(request.CbsaCode) || !CbsaCodeRegex().IsMatch(request.CbsaCode.Trim()))
         {
-            return ValidationFailure("Invalid CBSA code", "CBSA code is required.");
+            return ValidationFailure("Invalid CBSA code", "CBSA code must be a 5-digit numeric identifier.");
         }
 
         if (request.CredentialLevel < 1 || request.CredentialLevel > 6)
@@ -55,9 +78,9 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid credential level", "Credential level must be between 1 and 6.");
         }
 
-        if (request.ReportedAnnualSalary < 0)
+        if (request.ReportedAnnualSalary < 0 || request.ReportedAnnualSalary > 2_000_000)
         {
-            return ValidationFailure("Invalid salary", "Reported annual salary cannot be negative.");
+            return ValidationFailure("Invalid salary", "Reported annual salary must be between $0 and $2,000,000.");
         }
 
         if (request.MonthlyDisposable < -20_000)
@@ -65,14 +88,19 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid disposable income", "Monthly disposable income cannot be below -$20,000.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.HousingType))
+        if (string.IsNullOrWhiteSpace(request.HousingType) || !AllowedHousingTypes.Contains(request.HousingType.Trim()))
         {
-            return ValidationFailure("Invalid housing type", "Housing type is required.");
+            return ValidationFailure("Invalid housing type", "Housing type must be either 'alone' or 'roommate'.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.SentimentTag))
+        if (string.IsNullOrWhiteSpace(request.SentimentTag) || !AllowedSentimentTags.Contains(request.SentimentTag.Trim()))
         {
-            return ValidationFailure("Invalid sentiment tag", "Sentiment tag is required.");
+            return ValidationFailure("Invalid sentiment tag", "Sentiment tag must be one of: comfortable, surplus_plus, tight, hidden_gem, stretch.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SalaryMode) && !AllowedSalaryModes.Contains(request.SalaryMode.Trim()))
+        {
+            return ValidationFailure("Invalid salary mode", "Salary mode must be either 'scorecard_median' or 'user_override'.");
         }
 
         if (request.ScenarioTitle != null && request.ScenarioTitle.Length > 60)
@@ -85,7 +113,7 @@ public static partial class ScenarioEndpoints
 
     public static string ComputeClientHash(string clientIp, string? customSalt = null)
     {
-        var salt = customSalt ?? DefaultClientSalt;
+        var salt = !string.IsNullOrWhiteSpace(customSalt) ? customSalt : DefaultClientSalt;
         var dateStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var payload = $"{dateStr}:{clientIp}:{salt}";
 
@@ -95,16 +123,28 @@ public static partial class ScenarioEndpoints
 
     public static string ExtractClientIp(HttpContext httpContext)
     {
+        var remoteIp = httpContext.Connection.RemoteIpAddress;
+
+        // Fly.io trusted edge proxy header
+        if (httpContext.Request.Headers.TryGetValue("Fly-Client-IP", out var flyIp))
+        {
+            var ipStr = flyIp.ToString().Trim();
+            if (System.Net.IPAddress.TryParse(ipStr, out _))
+            {
+                return ipStr;
+            }
+        }
+
         if (httpContext.Request.Headers.TryGetValue("X-Forwarded-For", out var forwardedFor))
         {
             var firstIp = forwardedFor.ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
-            if (!string.IsNullOrWhiteSpace(firstIp))
+            if (!string.IsNullOrWhiteSpace(firstIp) && System.Net.IPAddress.TryParse(firstIp, out _))
             {
                 return firstIp;
             }
         }
 
-        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
+        return remoteIp?.ToString() ?? "127.0.0.1";
     }
 
     private static async Task<IResult> ShareScenario(
@@ -120,7 +160,8 @@ public static partial class ScenarioEndpoints
         }
 
         var clientIp = ExtractClientIp(httpContext);
-        var clientHash = ComputeClientHash(clientIp);
+        var configuredSalt = httpContext.RequestServices.GetService<IConfiguration>()?["Security:ClientHashSalt"];
+        var clientHash = ComputeClientHash(clientIp, configuredSalt);
         var todayPrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
         var dailySubmissions = await repository.GetDailySubmissionCountByClientHashAsync(clientHash, todayPrefix, ct);

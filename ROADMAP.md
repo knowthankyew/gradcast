@@ -3,7 +3,7 @@
 > **Portfolio Alignment**: Civic Reality Engine & Higher Education Return-on-Investment (ROI) Platform  
 > **Governance Standard**: `knowthankyew` Safe Allowlist Invariant & $k$-Anonymity Cloud Boundary ($k \ge 5$)  
 > **Technical Stack**: ASP.NET Core 10 / Dapper / SQLite 3 (Edge) ⇄ PySpark / Delta Lake / Unity Catalog / Terraform / DABs (Lakehouse)  
-> **Schema Reference**: [`docs/SCHEMA.md`](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md)
+> **Schema Reference**: [`docs/SCHEMA.md`](docs/SCHEMA.md)
 
 ---
 
@@ -78,7 +78,7 @@ GradCast currently simulates post-grad budgets entirely client-side or reads his
 - **OUT OF SCOPE**: Direct Databricks calls from the web app; user accounts/passwords (scenarios are 100% anonymous).
 
 ### Technical Specification
-1. **Schema DDL**: Execute migration in SQLite (see [`docs/SCHEMA.md`](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md#32-new-table-shared_scenarios-edge-operational-ingest)).
+1. **Schema DDL**: Execute migration in SQLite (see [`docs/SCHEMA.md`](docs/SCHEMA.md#32-new-table-shared_scenarios-edge-operational-ingest)).
 2. **Files to Modify/Create**:
    - `src/GradCast.Api/Models/SharedScenario.cs`: Record defining payload matching `SAFE_ALLOWLIST_KEYS`.
    - `src/GradCast.Api/Data/IScenarioRepository.cs` & `ScenarioRepository.cs`: Dapper implementation.
@@ -171,7 +171,7 @@ The Lakehouse ingests two streams: high-volume public reference data (College Sc
 1. **Source Code**:
    - `lakehouse/src/pipelines/bronze_ingest.py`: Auto Loader streaming / batch ingestion.
    - `lakehouse/src/pipelines/silver_transform.py`: Cleansing, type coercion, deduplication with `MERGE INTO`.
-2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.1 & 4.2](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md#4-databricks-lakehouse-medallion-schema-delta-lake--unity-catalog).
+2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.1 & 4.2](docs/SCHEMA.md#4-databricks-lakehouse-medallion-schema-delta-lake--unity-catalog).
 
 ### Acceptance Criteria
 - [x] Bronze tables configured with `delta.appendOnly = true`.
@@ -215,7 +215,7 @@ To prevent user re-identification and supply GradCast's public edge tier with fr
    - `lakehouse/src/pipelines/gold_modeling.py`: Populates fact and dimension tables.
    - `lakehouse/src/pipelines/views.py`: Declares $k$-anonymity views.
    - `lakehouse/src/pipelines/export_sqlite.py`: Reverse-ETL SQLite compiler.
-2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.3 & 5](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md#43-gold-layer-dimensional-star-schema--k-anonymity-marts).
+2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.3 & 5](docs/SCHEMA.md#43-gold-layer-dimensional-star-schema--k-anonymity-marts).
 
 ### Acceptance Criteria
 - [x] Queries on `v_public_positive_finds` return zero results for any `(cbsa_code, cip_family)` cohort with fewer than 5 scenarios.

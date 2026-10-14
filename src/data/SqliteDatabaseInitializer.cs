@@ -87,7 +87,11 @@ public static class SqliteDatabaseInitializer
             scenario_title TEXT NULL,
             client_hash TEXT NOT NULL,
             CONSTRAINT FK_shared_scenarios_schools FOREIGN KEY (school_id) REFERENCES schools (id) ON DELETE RESTRICT,
-            CONSTRAINT FK_shared_scenarios_cbsa FOREIGN KEY (cbsa_code) REFERENCES cbsa_locations (cbsa_code) ON DELETE RESTRICT
+            CONSTRAINT FK_shared_scenarios_cbsa FOREIGN KEY (cbsa_code) REFERENCES cbsa_locations (cbsa_code) ON DELETE RESTRICT,
+            CONSTRAINT CK_shared_scenarios_salary CHECK (reported_annual_salary >= 0 AND reported_annual_salary <= 2000000),
+            CONSTRAINT CK_shared_scenarios_disposable CHECK (monthly_disposable >= -20000),
+            CONSTRAINT CK_shared_scenarios_housing CHECK (housing_type IN ('alone', 'roommate')),
+            CONSTRAINT CK_shared_scenarios_client_hash CHECK (length(client_hash) = 64)
         );
 
         -- Covering Indexes

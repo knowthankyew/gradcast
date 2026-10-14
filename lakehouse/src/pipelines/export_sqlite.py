@@ -18,13 +18,14 @@ CREATE TABLE IF NOT EXISTS community_scenario_benchmarks (
     cip_family TEXT NOT NULL,
     cbsa_code TEXT NOT NULL,
     credential_level INTEGER NOT NULL,
+    housing_type TEXT NOT NULL,
     sample_count INTEGER NOT NULL,
     p25_monthly_disposable INTEGER NOT NULL,
     median_monthly_disposable INTEGER NOT NULL,
     p75_monthly_disposable INTEGER NOT NULL,
     top_contributing_school_id INTEGER NULL,
     last_updated_at TEXT NOT NULL,
-    CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level)
+    CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level, housing_type)
 );
 
 CREATE INDEX IF NOT EXISTS IX_community_scenario_benchmarks_cbsa_cip 
@@ -45,7 +46,8 @@ def export_gold_to_sqlite(
         SELECT 
             cip_family,
             cbsa_code,
-            3 AS credential_level,
+            credential_level,
+            housing_type,
             sample_count,
             CAST(p25_disposable AS INT) AS p25_monthly_disposable,
             CAST(median_disposable AS INT) AS median_monthly_disposable,
@@ -67,10 +69,10 @@ def export_gold_to_sqlite(
 
         insert_sql = """
             INSERT INTO community_scenario_benchmarks (
-                cip_family, cbsa_code, credential_level, sample_count,
+                cip_family, cbsa_code, credential_level, housing_type, sample_count,
                 p25_monthly_disposable, median_monthly_disposable, p75_monthly_disposable,
                 top_contributing_school_id, last_updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         """
 
         records = [
@@ -78,6 +80,7 @@ def export_gold_to_sqlite(
                 r["cip_family"],
                 r["cbsa_code"],
                 r["credential_level"],
+                r["housing_type"],
                 r["sample_count"],
                 r["p25_monthly_disposable"],
                 r["median_monthly_disposable"],

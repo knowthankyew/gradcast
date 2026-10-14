@@ -56,6 +56,7 @@ def ensure_gold_tables(spark: SparkSession, catalog: str = "gradcast_lakehouse")
             scenario_id STRING NOT NULL,
             school_id INT NOT NULL,
             cip_code STRING NOT NULL,
+            credential_level INT NOT NULL,
             cbsa_code STRING NOT NULL,
             date_key INT NOT NULL,
             housing_type STRING NOT NULL,
@@ -74,7 +75,7 @@ def populate_fact_scenario_outcomes(
     catalog: str = "gradcast_lakehouse",
 ) -> None:
     """
-    Populate fact_scenario_outcomes from silver.scenarios.
+    Populate fact_scenario_outcomes idempotently from silver.scenarios using Delta MERGE.
     """
     silver_df = spark.table(f"{catalog}.silver.scenarios")
 
@@ -85,6 +86,7 @@ def populate_fact_scenario_outcomes(
             F.col("scenario_id"),
             F.col("school_id"),
             F.col("cip_code"),
+            F.col("credential_level"),
             F.col("cbsa_code"),
             F.date_format(F.col("created_at"), "yyyyMMdd").cast("int").alias("date_key"),
             F.col("housing_type"),
@@ -93,14 +95,37 @@ def populate_fact_scenario_outcomes(
             F.col("monthly_disposable"),
             F.col("disposable_ratio"),
         )
+        .dropDuplicates(["scenario_id"])
     )
 
-    (
-        fact_df.write
-        .format("delta")
-        .mode("append")
-        .saveAsTable(f"{catalog}.gold.fact_scenario_outcomes")
-    )
+    fact_df.createOrReplaceTempView("stage_fact_scenarios")
+
+    spark.sql(f"""
+        MERGE INTO {catalog}.gold.fact_scenario_outcomes AS target
+        USING stage_fact_scenarios AS source
+        ON target.scenario_id = source.scenario_id
+        WHEN MATCHED THEN
+            UPDATE SET
+                target.school_id = source.school_id,
+                target.cip_code = source.cip_code,
+                target.credential_level = source.credential_level,
+                target.cbsa_code = source.cbsa_code,
+                target.date_key = source.date_key,
+                target.housing_type = source.housing_type,
+                target.annual_salary = source.annual_salary,
+                target.monthly_rent = source.monthly_rent,
+                target.monthly_disposable = source.monthly_disposable,
+                target.disposable_ratio = source.disposable_ratio
+        WHEN NOT MATCHED THEN
+            INSERT (
+                scenario_id, school_id, cip_code, credential_level, cbsa_code, date_key,
+                housing_type, annual_salary, monthly_rent, monthly_disposable, disposable_ratio
+            )
+            VALUES (
+                source.scenario_id, source.school_id, source.cip_code, source.credential_level, source.cbsa_code, source.date_key,
+                source.housing_type, source.annual_salary, source.monthly_rent, source.monthly_disposable, source.disposable_ratio
+            )
+    """)
 
 
 if __name__ == "__main__":

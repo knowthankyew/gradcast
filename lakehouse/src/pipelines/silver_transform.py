@@ -124,6 +124,7 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
         & (F.col("reported_annual_salary") >= 10000.00)
         & (F.col("monthly_disposable") >= -20000.00)
     )
+    is_valid_cond = F.coalesce(is_valid_cond, F.lit(False))
 
     valid_df = parsed_df.filter(is_valid_cond).drop("raw_payload")
 
@@ -155,7 +156,8 @@ def merge_scenarios_into_silver(
     """
     Idempotent Delta MERGE INTO on primary business key (scenario_id).
     """
-    valid_df.createOrReplaceTempView("stage_valid_scenarios")
+    deduped_df = valid_df.dropDuplicates(["scenario_id"])
+    deduped_df.createOrReplaceTempView("stage_valid_scenarios")
 
     spark.sql(f"""
         MERGE INTO {target_table} AS target

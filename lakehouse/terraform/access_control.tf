@@ -42,8 +42,8 @@ resource "databricks_grants" "silver_access" {
   }
 }
 
-# Gold schema grants (Service principal manages; Analysts read verified k-anonymity marts)
-resource "databricks_grants" "gold_access" {
+# Gold schema grants (Service principal manages; Analysts have USE_SCHEMA)
+resource "databricks_grants" "gold_schema_access" {
   schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.gold.name}"
 
   grant {
@@ -53,6 +53,16 @@ resource "databricks_grants" "gold_access" {
 
   grant {
     principal  = databricks_group.analysts.display_name
-    privileges = ["USE_SCHEMA", "SELECT"]
+    privileges = ["USE_SCHEMA"]
+  }
+}
+
+# Restrict Analysts to verified k-anonymity view only (never raw fact_scenario_outcomes)
+resource "databricks_grants" "gold_public_view_access" {
+  table = "${databricks_catalog.lakehouse.name}.${databricks_schema.gold.name}.v_public_positive_finds"
+
+  grant {
+    principal  = databricks_group.analysts.display_name
+    privileges = ["SELECT"]
   }
 }

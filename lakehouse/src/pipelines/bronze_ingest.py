@@ -14,7 +14,7 @@ from typing import Optional
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
-    BigIntegerType,
+    LongType,
     StringType,
     StructField,
     StructType,
@@ -29,7 +29,7 @@ def get_shared_scenarios_bronze_schema() -> StructType:
         StructField("ingest_timestamp", TimestampType(), False),
         StructField("source_system", StringType(), False),
         StructField("file_name", StringType(), False),
-        StructField("file_offset", BigIntegerType(), False),
+        StructField("file_offset", LongType(), False),
     ])
 
 
