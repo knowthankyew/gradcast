@@ -49,11 +49,11 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 | :--- | :--- | :--- | :--- | :---: |
 | **Stage 1** | **Edge SQLite Social Sharing Layer** | Edge / OLTP | Operational `shared_scenarios` table, Dapper repo, ASP.NET Core Minimal API endpoint with strict input allowlist, Vuetify share button. | ✅ **Completed** |
 | **Stage 2** | **Lakehouse Foundation & IaC** | Cloud / Governance | Terraform Unity Catalog provisioning (catalogs, schemas, service principals), Databricks Asset Bundle (`databricks.yml`), OAuth M2M authentication. | ✅ **Completed** |
-| **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | 📋 **Specified** |
-| **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | 📋 **Specified** |
-| **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | 📋 **Specified** |
-| **Stage 6** | **Google-Grade Testing Harness** | Quality Engineering | PySpark DataFrame unit testing with `chispa`, schema contract tests, local SQLite vs Spark integration suite, 100% CI pass. | 📋 **Specified** |
-| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `scripts/audit-claims.py` documentation linter, CycloneDX SBOM generation (`bom.json`), SLSA build provenance attestation. | 📋 **Specified** |
+| **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | ✅ **Completed** |
+| **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | ✅ **Completed** |
+| **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | ✅ **Completed** |
+| **Stage 6** | **Google-Grade Testing Harness** | Quality Engineering | PySpark DataFrame unit testing with `chispa`, schema contract tests, local SQLite vs Spark integration suite, 100% CI pass. | ✅ **Completed** |
+| **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `scripts/audit-claims.py` documentation linter, CycloneDX SBOM generation (`bom.json`), SLSA build provenance attestation. | ✅ **Completed** |
 
 ---
 
@@ -174,10 +174,10 @@ The Lakehouse ingests two streams: high-volume public reference data (College Sc
 2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.1 & 4.2](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md#4-databricks-lakehouse-medallion-schema-delta-lake--unity-catalog).
 
 ### Acceptance Criteria
-- [ ] Bronze tables configured with `delta.appendOnly = true`.
-- [ ] Silver tables utilize Liquid Clustering on `(cip_family, cbsa_code)` verified via `DESCRIBE DETAIL`.
-- [ ] Delta Change Data Feed emits `insert`, `update_postimage`, and `delete` events cleanly.
-- [ ] PySpark pipeline handles dirty data (missing rent, non-numeric earnings) by writing to an audit quarantine without terminating execution.
+- [x] Bronze tables configured with `delta.appendOnly = true`.
+- [x] Silver tables utilize Liquid Clustering on `(cip_family, cbsa_code)` verified via `DESCRIBE DETAIL`.
+- [x] Delta Change Data Feed emits `insert`, `update_postimage`, and `delete` events cleanly.
+- [x] PySpark pipeline handles dirty data (missing rent, non-numeric earnings) by writing to an audit quarantine without terminating execution.
 
 ### AI Coder Execution Prompt
 ```text
@@ -218,9 +218,9 @@ To prevent user re-identification and supply GradCast's public edge tier with fr
 2. **Schema Reference**: [`docs/SCHEMA.md` Section 4.3 & 5](file:///Users/cl0rkster/Dev/gradcast/docs/SCHEMA.md#43-gold-layer-dimensional-star-schema--k-anonymity-marts).
 
 ### Acceptance Criteria
-- [ ] Queries on `v_public_positive_finds` return zero results for any `(cbsa_code, cip_family)` cohort with fewer than 5 scenarios.
-- [ ] Reverse-ETL compiler produces a valid, queryable SQLite file containing table `community_scenario_benchmarks`.
-- [ ] Export script executes deterministically and includes SQLite index creation for edge performance.
+- [x] Queries on `v_public_positive_finds` return zero results for any `(cbsa_code, cip_family)` cohort with fewer than 5 scenarios.
+- [x] Reverse-ETL compiler produces a valid, queryable SQLite file containing table `community_scenario_benchmarks`.
+- [x] Export script executes deterministically and includes SQLite index creation for edge performance.
 
 ### AI Coder Execution Prompt
 ```text
@@ -258,9 +258,9 @@ Enterprise single sources of truth require continuous data quality verification.
    - `expect_or_fail`: Schema corruption halts execution immediately.
 
 ### Acceptance Criteria
-- [ ] Data quality checks execute in $< 30\text{s}$ over 100,000 records.
-- [ ] Quarantined records write to `quarantine.scenarios_rejected` with failure reason string.
-- [ ] OpenTelemetry trace attributes adhere strictly to `SAFE_ALLOWLIST_KEYS`.
+- [x] Data quality checks execute in $< 30\text{s}$ over 100,000 records.
+- [x] Quarantined records write to `quarantine.scenarios_rejected` with failure reason string.
+- [x] OpenTelemetry trace attributes adhere strictly to `SAFE_ALLOWLIST_KEYS`.
 
 ### AI Coder Execution Prompt
 ```text
@@ -298,9 +298,9 @@ A core requirement for lead/architect roles at companies like Google is rigorous
    - `lakehouse/tests/e2e/test_reverse_etl.py`: Verifies generated SQLite DB validity.
 
 ### Acceptance Criteria
-- [ ] All unit tests execute locally via `pytest lakehouse/tests/` in $< 45\text{s}$.
-- [ ] Tests run cleanly in GitHub Actions CI with zero cloud credentials.
-- [ ] `chispa.assert_df_equality` verifies schema and column-level precision.
+- [x] All unit tests execute locally via `pytest lakehouse/tests/` in $< 45\text{s}$.
+- [x] Tests run cleanly in GitHub Actions CI with zero cloud credentials.
+- [x] `chispa.assert_df_equality` verifies schema and column-level precision.
 
 ### AI Coder Execution Prompt
 ```text
@@ -341,9 +341,9 @@ To ensure the codebase, documentation, schemas, and CI supply chain remain in ab
    - `.github/workflows/lakehouse-ci.yml`: Unified CI gate.
 
 ### Acceptance Criteria
-- [ ] `python3 lakehouse/scripts/audit_claims.py` exits `0` on parity, exits `1` with clear diff on drift.
-- [ ] CycloneDX SBOM (`bom.json`) generated automatically for Python and .NET dependencies.
-- [ ] CI pipeline fails-closed if any claim, invariant, or test fails.
+- [x] `python3 lakehouse/scripts/audit_claims.py` exits `0` on parity, exits `1` with clear diff on drift.
+- [x] CycloneDX SBOM (`bom.json`) generated automatically for Python and .NET dependencies.
+- [x] CI pipeline fails-closed if any claim, invariant, or test fails.
 
 ### AI Coder Execution Prompt
 ```text
