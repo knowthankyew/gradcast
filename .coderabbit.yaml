@@ -1,0 +1,83 @@
+# CodeRabbit Configuration for GradCast Lakehouse
+# Targeted Scope: Dual-Mode Lakehouse Architecture, k-Anonymity Privacy & Supply Chain Assurance
+
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  sequence_diagrams: true
+  auto_review:
+    enabled: true
+    drafts: false
+
+  # Filter out compiled binaries, media files, and local caches
+  path_filters:
+    - "!**/*.mp4"
+    - "!**/*.gif"
+    - "!**/*.webm"
+    - "!**/*.png"
+    - "!**/*.db"
+    - "!**/*.db-shm"
+    - "!**/*.db-wal"
+    - "!src/web/dist/**"
+    - "!**/bin/**"
+    - "!**/obj/**"
+    - "!lakehouse/terraform/.terraform/**"
+    - "!bom.json"
+    - "!lakehouse/bom.json"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: |
+        You are performing an exhaustive architectural, security, and data governance audit for "GradCast", an enterprise-grade Civic Reality Engine and Higher Education ROI platform operating under a Dual-Mode Storage Architecture (Edge SQLite ⇄ Databricks Unity Catalog).
+
+        Evaluate all code against these non-negotiable architectural invariants:
+
+        1. DUAL-MODE STORAGE BOUNDARY & PRIVACY (CRITICAL):
+           - In the web and edge tier (`src/api/**`, `src/data/**`), all reads must be served from local SQLite (`gradcast.db`). Prohibit direct Databricks cluster API calls during live web traffic.
+           - Social sharing (`POST /api/scenarios/share`): Strictly prohibit persisting client IP addresses or PII. The client hash must be computed as a one-way daily salted hash (`SHA256(date + ip + salt)`).
+           - Enforce input allowlists, non-negative salary bounds, and a disposable income floor of -$20,000.
+           - Enforce rate-limiting defenses against scenario flooding.
+
+        2. LAKEHOUSE MEDALLION PIPELINES (BRONZE / SILVER / GOLD):
+           - In `lakehouse/src/pipelines/**`:
+           - Bronze layer tables must be append-only (`delta.appendOnly = true`).
+           - Silver layer tables must employ Liquid Clustering (`CLUSTER BY (cip_family, cbsa_code)`), Delta Change Data Feed (CDF), and route corrupted or unparseable records to quarantine without pipeline failure.
+           - Gold layer views (`v_public_positive_finds`) must strictly enforce k-anonymity (`HAVING COUNT(*) >= 5`) to prevent student cohort re-identification.
+
+        3. REVERSE-ETL COMPILER & EDGE CONTRACT PARITY:
+           - In `lakehouse/src/pipelines/export_sqlite.py`, verify that the exported schema for `community_scenario_benchmarks` strictly matches the Dapper entity models and creates covering indexes (`IX_community_scenario_benchmarks_cbsa_cip`) for sub-millisecond edge lookups.
+
+        4. DECLARATIVE INFRASTRUCTURE AS CODE (IaC):
+           - In `lakehouse/terraform/**`, enforce Unity Catalog 3-level naming (`catalog.schema.table`), zero Personal Access Tokens (PATs) in favor of OAuth M2M authentication, and least-privilege RBAC.
+           - In `lakehouse/databricks.yml`, verify Databricks Asset Bundle target configurations (`dev`, `prod`).
+
+        5. TESTING & CLAIMS AUDITING:
+           - In `lakehouse/scripts/audit_claims.py`, ensure static parity between documentation (`docs/SCHEMA.md`), PySpark DDL, and SQLite migrations.
+           - Prohibit unprovable marketing adjectives ('bulletproof', 'conclusive', 'definitive', 'infinitely scalable').
+           - Verify that `KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md` test counts match actual test inventories.
+
+    - path: "src/api/**"
+      instructions: "Audit ASP.NET Core Minimal APIs for parameter binding validation, XSS sanitization, anti-abuse client hashing, and thread-safe Dapper connection usage."
+
+    - path: "src/data/**"
+      instructions: "Audit SQLite schema DDL, constraint definitions, covering indexes, and Dapper entity mappings."
+
+    - path: "lakehouse/terraform/**"
+      instructions: "Audit Terraform HCL for provider version constraints, Unity Catalog metastore hierarchy, and least-privilege service principal grants."
+
+    - path: "lakehouse/src/pipelines/**"
+      instructions: "Audit PySpark transformations, Delta ACID invariants, Liquid Clustering keys, and k-anonymity suppression."
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
+  linked_repositories:
+    - repository: "knowthankyew/privacy-telemetry"
+      instructions: "Contains canonical zero-egress invariants, cryptographic evidence sealing standards, and privacy schemas for the KnowThankYew suite."
+    - repository: "knowthankyew/portfolio-admin"
+      instructions: "Contains portfolio integration standards, Master Brief assertions, and administrative compliance specifications."

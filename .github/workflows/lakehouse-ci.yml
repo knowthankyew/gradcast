@@ -1,0 +1,121 @@
+name: Lakehouse IaC & Governance CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lakehouse/**'
+      - 'src/**'
+      - '.github/workflows/lakehouse-ci.yml'
+      - 'docs/SCHEMA.md'
+      - 'ROADMAP.md'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lakehouse/**'
+      - 'src/**'
+      - '.github/workflows/lakehouse-ci.yml'
+      - 'docs/SCHEMA.md'
+      - 'ROADMAP.md'
+  workflow_dispatch:
+
+jobs:
+  validate-iac:
+    name: Validate Terraform & Databricks Asset Bundles
+    runs-on: ubuntu-latest
+    env:
+      DATABRICKS_CLIENT_ID: ${{ secrets.DATABRICKS_CLIENT_ID }}
+      DATABRICKS_CLIENT_SECRET: ${{ secrets.DATABRICKS_CLIENT_SECRET }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Check Terraform Formatting
+        run: terraform -chdir=lakehouse/terraform fmt -check
+
+      - name: Initialize Terraform (No Backend)
+        run: terraform -chdir=lakehouse/terraform init -backend=false
+
+      - name: Validate Terraform Configuration
+        run: terraform -chdir=lakehouse/terraform validate
+
+      - name: Setup Databricks CLI
+        uses: databricks/setup-cli@v0.229.0
+
+      - name: Validate Databricks Asset Bundle Syntax & Schema
+        run: |
+          python3 -c "
+          import yaml
+          with open('lakehouse/databricks.yml') as f:
+              data = yaml.safe_load(f)
+          assert 'bundle' in data, 'Missing bundle section'
+          assert 'resources' in data, 'Missing resources section'
+          assert 'jobs' in data['resources'], 'Missing jobs in resources'
+          assert 'targets' in data, 'Missing targets definition'
+          print('databricks.yml bundle structure validated successfully.')
+          "
+
+      - name: Validate Databricks Asset Bundle (when credentials configured)
+        if: env.DATABRICKS_CLIENT_ID != ''
+        run: |
+          cd lakehouse
+          databricks bundle validate -t dev
+          databricks bundle validate -t prod
+
+  api-tests:
+    name: Run .NET API & Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Run Backend Tests
+        run: dotnet test
+
+  lakehouse-tests:
+    name: Run Lakehouse Tests & Claims Linter Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r lakehouse/requirements-dev.txt
+
+      - name: Run Lakehouse Unit & Integration Tests
+        run: |
+          python3 -m unittest discover -s lakehouse/tests -v
+
+      - name: Execute Claims & Invariant Linter Gate
+        run: |
+          python3 lakehouse/scripts/audit_claims.py
+
+      - name: Generate Lakehouse CycloneDX SBOM
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements lakehouse/requirements.txt -o lakehouse/bom.json
+
+      - name: Upload Lakehouse SBOM Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-lakehouse-cyclonedx
+          path: lakehouse/bom.json

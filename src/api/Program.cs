@@ -15,6 +15,11 @@ var app = builder.Build();
 await app.EnsureGradCastDatabaseAsync();
 app.LogGradCastStartupDiagnostics();
 
+if (app.Environment.IsProduction() && string.IsNullOrWhiteSpace(builder.Configuration["Security:ClientHashSalt"]))
+{
+    throw new InvalidOperationException("Security:ClientHashSalt must be configured in production to protect client privacy.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
@@ -56,6 +61,7 @@ app.MapSchoolEndpoints();
 app.MapLocationEndpoints();
 app.MapFinanceEndpoints();
 app.MapJobEndpoints();
+app.MapScenarioEndpoints();
 
 // SPA Fallback: serve index.html for non-API routes when frontend is present
 if (staticRoot != null)

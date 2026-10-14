@@ -1,0 +1,107 @@
+bundle:
+  name: gradcast_lakehouse_bundle
+
+variables:
+  catalog_name:
+    description: "Target Unity Catalog namespace"
+    default: "gradcast_lakehouse"
+  service_principal_id:
+    description: "Production Service Principal Application ID (UUID)"
+    default: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
+  analysts_group:
+    description: "Target Analysts group name"
+    default: "gradcast-analysts-dev"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: "https://adb-mock-workspace.azuredatabricks.net"
+    variables:
+      catalog_name: "gradcast_lakehouse_dev"
+      analysts_group: "gradcast-analysts-dev"
+
+  prod:
+    mode: production
+    workspace:
+      host: "https://adb-prod-workspace.azuredatabricks.net"
+    variables:
+      catalog_name: "gradcast_lakehouse"
+      service_principal_id: "e9668ca7-2484-4822-ba4e-090cbb17b62e"
+      analysts_group: "gradcast-analysts-prod"
+    run_as:
+      service_principal_name: "${var.service_principal_id}"
+
+resources:
+  jobs:
+    gradcast_medallion_etl_job:
+      name: "[${bundle.target}] GradCast Medallion & Reverse-ETL Pipeline"
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"
+        timezone_id: "UTC"
+      tasks:
+        - task_key: run_bronze_ingest
+          spark_python_task:
+            python_file: ./src/pipelines/bronze_ingest.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+              - "--source-path"
+              - "/Volumes/${var.catalog_name}/bronze/raw_landing"
+          job_cluster_key: general_worker
+
+        - task_key: run_silver_transformation
+          depends_on:
+            - task_key: run_bronze_ingest
+          spark_python_task:
+            python_file: ./src/pipelines/silver_transform.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+          job_cluster_key: general_worker
+
+        - task_key: run_gold_dimensional_modeling
+          depends_on:
+            - task_key: run_silver_transformation
+          spark_python_task:
+            python_file: ./src/pipelines/gold_modeling.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+          job_cluster_key: general_worker
+
+        - task_key: refresh_k_anonymity_views
+          depends_on:
+            - task_key: run_gold_dimensional_modeling
+          spark_python_task:
+            python_file: ./src/pipelines/views.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+              - "--analysts-group"
+              - "${var.analysts_group}"
+          job_cluster_key: general_worker
+
+        - task_key: export_gold_to_sqlite
+          depends_on:
+            - task_key: refresh_k_anonymity_views
+          spark_python_task:
+            python_file: ./src/pipelines/export_sqlite.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+              - "--output-path"
+              - "/Volumes/${var.catalog_name}/gold/exports/gradcast_gold.db"
+          job_cluster_key: general_worker
+
+      job_clusters:
+        - job_cluster_key: general_worker
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              "spark.databricks.delta.preview.enabled": "true"
+            node_type_id: "Standard_D4s_v5"
+            autoscale:
+              min_workers: 1
+              max_workers: 2

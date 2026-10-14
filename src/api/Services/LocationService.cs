@@ -19,22 +19,38 @@ public class LocationService : ILocationService
     {
         await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
 
+        var hasQuery = !string.IsNullOrWhiteSpace(query);
         var sql = requireHousing
-            ? """
-              SELECT cbsa_code, name, state, type
-              FROM cbsa_locations
-              WHERE name LIKE @Query
-                AND EXISTS (SELECT 1 FROM fair_market_rents f WHERE f.cbsa_code = cbsa_locations.cbsa_code)
-              ORDER BY name ASC
-              LIMIT 10;
-              """
-            : """
-              SELECT cbsa_code, name, state, type
-              FROM cbsa_locations
-              WHERE name LIKE @Query
-              ORDER BY name ASC
-              LIMIT 10;
-              """;
+            ? (hasQuery
+                ? """
+                  SELECT cbsa_code, name, state, type
+                  FROM cbsa_locations
+                  WHERE name LIKE @Query
+                    AND EXISTS (SELECT 1 FROM fair_market_rents f WHERE f.cbsa_code = cbsa_locations.cbsa_code)
+                  ORDER BY name ASC
+                  LIMIT 25;
+                  """
+                : """
+                  SELECT cbsa_code, name, state, type
+                  FROM cbsa_locations
+                  WHERE EXISTS (SELECT 1 FROM fair_market_rents f WHERE f.cbsa_code = cbsa_locations.cbsa_code)
+                  ORDER BY name ASC
+                  LIMIT 25;
+                  """)
+            : (hasQuery
+                ? """
+                  SELECT cbsa_code, name, state, type
+                  FROM cbsa_locations
+                  WHERE name LIKE @Query
+                  ORDER BY name ASC
+                  LIMIT 25;
+                  """
+                : """
+                  SELECT cbsa_code, name, state, type
+                  FROM cbsa_locations
+                  ORDER BY name ASC
+                  LIMIT 25;
+                  """);
 
         var locations = (await conn.QueryAsync<CbsaLocation>(
             new CommandDefinition(sql, new { Query = $"%{query}%" }, cancellationToken: ct))).ToList();
