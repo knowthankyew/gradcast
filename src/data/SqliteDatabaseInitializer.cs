@@ -94,6 +94,21 @@ public static class SqliteDatabaseInitializer
             CONSTRAINT CK_shared_scenarios_client_hash CHECK (length(client_hash) = 64)
         );
 
+        CREATE TABLE IF NOT EXISTS community_scenario_benchmarks (
+            cip_family TEXT NOT NULL,
+            cbsa_code TEXT NOT NULL,
+            credential_level INTEGER NOT NULL,
+            housing_type TEXT NOT NULL,
+            sample_count INTEGER NOT NULL,
+            p25_monthly_disposable INTEGER NOT NULL,
+            median_monthly_disposable INTEGER NOT NULL,
+            p75_monthly_disposable INTEGER NOT NULL,
+            top_contributing_school_id INTEGER NULL,
+            last_updated_at TEXT NOT NULL,
+            CONSTRAINT PK_community_scenario_benchmarks PRIMARY KEY (cip_family, cbsa_code, credential_level, housing_type),
+            CONSTRAINT FK_community_benchmarks_cbsa FOREIGN KEY (cbsa_code) REFERENCES cbsa_locations (cbsa_code) ON DELETE RESTRICT
+        );
+
         -- Covering Indexes
         CREATE INDEX IF NOT EXISTS IX_schools_name ON schools (name);
         CREATE INDEX IF NOT EXISTS IX_schools_state ON schools (state);
@@ -111,6 +126,7 @@ public static class SqliteDatabaseInitializer
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_disposable ON shared_scenarios (monthly_disposable DESC);
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_created_at ON shared_scenarios (created_at DESC);
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_client_hash_created_at ON shared_scenarios (client_hash, created_at);
+        CREATE INDEX IF NOT EXISTS IX_community_scenario_benchmarks_cbsa_cip ON community_scenario_benchmarks (cbsa_code, cip_family);
     """;
 
     public static async Task<bool> InitializeAsync(SqliteConnection connection, CancellationToken ct = default)

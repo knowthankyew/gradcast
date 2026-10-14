@@ -418,14 +418,31 @@ def export_gold_to_sqlite(spark, sqlite_db_path: str, catalog: str = "gradcast_l
     """)
     rows = df.collect()
     
+    records = [
+        (
+            r["cip_family"],
+            r["cbsa_code"],
+            r["credential_level"],
+            r["housing_type"],
+            r["sample_count"],
+            r["p25_monthly_disposable"],
+            r["median_monthly_disposable"],
+            r["p75_monthly_disposable"],
+            r["top_contributing_school_id"],
+            r["last_updated_at"],
+        )
+        for r in rows
+    ]
+
     # Compile into local scratch SQLite database with explicit schema and covering index
     with tempfile.TemporaryDirectory() as scratch_dir:
         local_db_path = os.path.join(scratch_dir, "compiled_benchmarks.db")
-        with sqlite3.connect(local_db_path) as conn:
-            conn.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
-            conn.executemany(INSERT_BENCHMARKS_SQL, records)
+        with contextlib.closing(sqlite3.connect(local_db_path)) as conn:
+            cursor = conn.cursor()
+            cursor.executescript(SQLITE_BENCHMARK_SCHEMA_DDL)
+            cursor.executemany(INSERT_BENCHMARKS_SQL, records)
             conn.commit()
-            conn.execute("VACUUM;")
+            cursor.execute("VACUUM;")
         
         # Atomically replace live SQLite database via staged temporary file
         tmp_target = os.path.join(os.path.dirname(sqlite_db_path), f".tmp_{os.path.basename(sqlite_db_path)}")

@@ -63,7 +63,7 @@ def audit_schema_parity(errors: List[str]) -> None:
         """
         clean_sql = re.sub(r"--.*$", "", sql_text, flags=re.MULTILINE)
         blocks = []
-        pattern = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\"`\w\.]+)\s*\(", re.IGNORECASE)
+        pattern = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\"`\w\.\{\}]+)\s*\(", re.IGNORECASE)
         for match in pattern.finditer(clean_sql):
             table_name = match.group(1).replace('"', "").replace("`", "")
             start_idx = match.end()
@@ -123,8 +123,27 @@ def audit_schema_parity(errors: List[str]) -> None:
 
         # Deep DDL validation: verify column definitions strictly within matching CREATE TABLE block
         source_blocks = extract_create_table_blocks(source_content)
-        matching_source = next((b for b in source_blocks if b[0].split(".")[-1] == clean_table_name), None)
-        table_block = matching_source[1] if matching_source else source_content
+        matching_source = next((b for b in source_blocks if clean_table_name in b[0]), None)
+        if not matching_source and source_blocks:
+            if clean_table_name == "scenarios":
+                matching_source = next((b for b in source_blocks if "scenario_id" in b[1]), None)
+            elif clean_table_name == "scenarios_rejected":
+                matching_source = next((b for b in source_blocks if "quarantine_id" in b[1]), None)
+            elif clean_table_name == "college_scorecard":
+                matching_source = next((b for b in source_blocks if "unitid" in b[1]), None)
+            elif clean_table_name == "shared_scenarios":
+                matching_source = next((b for b in source_blocks if "file_offset" in b[1]), None)
+
+        if not matching_source:
+            if clean_table_name == "v_public_positive_finds":
+                table_block = source_content
+            else:
+                errors.append(
+                    f"Table DDL block for '{clean_table_name}' missing in {source_file.relative_to(REPO_ROOT)}"
+                )
+                continue
+        else:
+            table_block = matching_source[1]
 
         spec = parsed_tables.get(table_spec)
         if spec:

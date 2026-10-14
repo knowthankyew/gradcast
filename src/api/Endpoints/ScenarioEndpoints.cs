@@ -122,7 +122,7 @@ public static partial class ScenarioEndpoints
             return ValidationFailure("Invalid sentiment tag", "Sentiment tag must be one of: comfortable, surplus_plus, tight, hidden_gem, stretch.");
         }
 
-        if (!string.IsNullOrWhiteSpace(request.SalaryMode) && !AllowedSalaryModes.Contains(request.SalaryMode.Trim()))
+        if (string.IsNullOrWhiteSpace(request.SalaryMode) || !AllowedSalaryModes.Contains(request.SalaryMode.Trim()))
         {
             return ValidationFailure("Invalid salary mode", "Salary mode must be either 'scorecard_median' or 'user_override'.");
         }

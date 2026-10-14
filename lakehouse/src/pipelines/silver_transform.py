@@ -302,22 +302,19 @@ def merge_scenarios_into_silver(
     Idempotent Delta MERGE INTO on primary business key (scenario_id).
     Enforces deterministic deduplication windowing on newest ingest_timestamp and _updated_at.
     """
-    try:
-        if Window is not None:
-            order_cols = []
-            if hasattr(valid_df, "columns") and "ingest_timestamp" in valid_df.columns:
-                order_cols.append(F.col("ingest_timestamp").desc())
-            order_cols.append(F.col("_updated_at").desc())
-            window_spec = Window.partitionBy("scenario_id").orderBy(*order_cols)
-            deduped_df = (
-                valid_df
-                .withColumn("_row_num", F.row_number().over(window_spec))
-                .filter(F.col("_row_num") == 1)
-                .drop("_row_num")
-            )
-        else:
-            deduped_df = valid_df.dropDuplicates(["scenario_id"])
-    except Exception:
+    if Window is not None:
+        order_cols = []
+        if hasattr(valid_df, "columns") and "ingest_timestamp" in valid_df.columns:
+            order_cols.append(F.col("ingest_timestamp").desc())
+        order_cols.append(F.col("_updated_at").desc())
+        window_spec = Window.partitionBy("scenario_id").orderBy(*order_cols)
+        deduped_df = (
+            valid_df
+            .withColumn("_row_num", F.row_number().over(window_spec))
+            .filter(F.col("_row_num") == 1)
+            .drop("_row_num")
+        )
+    else:
         deduped_df = valid_df.dropDuplicates(["scenario_id"])
 
     deduped_df.createOrReplaceTempView("stage_valid_scenarios")
@@ -452,17 +449,14 @@ def run_silver_pipeline(
         except Exception as e:
             print(f"Notice: Pipeline watermark lookup skipped: {e}")
 
-    # Inspect current Delta table history to discover latest commit version
-    latest_table_version = None
-    try:
-        history_rows = spark.sql(f"DESCRIBE HISTORY {src} LIMIT 1").collect()
-        if history_rows and history_rows[0]["version"] is not None:
-            latest_table_version = int(history_rows[0]["version"])
-    except Exception:
-        pass
+    # Inspect current Delta table history to discover latest commit version (let exceptions propagate fail-closed)
+    history_rows = spark.sql(f"DESCRIBE HISTORY {src} LIMIT 1").collect()
+    latest_table_version = int(history_rows[0]["version"]) if history_rows and history_rows[0]["version"] is not None else None
 
     # Incremental Delta table version read
-    if last_version is not None and latest_table_version is not None:
+    if last_version is not None:
+        if latest_table_version is None:
+            raise RuntimeError(f"Unable to determine current commit version for {src} to execute incremental read.")
         start_version = last_version + 1
         if start_version > latest_table_version:
             print(f"Notice: No new commits in {src} (current version {latest_table_version} <= watermark {last_version}).")
@@ -470,6 +464,14 @@ def run_silver_pipeline(
         raw_df = (
             spark.read.format("delta")
             .option("startingVersion", start_version)
+            .option("endingVersion", latest_table_version)
+            .table(src)
+        )
+    elif latest_table_version is not None:
+        # Initial ingestion: read from version 0 through latest commit version
+        raw_df = (
+            spark.read.format("delta")
+            .option("startingVersion", 0)
             .option("endingVersion", latest_table_version)
             .table(src)
         )
