@@ -52,7 +52,7 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 | **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | ✅ **Completed** |
 | **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | ✅ **Completed** |
 | **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | ✅ **Completed** |
-| **Stage 6** | **Google-Grade Testing Harness** | Quality Engineering | PySpark DataFrame unit testing with `chispa`, schema contract tests, local SQLite vs Spark integration suite, 100% CI pass. | ✅ **Completed** |
+| **Stage 6** | **Testing Harness & Verification** | Quality Engineering | Isolated unit testing across Silver transforms, $k$-anonymity view generation, Reverse-ETL SQLite compiler, and ASP.NET Core API suite. | ✅ **Completed** |
 | **Stage 7** | **Claims Auditing & Supply Chain Gate** | Governance / CI | Automated `lakehouse/scripts/audit_claims.py` documentation linter and CycloneDX SBOM generation (`bom.json`) for multi-language supply chain security. | ✅ **Completed** |
 
 ---
@@ -284,23 +284,23 @@ A core requirement for lead/architect roles at companies like Google is rigorous
 
 ### Scope & Explicit Boundaries
 - **IN SCOPE**:
-  - Fast, deterministic PySpark unit test harness using `pytest` and `chispa`.
-  - Fixtures generating mock DataFrame inputs for Bronze, Silver, and Gold transformations.
-  - DataFrame equality assertions testing schema types, null handling, and edge calculations.
-  - End-to-end integration test validating the full ingestion-to-SQLite pipeline in GitHub Actions.
+  - Fast, deterministic unit test harness using `unittest` and `pytest`.
+  - Record-level validation fixtures testing null quarantine, boundaries, and mathematical precision.
+  - Verification of strict $k$-anonymity failsafe clamp ($k \ge 5$) in `views.py`.
+  - End-to-end integration test validating the Reverse-ETL SQLite compiler and schema in CI.
 - **OUT OF SCOPE**: Slow tests requiring live cloud connectivity.
 
 ### Technical Specification
 1. **Source Code**:
-   - `lakehouse/tests/conftest.py`: SparkSession fixture with local master (`local[2]`) and Delta Lake support.
-   - `lakehouse/tests/unit/test_silver_transform.py`: Transformation assertions using `chispa.assert_df_equality`.
-   - `lakehouse/tests/unit/test_k_anonymity.py`: Strict validation of the $k \ge 5$ boundary.
-   - `lakehouse/tests/e2e/test_reverse_etl.py`: Verifies generated SQLite DB validity.
+   - `lakehouse/tests/conftest.py`: Test environment configuration.
+   - `lakehouse/tests/unit/test_silver_transform.py`: Silver validation, quarantine reasons, and boundary assertions.
+   - `lakehouse/tests/unit/test_k_anonymity.py`: Strict validation of the $k \ge 5$ boundary and view DDL generation.
+   - `lakehouse/tests/e2e/test_reverse_etl.py`: Exercises `export_gold_to_sqlite`, SQLite VACUUM, and covering indexes.
 
 ### Acceptance Criteria
-- [x] All unit tests execute locally via `pytest lakehouse/tests/` in $< 45\text{s}$.
+- [x] All unit and integration tests execute locally via `python3 -m unittest discover -s lakehouse/tests` in $< 5\text{s}$.
 - [x] Tests run cleanly in GitHub Actions CI with zero cloud credentials.
-- [x] `chispa.assert_df_equality` verifies schema and column-level precision.
+- [x] Reverse-ETL compiler verifies atomic replace and SQLite query performance.
 
 ### AI Coder Execution Prompt
 ```text

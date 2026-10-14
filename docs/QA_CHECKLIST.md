@@ -126,7 +126,7 @@ dotnet run --project src/api
       "sentimentTag": "tight"
     }'
   ```
-  *Verify*: HTTP `400 Bad Request` with problem details `"Invalid salary"`: `"Reported annual salary cannot be negative."`
+  *Verify*: HTTP `400 Bad Request` with problem details `"Invalid salary"`: `"Reported annual salary must be between $0 and $2,000,000."`
 
 - [ ] **3.2 Disposable Income Floor Rejection (< -$20,000)**
   Submit a scenario claiming an impossible monthly deficit of -$30,000:

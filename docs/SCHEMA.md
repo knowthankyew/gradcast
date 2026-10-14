@@ -337,7 +337,7 @@ To honor the **KnowThankYew** privacy invariants in the cloud, raw user scenario
 CREATE OR REPLACE VIEW gradcast_lakehouse.gold.v_public_positive_finds AS
 SELECT 
     f.cbsa_code,
-    m.name AS metro_name,
+    m.metro_name,
     p.cip_family,
     f.credential_level,
     f.housing_type,
@@ -347,11 +347,11 @@ SELECT
     PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY f.monthly_disposable) AS p25_disposable,
     PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY f.monthly_disposable) AS p75_disposable
 FROM gradcast_lakehouse.gold.fact_scenario_outcomes f
-JOIN gradcast_lakehouse.silver.cbsa_locations m ON f.cbsa_code = m.cbsa_code
-JOIN gradcast_lakehouse.silver.programs p ON f.cip_code = p.cip_code
+JOIN gradcast_lakehouse.gold.dim_metro m ON f.cbsa_code = m.cbsa_code
+JOIN gradcast_lakehouse.gold.dim_program p ON f.cip_code = p.cip_code
 GROUP BY 
     f.cbsa_code, 
-    m.name, 
+    m.metro_name, 
     p.cip_family, 
     f.credential_level,
     f.housing_type

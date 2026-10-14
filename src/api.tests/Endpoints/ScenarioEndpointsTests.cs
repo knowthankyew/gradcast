@@ -174,6 +174,14 @@ public class ScenarioEndpointClientHashTests
     }
 
     [Fact]
+    public void ComputeClientHash_DefaultFallbackSalt_ProducesValidSha256()
+    {
+        var hash = ScenarioEndpoints.ComputeClientHash("10.0.0.1");
+        Assert.Equal(64, hash.Length);
+        Assert.Matches(@"^[a-f0-9]{64}$", hash);
+    }
+
+    [Fact]
     public void ExtractClientIp_PrefersForwardedForHeader()
     {
         var context = new DefaultHttpContext();

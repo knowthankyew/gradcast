@@ -142,6 +142,7 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
     quarantine_df = (
         parsed_df
         .filter(~is_valid_cond)
+        .drop("raw_payload")
         .withColumn(
             "rejection_reason",
             F.when(F.col("scenario_id").isNull(), "Missing scenario ID")
@@ -167,6 +168,57 @@ def parse_and_cleanse_scenarios(raw_df: DataFrame) -> tuple[DataFrame, DataFrame
     )
 
     return valid_df, quarantine_df
+
+
+def persist_quarantine_scenarios(
+    spark: SparkSession,
+    quarantine_df: DataFrame,
+    target_table: str = "gradcast_lakehouse.quarantine.scenarios_rejected",
+) -> None:
+    """
+    Persist quarantined scenarios into a dedicated audit table without failing the pipeline.
+    Strips raw payload and client identifiers to preserve zero-PII cloud invariants.
+    """
+    spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {target_table} (
+            scenario_id STRING,
+            created_at TIMESTAMP,
+            school_id INT,
+            cip_code STRING,
+            cip_family STRING,
+            credential_level INT,
+            cbsa_code STRING,
+            housing_type STRING,
+            salary_mode STRING,
+            reported_annual_salary DECIMAL(12, 2),
+            monthly_net_take_home DECIMAL(10, 2),
+            monthly_rent DECIMAL(10, 2),
+            monthly_loan_payment DECIMAL(10, 2),
+            monthly_disposable DECIMAL(10, 2),
+            disposable_ratio DOUBLE,
+            sentiment_tag STRING,
+            rejection_reason STRING NOT NULL,
+            quarantined_at TIMESTAMP NOT NULL
+        )
+        USING DELTA
+        TBLPROPERTIES ('delta.appendOnly' = 'true')
+    """)
+
+    clean_cols = [
+        "scenario_id", "created_at", "school_id", "cip_code", "cip_family",
+        "credential_level", "cbsa_code", "housing_type", "salary_mode",
+        "reported_annual_salary", "monthly_net_take_home", "monthly_rent",
+        "monthly_loan_payment", "monthly_disposable", "disposable_ratio",
+        "sentiment_tag", "rejection_reason", "quarantined_at"
+    ]
+    to_persist = quarantine_df.select(*[F.col(c) for c in clean_cols if c in quarantine_df.columns])
+
+    (
+        to_persist.write
+        .format("delta")
+        .mode("append")
+        .saveAsTable(target_table)
+    )
 
 
 def merge_scenarios_into_silver(
@@ -221,6 +273,31 @@ def merge_scenarios_into_silver(
     """)
 
 
+def run_silver_pipeline(
+    spark: SparkSession,
+    catalog: str = "gradcast_lakehouse",
+    source_table: Optional[str] = None,
+    target_table: Optional[str] = None,
+    quarantine_table: Optional[str] = None,
+) -> None:
+    """Execute complete Silver Medallion ingestion, quarantine, and conformed MERGE."""
+    src = source_table or f"{catalog}.bronze.shared_scenarios"
+    tgt = target_table or f"{catalog}.silver.scenarios"
+    quar = quarantine_table or f"{catalog}.quarantine.scenarios_rejected"
+
+    ensure_silver_table_exists(spark, table_name=tgt)
+    raw_df = spark.table(src)
+    valid_df, quarantine_df = parse_and_cleanse_scenarios(raw_df)
+    persist_quarantine_scenarios(spark, quarantine_df, target_table=quar)
+    merge_scenarios_into_silver(spark, valid_df, target_table=tgt)
+
+
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="Run Silver Transform Pipeline")
+    parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
+    args = parser.parse_args()
+
     spark = SparkSession.builder.appName("SilverTransform").getOrCreate()
-    print("Silver Transform module loaded successfully.")
+    run_silver_pipeline(spark, catalog=args.catalog)
+    print("Silver Transform pipeline executed successfully.")

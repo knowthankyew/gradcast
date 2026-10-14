@@ -15,6 +15,11 @@ var app = builder.Build();
 await app.EnsureGradCastDatabaseAsync();
 app.LogGradCastStartupDiagnostics();
 
+if (app.Environment.IsProduction() && string.IsNullOrWhiteSpace(builder.Configuration["Security:ClientHashSalt"]))
+{
+    throw new InvalidOperationException("Security:ClientHashSalt must be configured in production to protect client privacy.");
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

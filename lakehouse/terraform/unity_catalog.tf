@@ -61,33 +61,8 @@ resource "databricks_volume" "gold_exports" {
   comment      = "Managed volume for compiled, k-anonymized Reverse-ETL SQLite artifacts"
 }
 
-resource "databricks_sql_table" "v_public_positive_finds" {
+resource "databricks_schema" "quarantine" {
   catalog_name = databricks_catalog.lakehouse.name
-  schema_name  = databricks_schema.gold.name
-  name         = "v_public_positive_finds"
-  table_type   = "VIEW"
-  view_definition = <<-EOT
-    SELECT 
-        f.cbsa_code,
-        m.metro_name,
-        p.cip_family,
-        f.credential_level,
-        f.housing_type,
-        COUNT(*) AS sample_count,
-        ROUND(AVG(f.monthly_disposable), 2) AS mean_monthly_disposable,
-        PERCENTILE_CONT(0.50) WITHIN GROUP (ORDER BY f.monthly_disposable) AS median_disposable,
-        PERCENTILE_CONT(0.25) WITHIN GROUP (ORDER BY f.monthly_disposable) AS p25_disposable,
-        PERCENTILE_CONT(0.75) WITHIN GROUP (ORDER BY f.monthly_disposable) AS p75_disposable
-    FROM ${databricks_catalog.lakehouse.name}.gold.fact_scenario_outcomes f
-    JOIN ${databricks_catalog.lakehouse.name}.gold.dim_metro m ON f.cbsa_code = m.cbsa_code
-    JOIN ${databricks_catalog.lakehouse.name}.gold.dim_program p ON f.cip_code = p.cip_code
-    GROUP BY 
-        f.cbsa_code, 
-        m.metro_name, 
-        p.cip_family, 
-        f.credential_level,
-        f.housing_type
-    HAVING COUNT(*) >= 5
-  EOT
-  comment = "Public k-anonymized (k >= 5) reporting view enforcing zero individual student re-identification"
+  name         = "quarantine"
+  comment      = "Data quality quarantine layer for rejected scenarios and ingestion failures"
 }

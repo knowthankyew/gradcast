@@ -28,7 +28,7 @@ public record ShareScenarioRequest(
     [StringLength(50, ErrorMessage = "Salary mode cannot exceed 50 characters.")]
     string SalaryMode,
 
-    [Range(0, 10_000_000, ErrorMessage = "Reported annual salary must be non-negative and realistic.")]
+    [Range(0, 2_000_000, ErrorMessage = "Reported annual salary must be between $0 and $2,000,000.")]
     int ReportedAnnualSalary,
 
     int MonthlyNetTakeHome,

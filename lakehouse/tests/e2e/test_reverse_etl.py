@@ -16,7 +16,23 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from lakehouse.src.pipelines.export_sqlite import SQLITE_BENCHMARK_SCHEMA_DDL
+from lakehouse.src.pipelines.export_sqlite import SQLITE_BENCHMARK_SCHEMA_DDL, export_gold_to_sqlite
+
+
+class StubDataFrame:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def collect(self):
+        return self._rows
+
+
+class StubSparkSession:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def sql(self, query):
+        return StubDataFrame(self._rows)
 
 
 class TestReverseEtlSqlite(unittest.TestCase):
@@ -62,6 +78,35 @@ class TestReverseEtlSqlite(unittest.TestCase):
             """)
             index_row = cursor.fetchone()
             self.assertIsNotNone(index_row)
+
+    def test_export_gold_to_sqlite_full_pipeline(self):
+        fake_rows = [
+            {
+                "cip_family": "11",
+                "cbsa_code": "41860",
+                "credential_level": 3,
+                "housing_type": "alone",
+                "sample_count": 25,
+                "p25_monthly_disposable": 3200,
+                "median_monthly_disposable": 4500,
+                "p75_monthly_disposable": 5800,
+                "top_contributing_school_id": 101,
+                "last_updated_at": "2026-10-14 12:00:00",
+            }
+        ]
+        stub_spark = StubSparkSession(fake_rows)
+        exported_count = export_gold_to_sqlite(stub_spark, self.db_path, catalog="test_catalog")
+        self.assertEqual(exported_count, 1)
+
+        # Verify output SQLite database was atomically generated and vacuumed
+        self.assertTrue(os.path.isfile(self.db_path))
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT sample_count, median_monthly_disposable FROM community_scenario_benchmarks WHERE cbsa_code='41860';")
+            row = cursor.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row[0], 25)
+            self.assertEqual(row[1], 4500)
 
 
 if __name__ == "__main__":

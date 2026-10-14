@@ -101,8 +101,9 @@ def audit_vocabulary(errors: List[str]) -> None:
             continue
         lines = doc.read_text(encoding="utf-8").splitlines()
         for idx, line in enumerate(lines, 1):
-            # Skip assessment/historical discussion of why prohibited words are guarded
-            if "Prohibits unprovable" in line or "PROHIBITED_WORDS" in line or "bulletproof" in line and "prohibited" in line:
+            # Skip documentation explaining the linter rule itself
+            lower = line.lower()
+            if any(marker in lower for marker in ["prohibits unprovable", "prohibited adjectives", "prohibited words", "prohibited marketing", "prohibited_words"]) or ("bulletproof" in lower and "prohibited" in lower):
                 continue
             for pattern in PROHIBITED_WORDS:
                 if pattern.search(line):

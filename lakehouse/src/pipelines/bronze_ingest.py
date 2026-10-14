@@ -23,7 +23,10 @@ from pyspark.sql.types import (
 
 
 def get_shared_scenarios_bronze_schema() -> StructType:
-    """Return explicit schema for bronze.shared_scenarios."""
+    """
+    Return explicit schema for bronze.shared_scenarios.
+    file_offset stores the partition-unique row identifier generated at ingestion time.
+    """
     return StructType([
         StructField("raw_payload", StringType(), False),
         StructField("ingest_timestamp", TimestampType(), False),

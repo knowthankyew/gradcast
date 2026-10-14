@@ -121,7 +121,8 @@ public class ScenarioRepository : IScenarioRepository
             SELECT COUNT(*) 
             FROM shared_scenarios
             WHERE client_hash = @ClientHash
-              AND created_at >= @DatePrefixUtc;
+              AND created_at >= @DatePrefixUtc
+              AND created_at < date(@DatePrefixUtc, '+1 day');
         """;
 
         return await conn.ExecuteScalarAsync<int>(

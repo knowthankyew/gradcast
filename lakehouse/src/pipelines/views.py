@@ -6,19 +6,21 @@ v_public_positive_finds with hard k-anonymity boundary (HAVING COUNT(*) >= 5).
 Guarantees zero individual student or user scenario re-identification.
 """
 
-from pyspark.sql import SparkSession
+try:
+    from pyspark.sql import SparkSession
+except ImportError:
+    SparkSession = None  # type: ignore
 
 
-def create_k_anonymity_views(
-    spark: SparkSession,
+def get_k_anonymity_view_sql(
     catalog: str = "gradcast_lakehouse",
     min_cohort_size: int = 5,
-) -> None:
+) -> str:
     """
-    Create or replace the public reporting view enforcing k-anonymity (k >= 5).
+    Generate the SQL for v_public_positive_finds enforcing effective_min_k >= 5 clamp.
     """
     effective_min_k = max(min_cohort_size, 5)
-    view_sql = f"""
+    return f"""
         CREATE OR REPLACE VIEW {catalog}.gold.v_public_positive_finds AS
         SELECT 
             f.cbsa_code,
@@ -42,7 +44,22 @@ def create_k_anonymity_views(
             f.housing_type
         HAVING COUNT(*) >= {effective_min_k};
     """
+
+
+def create_k_anonymity_views(
+    spark: SparkSession,
+    catalog: str = "gradcast_lakehouse",
+    min_cohort_size: int = 5,
+) -> None:
+    """
+    Create or replace the public reporting view enforcing k-anonymity (k >= 5).
+    """
+    view_sql = get_k_anonymity_view_sql(catalog=catalog, min_cohort_size=min_cohort_size)
     spark.sql(view_sql)
+    try:
+        spark.sql(f"GRANT SELECT ON VIEW {catalog}.gold.v_public_positive_finds TO `analysts`")
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

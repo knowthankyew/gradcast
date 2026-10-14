@@ -141,15 +141,39 @@ def populate_dimensions(
     silver_scenarios = spark.table(f"{catalog}.silver.scenarios")
 
     # 1. dim_program (unique per cip_code)
-    programs_df = (
-        silver_scenarios
-        .select(
-            F.col("cip_code"),
-            F.col("cip_family"),
-            F.concat(F.lit("Field of Study: "), F.col("cip_family")).alias("program_title"),
+    # Check if conformed silver.programs is available to source canonical program titles
+    if spark.catalog.tableExists(f"{catalog}.silver.programs"):
+        silver_progs = (
+            spark.table(f"{catalog}.silver.programs")
+            .filter(F.col("title").isNotNull())
+            .select("cip_code", F.col("title").alias("source_title"))
+            .dropDuplicates(["cip_code"])
         )
-        .dropDuplicates(["cip_code"])
-    )
+        programs_df = (
+            silver_scenarios
+            .select(F.col("cip_code"), F.col("cip_family"))
+            .dropDuplicates(["cip_code"])
+            .join(silver_progs, on="cip_code", how="left")
+            .select(
+                F.col("cip_code"),
+                F.col("cip_family"),
+                F.coalesce(
+                    F.col("source_title"),
+                    F.concat(F.lit("Field of Study: "), F.col("cip_family")),
+                ).alias("program_title"),
+            )
+        )
+    else:
+        programs_df = (
+            silver_scenarios
+            .select(
+                F.col("cip_code"),
+                F.col("cip_family"),
+                F.concat(F.lit("Field of Study: "), F.col("cip_family")).alias("program_title"),
+            )
+            .dropDuplicates(["cip_code"])
+        )
+
     programs_df.createOrReplaceTempView("stage_dim_programs")
     spark.sql(f"""
         MERGE INTO {catalog}.gold.dim_program AS target
@@ -158,7 +182,11 @@ def populate_dimensions(
         WHEN MATCHED THEN
             UPDATE SET
                 target.cip_family = source.cip_family,
-                target.program_title = source.program_title
+                target.program_title = CASE 
+                    WHEN source.program_title NOT LIKE 'Field of Study:%' THEN source.program_title
+                    WHEN target.program_title IS NULL OR target.program_title LIKE 'Field of Study:%' THEN source.program_title
+                    ELSE target.program_title
+                END
         WHEN NOT MATCHED THEN
             INSERT (cip_code, cip_family, program_title)
             VALUES (source.cip_code, source.cip_family, source.program_title)

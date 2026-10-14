@@ -81,6 +81,10 @@ class TestSilverTransform(unittest.TestCase):
             "reported_annual_salary": 30000.00,
             "monthly_disposable": -25000.00,
         }
+        is_valid, reason = validate_scenario_record(record)
+        self.assertFalse(is_valid)
+        self.assertEqual(reason, "Disposable below -$20,000 floor")
+
     def test_null_salary_quarantined(self):
         record = {
             "id": "scen-test-04",

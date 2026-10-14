@@ -77,12 +77,12 @@ resource "databricks_grants" "gold_exports_volume_access" {
   }
 }
 
-# Restrict Analysts to verified k-anonymity view only (never raw fact_scenario_outcomes)
-resource "databricks_grants" "gold_public_view_access" {
-  table = "${databricks_catalog.lakehouse.name}.${databricks_schema.gold.name}.${databricks_sql_table.v_public_positive_finds.name}"
+# Quarantine schema access for pipeline runner
+resource "databricks_grants" "quarantine_schema_access" {
+  schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.quarantine.name}"
 
   grant {
-    principal  = databricks_group.analysts.display_name
-    privileges = ["SELECT"]
+    principal  = databricks_service_principal.pipeline_runner.application_id
+    privileges = ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]
   }
 }

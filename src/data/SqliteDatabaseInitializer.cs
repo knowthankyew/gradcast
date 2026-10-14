@@ -110,6 +110,7 @@ public static class SqliteDatabaseInitializer
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_cbsa_cip ON shared_scenarios (cbsa_code, cip_code);
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_disposable ON shared_scenarios (monthly_disposable DESC);
         CREATE INDEX IF NOT EXISTS IX_shared_scenarios_created_at ON shared_scenarios (created_at DESC);
+        CREATE INDEX IF NOT EXISTS IX_shared_scenarios_client_hash_created_at ON shared_scenarios (client_hash, created_at);
     """;
 
     public static async Task<bool> InitializeAsync(SqliteConnection connection, CancellationToken ct = default)

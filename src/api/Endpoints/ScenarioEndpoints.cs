@@ -13,7 +13,8 @@ namespace GradCast.Api.Endpoints;
 public static partial class ScenarioEndpoints
 {
     private const int MaxDailySharesPerClient = 50;
-    private const string DefaultClientSalt = "gradcast-lakehouse-client-salt-v1";
+    // Development fallback salt strictly for offline unit tests; production requires Security:ClientHashSalt
+    private const string DevelopmentFallbackSalt = "gradcast-lakehouse-dev-test-salt";
 
     private static readonly HashSet<string> AllowedHousingTypes = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -133,7 +134,7 @@ public static partial class ScenarioEndpoints
 
     public static string ComputeClientHash(string clientIp, string? customSalt = null)
     {
-        var salt = !string.IsNullOrWhiteSpace(customSalt) ? customSalt : DefaultClientSalt;
+        var salt = !string.IsNullOrWhiteSpace(customSalt) ? customSalt : DevelopmentFallbackSalt;
         var dateStr = DateTime.UtcNow.ToString("yyyy-MM-dd");
         var payload = $"{dateStr}:{clientIp}:{salt}";
 
@@ -184,7 +185,19 @@ public static partial class ScenarioEndpoints
         }
 
         var clientIp = ExtractClientIp(httpContext);
-        var configuredSalt = httpContext.RequestServices.GetService<IConfiguration>()?["Security:ClientHashSalt"];
+        var config = httpContext.RequestServices.GetService<IConfiguration>();
+        var env = httpContext.RequestServices.GetService<IWebHostEnvironment>();
+        var configuredSalt = config?["Security:ClientHashSalt"];
+
+        if (string.IsNullOrWhiteSpace(configuredSalt))
+        {
+            if (env != null && env.IsProduction())
+            {
+                throw new InvalidOperationException("Security:ClientHashSalt must be configured in production to protect client privacy.");
+            }
+            configuredSalt = DevelopmentFallbackSalt;
+        }
+
         var clientHash = ComputeClientHash(clientIp, configuredSalt);
         var todayPrefix = DateTime.UtcNow.ToString("yyyy-MM-dd");
 
