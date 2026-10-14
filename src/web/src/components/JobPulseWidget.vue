@@ -29,11 +29,14 @@
           <!-- Active Openings -->
           <v-col cols="12" sm="4">
             <div class="text-caption text-medium-emphasis">Active Openings</div>
-            <div class="text-h5 font-weight-medium" :class="pulse.activeOpenings > 0 ? 'text-deep-purple' : 'text-grey'">
-              {{ pulse.activeOpenings > 0 ? pulse.activeOpenings.toLocaleString() : 'N/A' }}
+            <div class="text-h5 font-weight-medium" :class="pulse.dataSource === 'adzuna' && pulse.activeOpenings > 0 ? 'text-deep-purple' : 'text-grey'">
+              {{ pulse.dataSource === 'adzuna' ? pulse.activeOpenings.toLocaleString() : 'N/A' }}
             </div>
-            <div v-if="pulse.activeOpenings === 0" class="text-caption text-medium-emphasis">
+            <div v-if="pulse.dataSource !== 'adzuna'" class="text-caption text-medium-emphasis">
               Live data requires Adzuna API key
+            </div>
+            <div v-else-if="pulse.activeOpenings === 0" class="text-caption text-medium-emphasis">
+              No active listings found in this metro
             </div>
           </v-col>
 
