@@ -198,7 +198,7 @@ def ingest_college_scorecard_csv(
     return scorecard_df
 
 
-if __name__ == "__main__":
+def main() -> int:
     import argparse
     parser = argparse.ArgumentParser(description="Run Bronze Ingest Pipeline")
     parser.add_argument("--catalog", default="gradcast_lakehouse", help="Unity Catalog name")
@@ -219,7 +219,13 @@ if __name__ == "__main__":
         is_missing_path = any(s in err_msg for s in ["Path does not exist", "TABLE_OR_VIEW_NOT_FOUND", "FileNotFoundException"])
         if not args.source_path and is_missing_path:
             print(f"Notice: Default landing volume '{source_path}' does not exist yet; skipping ingest.")
-            return
+            return 0
         # Fail-closed: re-raise permissions, corrupted payload, or explicit source-path failures
         raise
     print(f"Bronze Ingest pipeline executed successfully for {target_table}.")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())

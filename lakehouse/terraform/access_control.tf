@@ -57,6 +57,26 @@ resource "databricks_grants" "gold_schema_access" {
   }
 }
 
+# Quarantine schema grants (Service principal pipeline quarantine only)
+resource "databricks_grants" "quarantine_access" {
+  schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.quarantine.name}"
+
+  grant {
+    principal  = databricks_service_principal.pipeline_runner.application_id
+    privileges = ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]
+  }
+}
+
+# Control schema grants (Service principal watermark metadata only)
+resource "databricks_grants" "control_access" {
+  schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.control.name}"
+
+  grant {
+    principal  = databricks_service_principal.pipeline_runner.application_id
+    privileges = ["USE_SCHEMA", "SELECT", "MODIFY", "CREATE_TABLE"]
+  }
+}
+
 # Bronze raw landing volume grants
 resource "databricks_grants" "raw_landing_volume_access" {
   volume = "${databricks_catalog.lakehouse.name}.${databricks_schema.bronze.name}.${databricks_volume.raw_landing.name}"

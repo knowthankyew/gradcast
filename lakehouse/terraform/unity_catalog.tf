@@ -45,6 +45,28 @@ resource "databricks_schema" "gold" {
   }
 }
 
+resource "databricks_schema" "quarantine" {
+  catalog_name = databricks_catalog.lakehouse.name
+  name         = "quarantine"
+  comment      = "Audit quarantine schema capturing rejected and corrupt submissions"
+
+  properties = {
+    "tier"    = "quarantine"
+    "purpose" = "forensic-audit"
+  }
+}
+
+resource "databricks_schema" "control" {
+  catalog_name = databricks_catalog.lakehouse.name
+  name         = "control"
+  comment      = "Operational control schema tracking incremental pipeline watermarks"
+
+  properties = {
+    "tier"    = "control"
+    "purpose" = "pipeline-watermarking"
+  }
+}
+
 resource "databricks_volume" "raw_landing" {
   name         = "raw_landing"
   catalog_name = databricks_catalog.lakehouse.name
@@ -59,10 +81,4 @@ resource "databricks_volume" "gold_exports" {
   schema_name  = databricks_schema.gold.name
   volume_type  = "MANAGED"
   comment      = "Managed volume for compiled, k-anonymized Reverse-ETL SQLite artifacts"
-}
-
-resource "databricks_schema" "quarantine" {
-  catalog_name = databricks_catalog.lakehouse.name
-  name         = "quarantine"
-  comment      = "Data quality quarantine layer for rejected scenarios and ingestion failures"
 }
