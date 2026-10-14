@@ -1,0 +1,72 @@
+bundle:
+  name: gradcast_lakehouse_bundle
+
+variables:
+  catalog_name:
+    description: "Target Unity Catalog namespace"
+    default: "gradcast_lakehouse"
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: "https://adb-mock-workspace.azuredatabricks.net"
+    variables:
+      catalog_name: "gradcast_lakehouse_dev"
+
+  prod:
+    mode: production
+    workspace:
+      host: "https://adb-prod-workspace.azuredatabricks.net"
+    variables:
+      catalog_name: "gradcast_lakehouse"
+    run_as:
+      service_principal_name: "gradcast-lakehouse-pipeline-runner-prod"
+
+resources:
+  pipelines:
+    gradcast_medallion_pipeline:
+      name: "[${bundle.target}] GradCast Medallion Pipeline"
+      target: "${var.catalog_name}.silver"
+      catalog: "${var.catalog_name}"
+      continuous: false
+      development: false
+      channel: CURRENT
+      libraries:
+        - file:
+            path: ./src/pipelines/bronze_ingest.py
+        - file:
+            path: ./src/pipelines/silver_transform.py
+        - file:
+            path: ./src/pipelines/gold_modeling.py
+      configuration:
+        "bundle.source": "gradcast_lakehouse"
+
+  jobs:
+    gradcast_reverse_etl_job:
+      name: "[${bundle.target}] GradCast Reverse-ETL SQLite Compiler"
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"
+        timezone_id: "UTC"
+      tasks:
+        - task_key: export_gold_to_sqlite
+          spark_python_task:
+            python_file: ./src/pipelines/export_sqlite.py
+            parameters:
+              - "--catalog"
+              - "${var.catalog_name}"
+              - "--output-path"
+              - "/Volumes/${var.catalog_name}/gold/exports/gradcast_gold.db"
+          job_cluster_key: general_worker
+
+      job_clusters:
+        - job_cluster_key: general_worker
+          new_cluster:
+            spark_version: "14.3.x-scala2.12"
+            spark_conf:
+              "spark.databricks.delta.preview.enabled": "true"
+            node_type_id: "Standard_D4s_v5"
+            autoscale:
+              min_workers: 1
+              max_workers: 2

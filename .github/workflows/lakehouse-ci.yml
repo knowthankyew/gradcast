@@ -1,0 +1,54 @@
+name: Lakehouse IaC & Governance CI
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lakehouse/**'
+      - '.github/workflows/lakehouse-ci.yml'
+      - 'docs/SCHEMA.md'
+      - 'ROADMAP.md'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'lakehouse/**'
+      - '.github/workflows/lakehouse-ci.yml'
+      - 'docs/SCHEMA.md'
+      - 'ROADMAP.md'
+  workflow_dispatch:
+
+jobs:
+  validate-iac:
+    name: Validate Terraform & Databricks Asset Bundles
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Check Terraform Formatting
+        run: terraform -chdir=lakehouse/terraform fmt -check
+
+      - name: Initialize Terraform (No Backend)
+        run: terraform -chdir=lakehouse/terraform init -backend=false
+
+      - name: Validate Terraform Configuration
+        run: terraform -chdir=lakehouse/terraform validate
+
+      - name: Setup Databricks CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/databricks/setup-cli/main/install.sh | sh
+
+      - name: Validate Databricks Asset Bundle (Dev)
+        run: |
+          databricks bundle validate --bundle-dir lakehouse -t dev
+
+      - name: Validate Databricks Asset Bundle (Prod)
+        run: |
+          databricks bundle validate --bundle-dir lakehouse -t prod
