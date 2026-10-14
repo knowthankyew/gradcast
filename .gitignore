@@ -51,3 +51,16 @@ src/web/dist/
 test-results/
 playwright-report/
 docs/assets/*.webm
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.venv/
+lakehouse/bom.json

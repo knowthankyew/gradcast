@@ -8,7 +8,7 @@ resource "databricks_group" "analysts" {
 }
 
 # Catalog access grants
-resource "databricks_grant" "catalog_access" {
+resource "databricks_grants" "catalog_access" {
   catalog = databricks_catalog.lakehouse.name
 
   grant {
@@ -23,7 +23,7 @@ resource "databricks_grant" "catalog_access" {
 }
 
 # Bronze schema grants (Service principal pipeline ingest only)
-resource "databricks_grant" "bronze_access" {
+resource "databricks_grants" "bronze_access" {
   schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.bronze.name}"
 
   grant {
@@ -33,7 +33,7 @@ resource "databricks_grant" "bronze_access" {
 }
 
 # Silver schema grants (Pipeline transformation only)
-resource "databricks_grant" "silver_access" {
+resource "databricks_grants" "silver_access" {
   schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.silver.name}"
 
   grant {
@@ -43,7 +43,7 @@ resource "databricks_grant" "silver_access" {
 }
 
 # Gold schema grants (Service principal manages; Analysts read verified k-anonymity marts)
-resource "databricks_grant" "gold_access" {
+resource "databricks_grants" "gold_access" {
   schema = "${databricks_catalog.lakehouse.name}.${databricks_schema.gold.name}"
 
   grant {
