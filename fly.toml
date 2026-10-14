@@ -12,6 +12,7 @@ primary_region = 'dfw'
   ASPNETCORE_ENVIRONMENT = 'Production'
   DatabasePath = '/app/data/gradcast.db'
   DataSource = 'hybrid'
+  Security__ClientHashSalt = 'gradcast-lakehouse-client-salt-v1'
 
 [http_service]
   internal_port = 5062

@@ -45,6 +45,7 @@ COPY --from=api-build /app/publish .
 ENV ASPNETCORE_URLS=http://+:5062
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV DatabasePath=/app/data/gradcast.db
+ENV Security__ClientHashSalt=gradcast-lakehouse-client-salt-v1
 
 USER $APP_UID
 
