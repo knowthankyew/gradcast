@@ -48,7 +48,7 @@ Following the proven pattern from `mac-screen-record` and `event-driven-ftaas` (
 | Phase | Milestone | Focus Area | Deliverables & Scope | Status |
 | :--- | :--- | :--- | :--- | :---: |
 | **Stage 1** | **Edge SQLite Social Sharing Layer** | Edge / OLTP | Operational `shared_scenarios` table, Dapper repo, ASP.NET Core Minimal API endpoint with strict input allowlist, Vuetify share button. | ✅ **Completed** |
-| **Stage 2** | **Lakehouse Foundation & IaC** | Cloud / Governance | Terraform Unity Catalog provisioning (catalogs, schemas, service principals), Databricks Asset Bundle (`databricks.yml`), OAuth M2M authentication. | 📋 **Specified** |
+| **Stage 2** | **Lakehouse Foundation & IaC** | Cloud / Governance | Terraform Unity Catalog provisioning (catalogs, schemas, service principals), Databricks Asset Bundle (`databricks.yml`), OAuth M2M authentication. | ✅ **Completed** |
 | **Stage 3** | **Bronze & Silver Medallion Pipelines** | Data Engineering | PySpark Auto Loader raw ingestion, Silver cleansing/conformance, Delta constraints, Liquid Clustering (`CLUSTER BY`), Delta Change Data Feed (CDF). | 📋 **Specified** |
 | **Stage 4** | **Gold Dimensional Modeling & Reverse-ETL** | Analytics / Serving | Star schema (`fact_scenario_outcomes`, `dim_program`, `dim_school`, `dim_metro`), $k$-anonymity row-level filter view ($k \ge 5$), PySpark-to-SQLite compiler. | 📋 **Specified** |
 | **Stage 5** | **Observability & Lakehouse Monitoring** | SRE / Data Quality | Delta Live Tables expectations, schema enforcement contracts, data drift tracking, and OpenTelemetry pipeline metrics. | 📋 **Specified** |
@@ -131,10 +131,10 @@ To establish Databricks as the enterprise Single Source of Truth, all Lakehouse 
    - Zero Personal Access Tokens (PATs). Use OAuth machine-to-machine (`ARM_CLIENT_ID` / `DATABRICKS_CLIENT_ID`).
 
 ### Acceptance Criteria
-- [ ] `terraform validate` passes with zero warnings.
-- [ ] `databricks bundle validate` succeeds against bundle schema specifications.
-- [ ] Unity Catalog 3-level namespace (`gradcast_lakehouse.<schema>.<table>`) strictly enforced.
-- [ ] Storage locations use cloud object storage abstractions with zero hardcoded access keys.
+- [x] `terraform validate` passes with zero warnings.
+- [x] `databricks bundle validate` succeeds against bundle schema specifications.
+- [x] Unity Catalog 3-level namespace (`gradcast_lakehouse.<schema>.<table>`) strictly enforced.
+- [x] Storage locations use cloud object storage abstractions with zero hardcoded access keys.
 
 ### AI Coder Execution Prompt
 ```text
