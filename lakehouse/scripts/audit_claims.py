@@ -213,6 +213,7 @@ def audit_privacy_invariants(errors: List[str]) -> None:
 def audit_vocabulary(errors: List[str]) -> None:
     """Check markdown docs and source comments for prohibited marketing terms."""
     docs_to_check = [
+        REPO_ROOT / "README.md",
         REPO_ROOT / "docs" / "SCHEMA.md",
         REPO_ROOT / "docs" / "QA_CHECKLIST.md",
         REPO_ROOT / "ROADMAP.md",
@@ -230,6 +231,96 @@ def audit_vocabulary(errors: List[str]) -> None:
             for pattern in PROHIBITED_WORDS:
                 if pattern.search(line):
                     errors.append(f"Prohibited word '{pattern.pattern}' found in {doc.name}:{idx}: {line.strip()}")
+
+
+def audit_readme_parity(errors: List[str]) -> None:
+    """Verify that root README.md reflects Lakehouse, Databricks, and Dual-Mode architecture."""
+    readme_file = REPO_ROOT / "README.md"
+    if not readme_file.is_file():
+        errors.append("Missing README.md file at repository root.")
+        return
+
+    content = readme_file.read_text(encoding="utf-8")
+
+    # 1. Tech stack section check: specifically inside '## Tech Stack'
+    tech_stack_match = re.search(r"## Tech Stack\s*\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+    if not tech_stack_match:
+        errors.append("README drift: '## Tech Stack' section not found in README.md")
+    else:
+        tech_stack_text = tech_stack_match.group(1)
+        required_stack_keywords = [
+            "SQLite",
+            "Dapper",
+            "Databricks",
+            "Delta Lake",
+            "PySpark",
+            "Unity Catalog",
+            "Terraform",
+            "Dual-Mode Architecture",
+        ]
+        for kw in required_stack_keywords:
+            if kw not in tech_stack_text:
+                errors.append(f"README drift: '## Tech Stack' section is missing keyword '{kw}'")
+
+    # 2. Directory structure check inside fenced block directly under '## Project Structure'
+    proj_struct_match = re.search(r"## Project Structure\b.*?```[^\n]*\n(.*?)```", content, re.DOTALL)
+    if not proj_struct_match or "lakehouse/" not in proj_struct_match.group(1):
+        errors.append("README drift: Project structure tree in README.md does not document 'lakehouse/' directory.")
+
+    # 3. Operations & verification commands check scoped to specific sections
+    ops_match = re.search(r"## Databricks & Lakehouse Operations\s*\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+    if not ops_match:
+        errors.append("README drift: Missing '## Databricks & Lakehouse Operations' section in README.md")
+    else:
+        ops_text = ops_match.group(1)
+        for cmd in ["databricks bundle validate", "databricks bundle deploy", "lakehouse/terraform"]:
+            if cmd not in ops_text:
+                errors.append(f"README drift: Missing operational command or path '{cmd}' in '## Databricks & Lakehouse Operations'")
+
+    testing_match = re.search(r"## Testing\s*\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+    if not testing_match:
+        errors.append("README drift: Missing '## Testing' section in README.md")
+    else:
+        testing_text = testing_match.group(1)
+        for cmd in ["lakehouse/tests", "lakehouse/scripts/audit_claims.py"]:
+            if cmd not in testing_text:
+                errors.append(f"README drift: Missing test/audit command or path '{cmd}' in '## Testing'")
+
+    # 4. Architectural doc links check (enforce valid markdown links ](target))
+    for doc in ["docs/SCHEMA.md", "ROADMAP.md", "docs/QA_CHECKLIST.md"]:
+        if f"]({doc})" not in content:
+            errors.append(f"README drift: Missing Markdown link to '{doc}' in README.md")
+
+    # 5. Dual-Mode edge-read storage contract check
+    if "gradcast.db" not in content:
+        errors.append("README drift: Missing SQLite database contract reference 'gradcast.db' in README.md")
+
+    normalized = re.sub(r"\s+", " ", content.replace("*", "").replace("`", ""))
+    normalized_lower = normalized.lower()
+    if "all reads are served from local sqlite" not in normalized_lower:
+        errors.append("README drift: Missing edge-read storage contract ('all reads are served from local SQLite') in README.md")
+
+    if "direct databricks cluster queries during live web traffic are prohibited" not in normalized_lower:
+        errors.append("README drift: Missing boundary invariant ('direct Databricks cluster queries during live web traffic are prohibited') in README.md")
+
+    # Verify production data mode parity scoped directly to '### Data Modes'
+    data_modes_match = re.search(r"### Data Modes\s*\n(.*?)(?=\n## |\Z)", content, re.DOTALL)
+    if not data_modes_match:
+        errors.append("README drift: Missing '### Data Modes' section in README.md")
+    else:
+        data_modes_text = data_modes_match.group(1)
+        if not re.search(r"^\s*-\s*\*\*`local`\*\*\s*\([^)]*production[^)]*\)", data_modes_text, re.IGNORECASE | re.MULTILINE):
+            errors.append("README drift: 'local' mode must be designated as the production/edge mode in '### Data Modes'")
+
+        # Ensure neither 'hybrid' nor 'api' is erroneously designated as production
+        for mode in ["hybrid", "api"]:
+            mode_line = re.search(rf"^\s*-\s*\*\*`{mode}`\*\*(.*)$", data_modes_text, re.IGNORECASE | re.MULTILINE)
+            if mode_line:
+                line_text = mode_line.group(1)
+                # Check leading mode label for affirmative production designation e.g. - **`hybrid`** (Production Mode)
+                if re.match(r"^\s*\([^)]*(?<!\bnon-)(?<!\bnot\s)(?<!\bnot for\s)\bproduction\b[^)]*\)", line_text, re.IGNORECASE) or \
+                   re.search(r"\b(?:use in production|recommended for production|designated as production)\b", line_text, re.IGNORECASE):
+                    errors.append(f"README drift: Incompatible data mode '{mode}' designated for production in '### Data Modes'")
 
 
 def audit_portfolio_master_brief(errors: List[str], require_brief: bool = False) -> bool:
@@ -289,6 +380,7 @@ def main() -> int:
     audit_schema_parity(errors)
     audit_privacy_invariants(errors)
     audit_vocabulary(errors)
+    audit_readme_parity(errors)
     brief_checked = audit_portfolio_master_brief(errors, require_brief=args.require_brief)
 
     if errors:
@@ -302,6 +394,7 @@ def main() -> int:
     print("  ✓ Hard k-anonymity invariant (k >= 5) verified in views.py")
     print("  ✓ Client privacy hash (SHA-256) verified in ScenarioEndpoints.cs")
     print("  ✓ Zero prohibited vocabulary words detected")
+    print("  ✓ Root README.md architectural parity (Databricks, Lakehouse, IaC) verified")
     if brief_checked:
         print("  ✓ Portfolio Master Brief parity verified (dynamic test suite)")
     else:

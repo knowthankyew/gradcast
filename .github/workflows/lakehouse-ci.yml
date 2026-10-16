@@ -10,6 +10,7 @@ on:
       - '.github/workflows/lakehouse-ci.yml'
       - 'docs/SCHEMA.md'
       - 'ROADMAP.md'
+      - 'README.md'
   pull_request:
     branches:
       - main
@@ -19,6 +20,7 @@ on:
       - '.github/workflows/lakehouse-ci.yml'
       - 'docs/SCHEMA.md'
       - 'ROADMAP.md'
+      - 'README.md'
   workflow_dispatch:
 
 jobs:
