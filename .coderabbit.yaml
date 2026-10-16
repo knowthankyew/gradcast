@@ -59,6 +59,7 @@ reviews:
            - In `lakehouse/scripts/audit_claims.py`, ensure static parity between documentation (`docs/SCHEMA.md`), PySpark DDL, and SQLite migrations.
            - Prohibit unprovable marketing adjectives ('bulletproof', 'conclusive', 'definitive', 'infinitely scalable').
            - Verify that `KNOWTHANKYEW_PORTFOLIO_MASTER_BRIEF.md` test counts match actual test inventories.
+           - Ensure root `README.md` maintains architectural parity with the Lakehouse tier, Databricks operations, and tech stack definitions.
 
     - path: "src/api/**"
       instructions: "Audit ASP.NET Core Minimal APIs for parameter binding validation, XSS sanitization, anti-abuse client hashing, and thread-safe Dapper connection usage."

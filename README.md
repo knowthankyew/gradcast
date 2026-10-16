@@ -18,11 +18,21 @@ A proof-of-concept web application that helps students simulate their financial 
 
 - **Backend**: C# / ASP.NET Core 10 Minimal API
 - **Frontend**: Vue 3 (Composition API) + TypeScript + Vuetify 4 + Pinia
-- **Testing**: Playwright (Frontend E2E) + xUnit (.NET Backend)
-- **Data Layer**: SQLite via Dapper / Microsoft.Data.Sqlite (local/hybrid mode) or live API calls (remote mode)
-- **Build**: .NET CLI + Vite
+- **Testing**: Playwright (Frontend E2E) + xUnit (.NET Backend) + Python `unittest` (Lakehouse)
+- **Data Layer & Storage**: Dual-Mode Architecture — Edge SQLite 3 via Dapper (sub-millisecond reads) ⇄ Databricks Unity Catalog (Analytical SSOT)
+- **Data Lakehouse Engine**: PySpark + Delta Lake (Medallion: Bronze → Silver → Gold, Liquid Clustering, Delta Change Data Feed)
+- **Infrastructure as Code (IaC)**: Terraform + Databricks Asset Bundles (DABs)
+- **Privacy & Governance**: k-Anonymity row suppression (k ≥ 5), daily-salted client SHA-256 hashing (no raw IP or PII persisted), and automated claims linting
+- **Build**: .NET CLI + Vite + Databricks CLI
 
 ## Features
+
+### Dual-Mode Storage & Lakehouse Tier
+- **Edge / Dirt-Cheap Hosting (SQLite 3)**: Serves live web traffic at sub-millisecond latency on Fly.io without spinning up cloud compute clusters. In production edge hosting, all reads are served from local SQLite (`gradcast.db`); direct Databricks cluster queries during live web traffic are prohibited. Ingests anonymous user-shared budget scenarios (`shared_scenarios`) with client salt hashing.
+- **Enterprise Lakehouse (Databricks / Unity Catalog)**: Serves as the Single Source of Truth (SSOT). Ingests raw multi-gigabyte College Scorecard and IPEDS archives via Auto Loader, applies Liquid Clustering and Delta Change Data Feed (CDF), and computes Gold dimensional models.
+- **k-Anonymity Cloud Boundary (k ≥ 5)**: Enforces row-level cohort suppression in `v_public_positive_finds` so student cohorts smaller than 5 individuals are never exposed.
+- **Reverse-ETL SQLite Compiler**: A scheduled PySpark pipeline compiles Gold analytics into an edge-optimized, indexed SQLite database (`community_scenario_benchmarks`).
+- **Full Architecture & Schema Specifications**: See [`docs/SCHEMA.md`](docs/SCHEMA.md), [`ROADMAP.md`](ROADMAP.md), and [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md).
 
 ### Phase 1: College Data Explorer
 - Type-ahead school search with optional state filtering
@@ -47,9 +57,15 @@ A proof-of-concept web application that helps students simulate their financial 
 - **Saved Scenarios**: name and save budget simulations to localStorage for comparison
 
 ### Data Modes
-- **`hybrid`** (default): Local DB for imported data, API fallback for historic years
-- **`local`**: All requests query local SQLite database only
-- **`api`**: All Scorecard requests go to the live API
+
+GradCast's ASP.NET backend supports three configurable data source modes via `appsettings.json` or the `DataSource` environment variable:
+
+- **`local`** (Production Edge Mode): All Scorecard, program, earnings, and benchmark reads are served from local SQLite (`gradcast.db`). Guarantees sub-millisecond query execution, zero Databricks cloud cluster dependency, and offline data tier resilience on Fly.io or containers (optional live job market pulse calls to Adzuna operate as a separate external service).
+- **`hybrid`** (Default Development Mode): Queries local SQLite (`gradcast.db`) first for all imported institutions and benchmarks. Includes a development-only fallback to the federal College Scorecard API for unseeded historic years (an explicit developer-mode exception when running locally with an API key, outside production).
+- **`api`** (Diagnostic Mode): Direct passthrough to the federal College Scorecard API for development validation without a local database.
+
+> [!NOTE]
+> **Edge Storage Boundary**: Under the Dual-Mode Storage Architecture, live web traffic is completely decoupled from cloud clusters. In production edge hosting, all reads are served from local SQLite (`gradcast.db`), and direct Databricks cluster queries during live web traffic are prohibited. All analytical benchmarks and reference models are compiled offline into `gradcast.db` via the Reverse-ETL pipeline.
 
 ## User Flow
 
@@ -221,7 +237,8 @@ gradcast/
 │   │   │   ├── SchoolEndpoints.cs        # /api/schools/*
 │   │   │   ├── LocationEndpoints.cs      # /api/locations/*
 │   │   │   ├── FinanceEndpoints.cs       # /api/finance/*
-│   │   │   └── JobEndpoints.cs           # /api/jobs/*
+│   │   │   ├── JobEndpoints.cs           # /api/jobs/*
+│   │   │   └── ScenarioEndpoints.cs      # /api/scenarios/* (social sharing)
 │   │   ├── Models/                       # DTOs
 │   │   └── Services/                     # Business logic
 │   │       ├── ICollegeScorecardService.cs
@@ -243,7 +260,7 @@ gradcast/
 │   │   ├── Services/                     # Service unit tests (Budget, Tax, Loan, etc.)
 │   │   └── TestDoubles/                  # Shared test doubles & stubs
 │   ├── data/                             # SQLite data layer (Dapper & connection factory)
-│   │   ├── Entities/                     # School, Program, CbsaLocation, FairMarketRent, etc.
+│   │   ├── Entities/                     # School, Program, CbsaLocation, SharedScenario, etc.
 │   │   ├── SeedData/                     # Static seed (metros + FMR values)
 │   │   ├── ISqliteConnectionFactory.cs   # Connection factory interface
 │   │   ├── SqliteConnectionFactory.cs    # Connection factory with WAL pragmas
@@ -279,6 +296,34 @@ gradcast/
 │           ├── data/                     # Static lookup data (CIP categories)
 │           │   └── cipCategories.ts
 │           └── types/                    # TypeScript interfaces
+├── lakehouse/                            # Databricks Lakehouse & Analytics tier
+│   ├── databricks.yml                    # Databricks Asset Bundle (DAB) workflow
+│   ├── requirements.txt                  # Production dependencies (PySpark, Delta)
+│   ├── requirements-dev.txt              # Dev/test dependencies (pytest, Great Expectations)
+│   ├── terraform/                        # Unity Catalog & Access Control IaC
+│   │   ├── main.tf                       # Databricks provider configuration
+│   │   ├── unity_catalog.tf              # Catalogs, schemas, volumes, external locations
+│   │   └── access_control.tf             # Service principal & group RBAC
+│   ├── src/                              # Medallion pipelines & reverse-ETL
+│   │   ├── pipelines/
+│   │   │   ├── bronze_ingest.py          # Auto Loader raw ingest (append-only)
+│   │   │   ├── silver_transform.py       # Cleansing, quarantine, Liquid Clustering & CDF
+│   │   │   ├── gold_modeling.py          # Star schema dimensional modeling
+│   │   │   ├── views.py                  # k-Anonymity row filter views (k >= 5)
+│   │   │   └── export_sqlite.py          # Reverse-ETL: Gold to edge SQLite compiler
+│   │   ├── quality/
+│   │   │   └── expectations.py           # Great Expectations contracts & rules
+│   │   └── monitoring/
+│   │       └── lakehouse_monitor.py      # Databricks Lakehouse Monitor & drift profiling
+│   ├── tests/                            # Lakehouse automated test suites
+│   │   ├── unit/                         # Silver transforms & k-anonymity clamp tests
+│   │   └── e2e/                          # Reverse-ETL SQLite compiler integration tests
+│   └── scripts/
+│       └── audit_claims.py               # Claims, DDL parity & privacy invariant linter
+├── docs/                                 # Technical architecture & governance specifications
+│   ├── SCHEMA.md                         # Unity Catalog & SQLite schema DDL specification
+│   ├── QA_CHECKLIST.md                   # Manual & automated QA verification runbook
+│   └── PRIVACY_TELEMETRY_SCHEMA.md       # Consumer privacy schema standards
 ├── GradCast.slnx                         # .NET solution
 └── README.md
 ```
@@ -306,6 +351,58 @@ Test coverage:
 ```bash
 dotnet test
 ```
+
+### Lakehouse & Governance (Python `unittest` & Claims Linter)
+```bash
+# Run Lakehouse transformation, k-anonymity & SQLite compiler tests
+python3 -m unittest discover -s lakehouse/tests -v
+
+# Run automated claims, DDL parity, and privacy invariant linter
+python3 lakehouse/scripts/audit_claims.py
+```
+
+## Databricks & Lakehouse Operations
+
+GradCast Lakehouse runs as a scheduled Medallion ETL and Reverse-ETL job orchestrated via Databricks Asset Bundles (DABs) and provisioned using Terraform.
+
+### 1. Terraform Infrastructure as Code (IaC)
+
+Provision Unity Catalog schemas, storage credentials, and service principal access:
+
+```bash
+cd lakehouse/terraform
+terraform init -backend=false
+terraform validate
+# When targeting a live Databricks workspace:
+# terraform apply
+cd ../..
+```
+
+### 2. Databricks Asset Bundle (DAB) Operations
+
+Validate and deploy the Medallion & Reverse-ETL pipeline job:
+
+```bash
+cd lakehouse
+
+# Validate bundle configuration against Databricks schema
+databricks bundle validate -t dev
+
+# Deploy workflow bundle to development target
+databricks bundle deploy -t dev
+
+# Trigger pipeline run (Bronze -> Silver -> Gold -> k-anonymity views -> Reverse-ETL)
+databricks bundle run -t dev gradcast_medallion_etl_job
+```
+
+For production deployment:
+```bash
+databricks bundle deploy -t prod
+```
+
+### 3. Step-by-Step QA Verification
+
+For detailed end-to-end verification and exploratory testing scenarios, see [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md).
 
 ## Deployment (Fly.io)
 
@@ -343,6 +440,9 @@ Live instance is accessible at **https://gradcast.fly.dev**.
 | GET | `/api/finance/loan-payment?principal=&rate=&termYears=` | Loan amortization |
 | POST | `/api/finance/simulator` | Full budget simulation |
 | GET | `/api/jobs/pulse?cipCode={cip}&cbsa={cbsa}` | Live job openings & salary data |
+| POST | `/api/scenarios/share` | Share anonymous positive financial scenario (SHA-256 client hash) |
+| GET | `/api/scenarios/positive-finds?cbsa=&cipFamily=` | Retrieve top shared positive scenarios |
+| GET | `/api/scenarios/{id}` | Retrieve specific shared scenario |
 
 ## Phase 3 Vision
 
@@ -365,7 +465,7 @@ Live instance is accessible at **https://gradcast.fly.dev**.
 
 Within the [knowthankyew](https://github.com/knowthankyew) portfolio of consumer privacy reality engines:
 - Tools like `lease-audit`, `careCheck`, `paystub-check`, and `mailStripper` enforce ultra-strict client-side sandbox execution, air-gapped zero-egress policies, and volatile memory burnability because they ingest **sensitive, private, confidential personal records** (leases, medical bills, paystubs, personal emails).
-- **GradCast is the inherently public civic consequence engine in the portfolio.** It queries open public data (U.S. Department of Education, IPEDS, HUD FMR) to demystify college costs and projected earnings. It does not collect private user documents, requires no user authentication, retains zero user profiles, and saves budget simulations exclusively to the user's browser `localStorage`. It is intentionally designed for open web exploration and public access.
+- **GradCast is the inherently public civic consequence engine in the portfolio.** It queries open public data (U.S. Department of Education, IPEDS, HUD FMR) to demystify college costs and projected earnings. It collects no private user documents, requires no user authentication, and maintains zero user profiles or tracking accounts. Personal budget simulations remain strictly client-side in the user's browser `localStorage` by default; when a user voluntarily publishes an anonymous scenario via `/api/scenarios/share`, the financial payload is persisted while client identity is protected via a one-way daily-salted SHA-256 hash (`SHA256(date + ip + salt)`) before entering the Dual-Mode Lakehouse tier. It is intentionally designed for open web exploration and civic access.
 
 ## License
 
