@@ -1,5 +1,5 @@
 <!-- diagram-meta
-  last-validated: 2026-10-19
+  last-validated: 2026-10-24
   covers: [src/**, lakehouse/**]
   generated-by: manual
 -->
