@@ -109,7 +109,7 @@ jobs:
 
       - name: Execute Claims & Invariant Linter Gate
         run: |
-          python3 lakehouse/scripts/audit_claims.py
+          python3 scripts/audit-claims.py
 
       - name: Generate Lakehouse CycloneDX SBOM
         run: |
