@@ -1,5 +1,6 @@
 <!-- diagram-meta
-  last-validated: 2026-10-24
+  last-validated: 2026-10-26
+  validated-commit: 18765e9
   covers: [src/**, lakehouse/**]
   generated-by: manual
 -->
@@ -36,7 +37,7 @@ flowchart TD
     subgraph BackendAPI["3. .NET 10 Application Tier (:5000)"]
         Importer["⚙️ Import Job Runner<br/><code>src/import</code>"]
         NetAPI[".NET 10 Minimal API<br/><code>src/api/Program.cs</code>"]
-        DataLayer["💾 Data Repository & SQLite Cache<br/><code>src/data/gradcast.db</code>"]
+        DataLayer["💾 Data Repository & SQLite Cache<br/><code>src/data/SqliteDatabaseInitializer.cs</code>"]
         Telemetry["🛡️ KnowThankYew.Privacy.Telemetry<br/><i>(ActivitySource + OTel SDK)</i>"]
     end
 

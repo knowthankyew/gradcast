@@ -23,7 +23,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 DEV_ROOT = REPO_ROOT.parent
 
 PROHIBITED_WORDS = [
-    re.compile(r"\bbulletproof\b", re.IGNORECASE),
+    re.compile(r"\bbullet-?proof\b", re.IGNORECASE),
+    re.compile(r"\brock\s+solid\b", re.IGNORECASE),
     re.compile(r"\bconclusive\b", re.IGNORECASE),
     re.compile(r"\bdefinitive\b", re.IGNORECASE),
     re.compile(r"\binfinitely scalable\b", re.IGNORECASE),
