@@ -1,6 +1,6 @@
 <!-- diagram-meta
   last-validated: 2026-10-26
-  validated-commit: 56806fa
+  validated-commit: 6ff1c04
   covers: [src/**, lakehouse/**]
   generated-by: manual
 -->
