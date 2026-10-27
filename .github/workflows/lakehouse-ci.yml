@@ -7,20 +7,32 @@ on:
     paths:
       - 'lakehouse/**'
       - 'src/**'
+      - 'scripts/**'
+      - 'docs/**'
       - '.github/workflows/lakehouse-ci.yml'
-      - 'docs/SCHEMA.md'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'Dockerfile'
+      - 'NOTICE.md'
       - 'ROADMAP.md'
       - 'README.md'
+      - '**/*.md'
   pull_request:
     branches:
       - main
     paths:
       - 'lakehouse/**'
       - 'src/**'
+      - 'scripts/**'
+      - 'docs/**'
       - '.github/workflows/lakehouse-ci.yml'
-      - 'docs/SCHEMA.md'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'Dockerfile'
+      - 'NOTICE.md'
       - 'ROADMAP.md'
       - 'README.md'
+      - '**/*.md'
   workflow_dispatch:
 
 jobs:
