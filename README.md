@@ -32,7 +32,7 @@ A proof-of-concept web application that helps students simulate their financial 
 - **Enterprise Lakehouse (Databricks / Unity Catalog)**: Serves as the Single Source of Truth (SSOT). Ingests raw multi-gigabyte College Scorecard and IPEDS archives via Auto Loader, applies Liquid Clustering and Delta Change Data Feed (CDF), and computes Gold dimensional models.
 - **k-Anonymity Cloud Boundary (k ≥ 5)**: Enforces row-level cohort suppression in `v_public_positive_finds` so student cohorts smaller than 5 individuals are never exposed.
 - **Reverse-ETL SQLite Compiler**: A scheduled PySpark pipeline compiles Gold analytics into an edge-optimized, indexed SQLite database (`community_scenario_benchmarks`).
-- **Full Architecture & Schema Specifications**: See [`docs/SCHEMA.md`](docs/SCHEMA.md), [`ROADMAP.md`](ROADMAP.md), and [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md).
+- **Full Architecture & Schema Specifications**: See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/SCHEMA.md`](docs/SCHEMA.md), [`ROADMAP.md`](ROADMAP.md), and [`docs/QA_CHECKLIST.md`](docs/QA_CHECKLIST.md).
 
 ### Phase 1: College Data Explorer
 - Type-ahead school search with optional state filtering
@@ -320,7 +320,10 @@ gradcast/
 │   │   └── e2e/                          # Reverse-ETL SQLite compiler integration tests
 │   └── scripts/
 │       └── audit_claims.py               # Claims, DDL parity & privacy invariant linter
+├── scripts/
+│   └── audit-claims.py                   # Portfolio-standard claims & invariant linter entrypoint
 ├── docs/                                 # Technical architecture & governance specifications
+│   ├── ARCHITECTURE.md                   # System architecture, diagrams & invariant specification
 │   ├── SCHEMA.md                         # Unity Catalog & SQLite schema DDL specification
 │   ├── QA_CHECKLIST.md                   # Manual & automated QA verification runbook
 │   └── PRIVACY_TELEMETRY_SCHEMA.md       # Consumer privacy schema standards
@@ -354,11 +357,12 @@ dotnet test
 
 ### Lakehouse & Governance (Python `unittest` & Claims Linter)
 ```bash
-# Run Lakehouse transformation, k-anonymity & SQLite compiler tests
+# Run Lakehouse transformation, k-anonymity, reverse-ETL & claims linter unit tests
 python3 -m unittest discover -s lakehouse/tests -v
 
-# Run automated claims, DDL parity, and privacy invariant linter
-python3 lakehouse/scripts/audit_claims.py
+# Run automated claims, DDL parity, supply-chain, and privacy invariant linter
+python3 scripts/audit-claims.py
+# (or via lakehouse path: python3 lakehouse/scripts/audit_claims.py)
 ```
 
 ## Databricks & Lakehouse Operations
