@@ -34,14 +34,21 @@ public class CollegeScorecardService : ICollegeScorecardService
     {
         EnsureApiKeyConfigured();
 
+        var parsed = SearchQueryParser.Parse(query);
+        if (parsed.IsEmpty)
+        {
+            return [];
+        }
+
+        var upstreamQuery = string.Join(' ', parsed.AllSqlFilterTerms);
         var url = $"{_options.BaseUrl}/schools?api_key={_options.ApiKey}" +
-                  $"&school.name={Uri.EscapeDataString(query)}" +
+                  $"&school.name={Uri.EscapeDataString(upstreamQuery)}" +
                   $"&fields=id,school.name,school.city,school.state" +
-                  $"&per_page=10";
+                  $"&per_page={LocalCollegeScorecardService.MaxSearchResults}";
 
         if (!string.IsNullOrWhiteSpace(state))
         {
-            url += $"&school.state={Uri.EscapeDataString(state)}";
+            url += $"&school.state={Uri.EscapeDataString(state.Trim().ToUpperInvariant())}";
         }
 
         var response = await _httpClient.GetAsync(url, ct);
@@ -62,7 +69,26 @@ public class CollegeScorecardService : ICollegeScorecardService
             ));
         }
 
-        return schools;
+        if (parsed.ExactPhrases.Count > 0)
+        {
+            // Enforce exact word-boundary matching for double-quoted phrases while preserving alias behavior for unquoted queries
+            var exactOnlyQuery = new ParsedSearchQuery(
+                parsed.RawQuery,
+                parsed.NormalizedFullText,
+                parsed.ExactPhrases,
+                Array.Empty<string>());
+
+            schools = schools
+                .Where(s => exactOnlyQuery.Matches(s.Name, s.City, s.State, $"{s.City}, {s.State}"))
+                .ToList();
+        }
+
+        return schools
+            .Select((s, index) => (School: s, Tier: parsed.ComputeMatchTier(s.Name), Index: index))
+            .OrderBy(x => x.Tier)
+            .ThenBy(x => x.Index)
+            .Select(x => x.School)
+            .ToList();
     }
 
     public async Task<SchoolDetail?> GetSchoolDetailAsync(int schoolId, int? year = null, CancellationToken ct = default)

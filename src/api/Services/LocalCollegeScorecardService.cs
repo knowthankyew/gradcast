@@ -1,4 +1,5 @@
 using System.Data.Common;
+using System.Text;
 using Dapper;
 using GradCast.Api.Models;
 using GradCast.Data;
@@ -12,6 +13,8 @@ namespace GradCast.Api.Services;
 /// </summary>
 public class LocalCollegeScorecardService : ICollegeScorecardService
 {
+    public const int MaxSearchResults = 25;
+
     private readonly ISqliteConnectionFactory _dbFactory;
     private readonly ILogger<LocalCollegeScorecardService> _logger;
 
@@ -24,35 +27,81 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
     public async Task<IReadOnlyList<SchoolSearchResult>> SearchSchoolsAsync(
         string query, string? state, CancellationToken ct = default)
     {
-        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
-        const string sql = """
-            SELECT id, name, city, state
-            FROM schools
-            WHERE name LIKE @Query
-              AND (@State IS NULL OR state = @State)
-            ORDER BY name ASC
-            LIMIT 10;
-        """;
-
-        await using var reader = await conn.ExecuteReaderAsync(
-            new CommandDefinition(sql, new
-            {
-                Query = $"%{query}%",
-                State = string.IsNullOrWhiteSpace(state) ? null : state
-            }, cancellationToken: ct));
-
-        var results = new List<SchoolSearchResult>();
-        while (await reader.ReadAsync(ct))
+        var parsed = SearchQueryParser.Parse(query);
+        if (parsed.IsEmpty)
         {
-            results.Add(new SchoolSearchResult(
-                reader.GetInt32(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetString(3)
-            ));
+            return Array.Empty<SchoolSearchResult>();
         }
 
-        return results;
+        var parameters = new DynamicParameters();
+        parameters.Add("State", string.IsNullOrWhiteSpace(state) ? null : state.Trim().ToUpperInvariant());
+
+        var sqlBuilder = new StringBuilder("""
+            SELECT s.id,
+                   s.name,
+                   s.city,
+                   s.state,
+                   COALESCE((SELECT MAX(y.student_size) FROM school_year_data y WHERE y.school_id = s.id), 0) AS max_student_size
+            FROM schools s
+            WHERE (@State IS NULL OR UPPER(s.state) = @State)
+            """);
+
+        var paramIndex = 0;
+        foreach (var phrase in parsed.ExactPhrases)
+        {
+            var paramName = $"p{paramIndex++}";
+            parameters.Add(paramName, SearchQueryParser.ToUnanchoredLikePattern(phrase));
+            sqlBuilder.AppendLine();
+            sqlBuilder.Append(
+                $"  AND (s.name LIKE @{paramName} ESCAPE '\\' OR s.city LIKE @{paramName} ESCAPE '\\' OR s.state LIKE @{paramName} ESCAPE '\\' OR (s.city || ', ' || s.state) LIKE @{paramName} ESCAPE '\\')");
+        }
+
+        foreach (var term in parsed.FuzzyTerms)
+        {
+            var paramName = $"p{paramIndex++}";
+            parameters.Add(paramName, SearchQueryParser.ToUnanchoredLikePattern(term));
+            sqlBuilder.AppendLine();
+            sqlBuilder.Append(
+                $"  AND (s.name LIKE @{paramName} ESCAPE '\\' OR s.city LIKE @{paramName} ESCAPE '\\' OR s.state LIKE @{paramName} ESCAPE '\\')");
+        }
+
+        sqlBuilder.Append(';');
+
+        await using var conn = await _dbFactory.CreateOpenConnectionAsync(ct);
+        await using var reader = await conn.ExecuteReaderAsync(
+            new CommandDefinition(sqlBuilder.ToString(), parameters, cancellationToken: ct));
+
+        var candidates = new List<SchoolSearchCandidate>();
+        while (await reader.ReadAsync(ct))
+        {
+            var id = reader.GetInt32(0);
+            var name = reader.GetString(1);
+            var city = reader.GetString(2);
+            var schoolState = reader.GetString(3);
+            var maxStudentSize = reader.IsDBNull(4) ? 0 : reader.GetInt32(4);
+
+            if (!parsed.Matches(name, city, schoolState, $"{city}, {schoolState}"))
+            {
+                continue;
+            }
+
+            candidates.Add(new SchoolSearchCandidate(
+                id,
+                name,
+                city,
+                schoolState,
+                parsed.ComputeMatchTier(name),
+                maxStudentSize));
+        }
+
+        return candidates
+            .OrderBy(c => c.MatchTier)
+            .ThenByDescending(c => c.MaxStudentSize)
+            .ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(c => c.Id)
+            .Take(MaxSearchResults)
+            .Select(c => new SchoolSearchResult(c.Id, c.Name, c.City, c.State))
+            .ToList();
     }
 
     public async Task<bool> HasYearDataAsync(int schoolId, int year, CancellationToken ct = default)
@@ -168,6 +217,14 @@ public class LocalCollegeScorecardService : ICollegeScorecardService
 
         return points;
     }
+
+    private sealed record SchoolSearchCandidate(
+        int Id,
+        string Name,
+        string City,
+        string State,
+        int MatchTier,
+        int MaxStudentSize);
 
     private sealed class ProgramRow
     {

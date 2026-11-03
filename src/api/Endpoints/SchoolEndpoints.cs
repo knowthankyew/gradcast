@@ -29,11 +29,21 @@ public static class SchoolEndpoints
         ICollegeScorecardService service,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(query) || query.Length < 2)
+        if (string.IsNullOrWhiteSpace(query) ||
+            query.Length > SearchQueryParser.MaxQueryLength ||
+            SearchQueryParser.GetEffectiveLength(query) < 2)
         {
             return Results.Problem(
                 title: "Invalid query",
-                detail: "Search query must be at least 2 characters.",
+                detail: $"Search query must be between 2 and {SearchQueryParser.MaxQueryLength} characters.",
+                statusCode: 400);
+        }
+
+        if (!string.IsNullOrWhiteSpace(state) && !SearchQueryParser.IsValidStateCode(state))
+        {
+            return Results.Problem(
+                title: "Invalid state",
+                detail: "State must be a valid two-letter U.S. state or territory code.",
                 statusCode: 400);
         }
 
