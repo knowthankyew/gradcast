@@ -107,4 +107,61 @@ public class LocationServiceTests
             }
         }
     }
+
+    [Fact]
+    public async Task SearchLocationsAsyncSupportsUnanchoredMultiTokenStateAndExactQuotes()
+    {
+        var databasePath = Path.Combine(Path.GetTempPath(), $"gradcast-loc-search-{Guid.NewGuid():N}.db");
+
+        try
+        {
+            var factory = new SqliteConnectionFactory(databasePath);
+            await using (var conn = await factory.CreateOpenConnectionAsync())
+            {
+                await SqliteDatabaseInitializer.InitializeAsync(conn);
+
+                await conn.ExecuteAsync("""
+                    INSERT INTO cbsa_locations (cbsa_code, name, state, type) VALUES
+                    ('12420', 'Austin-Round Rock-Georgetown', 'TX', 'Metropolitan'),
+                    ('14454', 'Brockton-Bridgewater-Easton', 'MA', 'Metropolitan'),
+                    ('30780', 'Little Rock-North Little Rock-Conway', 'AR', 'Metropolitan'),
+                    ('35620', 'New York-Newark-Jersey City', 'NY-NJ-PA', 'Metropolitan'),
+                    ('49620', 'York-Hanover', 'PA', 'Metropolitan');
+                """);
+            }
+
+            var service = new LocationService(factory);
+
+            // Multi-token across name + state
+            var austinTx = await service.SearchLocationsAsync("Austin, TX");
+            Assert.Single(austinTx);
+            Assert.Equal("12420", austinTx[0].CbsaCode);
+
+            // Unanchored mid/end-of-string token
+            var georgetown = await service.SearchLocationsAsync("town");
+            Assert.Single(georgetown);
+            Assert.Equal("12420", georgetown[0].CbsaCode);
+
+            // Unquoted "rock" matches mid-word "Brockton" as well as "Round Rock" and "Little Rock"
+            var unquotedRock = await service.SearchLocationsAsync("rock");
+            Assert.Equal(3, unquotedRock.Count);
+
+            // Double-quoted "rock" matches only exact word "Rock" and excludes "Brockton"
+            var quotedRock = await service.SearchLocationsAsync("\"rock\"");
+            Assert.Equal(2, quotedRock.Count);
+            Assert.DoesNotContain(quotedRock, r => r.Name.Contains("Brockton"));
+
+            // Double-quoted "New York" excludes "York-Hanover"
+            var quotedNewYork = await service.SearchLocationsAsync("\"New York\"");
+            Assert.Single(quotedNewYork);
+            Assert.Equal("35620", quotedNewYork[0].CbsaCode);
+        }
+        finally
+        {
+            if (File.Exists(databasePath))
+            {
+                File.Delete(databasePath);
+            }
+        }
+    }
 }

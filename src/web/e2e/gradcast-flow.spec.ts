@@ -229,5 +229,73 @@ test.describe('GradCast Core User Flow', () => {
     await expect(page.getByText('Pending Salary Input')).not.toBeVisible()
     await expect(page.getByText('Reset')).toBeVisible()
   })
+
+  test('supports unanchored search, double-quoted exact matching, and mid-word state filtering across comboboxes', async ({ page }) => {
+    const capturedSchoolQueries: Array<{ q: string | null; state: string | null }> = []
+    await page.route('**/api/schools/search*', async (route) => {
+      const url = new URL(route.request().url())
+      capturedSchoolQueries.push({
+        q: url.searchParams.get('q'),
+        state: url.searchParams.get('state'),
+      })
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 1001,
+            name: 'The University of Texas at Austin',
+            city: 'Austin',
+            state: 'TX',
+          },
+        ]),
+      })
+    })
+
+    const schoolInput = page.getByPlaceholder('Start typing a school name...')
+    await expect(schoolInput).toHaveAttribute('autocorrect', 'off')
+    await expect(schoolInput).toHaveAttribute('autocapitalize', 'off')
+    await expect(schoolInput).toHaveAttribute('spellcheck', 'false')
+
+    // 1. Typing just quotes or 1 effective char inside quotes should NOT trigger API search
+    await schoolInput.fill('"T')
+    await page.waitForTimeout(400)
+    expect(capturedSchoolQueries).toHaveLength(0)
+
+    // 2. Filter by state autocomplete supports mid-word unanchored search ("exas" -> "TX — Texas")
+    const stateInput = page.getByRole('combobox', { name: 'Filter by state' })
+    await stateInput.click()
+    await stateInput.fill('exas')
+    await page.getByRole('option', { name: /TX — Texas/i }).click()
+
+    // 3. Double-quoted exact phrase + unanchored token triggers search with state=TX
+    await schoolInput.fill('"University of Texas" Austin')
+    const option = page.getByRole('option', { name: /The University of Texas at Austin/i })
+    await expect(option).toBeVisible()
+    expect(capturedSchoolQueries.some((c) => c.q === '"University of Texas" Austin' && c.state === 'TX')).toBe(true)
+    await option.click()
+
+    // 4. Program search supports unanchored mid-word tokens AND double-quoted exact word boundaries
+    const programSearch = page.getByLabel('Search programs by name', { exact: true })
+    await expect(programSearch).toHaveAttribute('autocorrect', 'off')
+    await expect(programSearch).toHaveAttribute('spellcheck', 'false')
+
+    // Mid-word "eer" matches "Engineering, General" when unquoted
+    await programSearch.fill('eer')
+    await expect(page.getByText('Showing 1 of 3 programs matching "eer"')).toBeVisible()
+    await expect(page.getByRole('row', { name: /Engineering, General/i })).toBeVisible()
+
+    // Quoted '"eer"' enforces word boundaries and excludes mid-word substring matches
+    await programSearch.fill('"eer"')
+    await expect(page.getByText('No matching programs found')).toBeVisible()
+
+    // Multi-token unanchored "science bachelor" matches across program title and credential name
+    await programSearch.fill('science bachelor')
+    await expect(page.getByRole('row', { name: /Computer Science/i })).toBeVisible()
+
+    // Quoted '"Computer Science"' matches exact phrase
+    await programSearch.fill('"Computer Science"')
+    await expect(page.getByRole('row', { name: /Computer Science/i })).toBeVisible()
+  })
 })
 

@@ -65,6 +65,9 @@
             prepend-inner-icon="mdi-magnify"
             clearable
             hide-details
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
           />
         </v-col>
         <v-col cols="12" sm="5" class="d-flex align-center justify-sm-end">
@@ -240,6 +243,7 @@ import type { ProgramData, ProgramCategory } from '../types'
 import { cipCategories } from '../data/cipCategories'
 import { useAppStore } from '../stores/appStore'
 import { formatCurrency } from '../utils/format'
+import { matchesSearchQuery, parseSearchQuery } from '../utils/searchQuery'
 
 const props = defineProps<{
   programs: ProgramData[]
@@ -251,17 +255,22 @@ const hasAnyProgramEarnings = computed(() => props.programs.some((p) => p.median
 
 const searchQuery = ref('')
 const openedPanels = ref<string[]>([])
+const parsedProgramSearch = computed(() => parseSearchQuery(searchQuery.value))
 
 const filteredPrograms = computed(() => {
   let list = props.programs
   if (store.hideMissingProgramData) {
     list = list.filter((p) => p.medianEarnings != null)
   }
-  const q = searchQuery.value.trim().toLowerCase()
-  if (q) {
+  if (!parsedProgramSearch.value.isEmpty) {
     list = list.filter((p) => {
-      const categoryName = cipCategories[p.code.substring(0, 2)]?.toLowerCase() || ''
-      return p.title.toLowerCase().includes(q) || categoryName.includes(q)
+      const categoryName = cipCategories[p.code.substring(0, 2)] || ''
+      return matchesSearchQuery(parsedProgramSearch.value, [
+        p.title,
+        categoryName,
+        p.credentialName,
+        p.code,
+      ])
     })
   }
   return list
@@ -326,10 +335,15 @@ watch(
 )
 
 // Auto-expand all categories when searching so matching programs are visible
-watch(searchQuery, (newQuery) => {
-  if (newQuery.trim().length > 0) {
-    openedPanels.value = categories.value.map((c) => c.code)
-  } else {
+watch([parsedProgramSearch, categories], ([parsed, cats]) => {
+  if (!parsed.isEmpty) {
+    openedPanels.value = cats.map((c) => c.code)
+  }
+})
+
+watch(parsedProgramSearch, (parsed, prevParsed) => {
+  if (parsed.isEmpty && prevParsed && !prevParsed.isEmpty) {
+    openedPanels.value = []
     expandSelectedCategory()
   }
 })

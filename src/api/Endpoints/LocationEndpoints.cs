@@ -53,11 +53,12 @@ public static class LocationEndpoints
         ILocationService service,
         CancellationToken ct)
     {
-        if (!string.IsNullOrWhiteSpace(query) && query.Trim().Length == 1)
+        if (!string.IsNullOrWhiteSpace(query) &&
+            (query.Length > SearchQueryParser.MaxQueryLength || SearchQueryParser.GetEffectiveLength(query) < 2))
         {
             return Results.Problem(
                 title: "Invalid query",
-                detail: "Search query must be at least 2 characters.",
+                detail: $"Search query must be between 2 and {SearchQueryParser.MaxQueryLength} characters.",
                 statusCode: 400);
         }
 

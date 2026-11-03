@@ -40,10 +40,15 @@
             return-object
             label="Search metro areas"
             placeholder="Start typing a city or metro area..."
+            hint="Matches anywhere in metro or state • Use &quot;quotes&quot; for exact match"
             prepend-inner-icon="mdi-city"
             variant="outlined"
             clearable
             no-filter
+            maxlength="200"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
             @update:model-value="onLocationSelected"
           >
             <template #selection="{ item }">
@@ -67,7 +72,7 @@
             </template>
             <template #no-data>
               <div class="pa-4 text-caption text-medium-emphasis text-center">
-                <div v-if="searchQuery && searchQuery.trim().length === 1">
+                <div v-if="searchQuery && searchQuery.trim().length > 0 && effectiveSearchLength < 2">
                   Type at least 2 characters to search across U.S. metro areas.
                 </div>
                 <div v-else-if="store.hideMissingLocationData">
@@ -83,7 +88,7 @@
                     </v-btn>
                   </div>
                 </div>
-                <div v-else-if="searchQuery && searchQuery.trim().length >= 2">
+                <div v-else-if="effectiveSearchLength >= 2">
                   No matching metro areas found for "{{ searchQuery }}".
                 </div>
                 <div v-else>
@@ -122,6 +127,7 @@
 import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useAppStore, type LocationSelection } from '../stores/appStore'
 import { formatCurrency } from '../utils/format'
+import { getEffectiveSearchLength } from '../utils/searchQuery'
 
 interface LocationResult {
   cbsaCode: string
@@ -140,6 +146,7 @@ const selectedItem = ref<LocationResult | null>(null)
 const results = ref<LocationResult[]>([])
 const loading = ref(false)
 const housingChoice = ref<'1bed' | '2bed'>(store.housingType)
+const effectiveSearchLength = computed(() => getEffectiveSearchLength(searchQuery.value))
 
 const items = computed(() => {
   if (selectedItem.value && !results.value.some((r) => r.cbsaCode === selectedItem.value?.cbsaCode)) {
@@ -156,21 +163,22 @@ function fetchLocations(val: string) {
   if (abortController) abortController.abort()
 
   const trimmed = val ? val.trim() : ''
+  const effectiveLen = getEffectiveSearchLength(trimmed)
 
-  // If user typed only 1 character, wait for the next character
-  if (trimmed.length === 1) {
+  // If user typed < 2 searchable characters (e.g. "a" or opening quote '"'), wait for more input
+  if (trimmed.length > 0 && effectiveLen < 2) {
     return
   }
 
   // Preload immediately without delay when empty, debounce when typing
-  const delay = trimmed.length >= 2 ? 300 : 0
+  const delay = effectiveLen >= 2 ? 300 : 0
 
   debounceTimer = setTimeout(async () => {
     loading.value = true
     abortController = new AbortController()
     try {
       const requireHousingParam = store.hideMissingLocationData ? '&requireHousing=true' : ''
-      const qParam = trimmed.length >= 2 ? `q=${encodeURIComponent(trimmed)}` : ''
+      const qParam = effectiveLen >= 2 ? `q=${encodeURIComponent(trimmed)}` : ''
       const queryPart = qParam ? `${qParam}${requireHousingParam}` : (requireHousingParam ? requireHousingParam.slice(1) : '')
       const url = queryPart ? `/api/locations/search?${queryPart}` : '/api/locations/search'
 
