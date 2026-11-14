@@ -11,7 +11,7 @@ COPY src/web/ ./
 RUN npm run build
 
 # ── Stage 2: Build & Publish Backend ───────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS api-build
+FROM mcr.microsoft.com/dotnet/sdk:11.0-alpine AS api-build
 WORKDIR /app
 
 # Copy solution, CPM definitions, and project definitions for caching restore
